@@ -1,13 +1,17 @@
-import 'dart:io';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart'; // kIsWeb
+import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:smeet_app/widgets/location_search_field.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // supabase package defaults to AuthFlowType.pkce; no need to pass authOptions.
   await Supabase.initialize(
     url: 'https://gjaljqqvtxfqddmtyxgt.supabase.co',
     anonKey:
@@ -86,16 +90,9 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Supabase.instance.client.auth;
-
-    return StreamBuilder<AuthState>(
-      stream: auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final session = auth.currentSession;
-        if (session != null) return const SmeetShell();
-        return const AuthPage();
-      },
-    );
+    // Guest mode: never block app access behind login.
+    // Individual pages/actions will call `_ensureLoginAndPrompt` when needed.
+    return const SmeetShell();
   }
 }
 
@@ -127,17 +124,97 @@ class _AuthPageState extends State<AuthPage> {
     try {
       final auth = Supabase.instance.client.auth;
 
+      // Runtime evidence for web auth / CORS debugging (see browser / Flutter console).
+      if (kIsWeb) {
+        debugPrint(
+          '[auth] web origin=${Uri.base.origin} path=${Uri.base.path} '
+          'mode=${_isLogin ? "login" : "signup"}',
+        );
+      }
+      // #region agent log
+      debugPrint(
+        '[agent_ndjson] ${jsonEncode({
+          'sessionId': '2e4d4f',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'location': 'main.dart:_AuthPageState._submit',
+          'message': 'auth_attempt',
+          'hypothesisId': 'H1_origin',
+          'data': {
+            'isWeb': kIsWeb,
+            if (kIsWeb) 'origin': Uri.base.origin,
+            'path': Uri.base.path,
+            'mode': _isLogin ? 'login' : 'signup',
+          },
+        })}',
+      );
+      // #endregion
+
       if (_isLogin) {
         await auth.signInWithPassword(email: email, password: password);
       } else {
-        await auth.signUp(email: email, password: password);
+        // On web, Supabase may require the redirect URL to be on the allow list
+        // (URL Configuration -> Redirect URLs) for email confirmation flows.
+        await auth.signUp(
+          email: email,
+          password: password,
+          emailRedirectTo: kIsWeb ? '${Uri.base.origin}/' : null,
+        );
       }
+      // #region agent log
+      debugPrint(
+        '[agent_ndjson] ${jsonEncode({
+          'sessionId': '2e4d4f',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'location': 'main.dart:_AuthPageState._submit',
+          'message': 'auth_ok',
+          'hypothesisId': 'H0_success',
+          'data': {
+            'isWeb': kIsWeb,
+            if (kIsWeb) 'origin': Uri.base.origin,
+            'mode': _isLogin ? 'login' : 'signup',
+          },
+        })}',
+      );
+      // #endregion
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Auth failed: $e')));
+      debugPrint('[auth] failed: $e');
+      final msg = e.toString();
+      final isWebFetchFail =
+          kIsWeb && msg.contains('Failed to fetch');
+      // #region agent log
+      debugPrint(
+        '[agent_ndjson] ${jsonEncode({
+          'sessionId': '2e4d4f',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'location': 'main.dart:_AuthPageState._submit',
+          'message': 'auth_failed',
+          'hypothesisId': 'H2_fetch_layer',
+          'data': {
+            'isWeb': kIsWeb,
+            if (kIsWeb) 'origin': Uri.base.origin,
+            'errorType': e.runtimeType.toString(),
+            'failedToFetch': isWebFetchFail,
+          },
+        })}',
+      );
+      // #endregion
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 12),
+          content: Text(
+            isWebFetchFail
+                ? '❌ Browser could not reach Supabase (no HTTP status). '
+                    'Use a fixed port: run "Smeet: Chrome (web port 8080)" or '
+                    'flutter run -d chrome --web-port=8080, then in Supabase → '
+                    'Authentication → URL Configuration set Site URL + Redirect URLs '
+                    'for http://localhost:8080 (see WEB_AUTH.md). DevTools → Network '
+                    'for details. Raw: $msg'
+                : '❌ Auth failed: $msg',
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -186,6 +263,19 @@ class _AuthPageState extends State<AuthPage> {
   }
 }
 
+/// Ensures the user is logged in before performing an action.
+/// Returns `true` if the user is logged in, otherwise `false` (e.g. user cancels login).
+Future<bool> _ensureLoginAndPrompt(BuildContext context) async {
+  final auth = Supabase.instance.client.auth;
+  if (auth.currentUser != null) return true;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const AuthPage()),
+  );
+
+  return auth.currentUser != null;
+}
+
 /// Smeet 主框架：底部 5 个 Tab
 class SmeetShell extends StatefulWidget {
   const SmeetShell({super.key});
@@ -231,18 +321,10 @@ class _SmeetShellState extends State<SmeetShell> {
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Put your logo here:
-                  // 1) Save image to: assets/images/Smeet_logo_transparent.png
-                  // 2) Add in pubspec.yaml:
-                  //    flutter:
-                  //      assets:
-                  //        - assets/images/Smeet_logo_transparent.png
                   Image.asset(
                     'assets/images/Smeet_logo_transparent.png',
-
                     height: 26,
                     errorBuilder: (context, error, stackTrace) {
-                      // If asset not added yet, show fallback icon
                       return const Icon(Icons.sports, size: 22);
                     },
                   ),
@@ -256,7 +338,13 @@ class _SmeetShellState extends State<SmeetShell> {
             : Text(_title),
         centerTitle: true,
       ),
-      body: SafeArea(child: _pages[_index]),
+      // Use IndexedStack to keep pages alive when switching tabs
+      body: SafeArea(
+        child: IndexedStack(
+          index: _index,
+          children: _pages,
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
@@ -292,43 +380,42 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  User? get _user => Supabase.instance.client.auth.currentUser;
-
   Future<bool> _ensureLogin() async {
-    if (_user != null) return true;
-
-    // 跳登录页
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const AuthPage()));
-
-    // 回来后再检查是否登录成功
-    return _user != null;
+    // Reuse the shared login gating logic.
+    return _ensureLoginAndPrompt(context);
   }
 
   final ScrollController _scrollCtrl = ScrollController();
   final GlobalKey _upcomingKey = GlobalKey();
   final _formKey = GlobalKey<FormState>();
-  late Future<List<Map<String, dynamic>>> _gamesFuture;
+
+  /// Realtime: `joined_count` / new rows update all clients without refresh.
+  /// Enable replication for table `games` in Supabase → Database → Publications.
+  late Stream<List<Map<String, dynamic>>> _gamesStream;
 
   // Form state
   String _sport = 'Tennis';
   DateTime? _dateTime;
   int _players = 4;
-
-  final _locationCtrl = TextEditingController();
-  final _courtFeeCtrl = TextEditingController(text: '20'); // default
+  LocationResult? _selectedLocation;
+  final _courtFeeCtrl = TextEditingController(text: '20');
 
   @override
   void initState() {
     super.initState();
-    _gamesFuture = _fetchGames();
+    _gamesStream = _fetchGamesStream();
+  }
+
+  Stream<List<Map<String, dynamic>>> _fetchGamesStream() {
+    return Supabase.instance.client
+        .from('games')
+        .stream(primaryKey: ['id'])
+        .order('created_at');
   }
 
   @override
   void dispose() {
     _scrollCtrl.dispose();
-    _locationCtrl.dispose();
     _courtFeeCtrl.dispose();
     super.dispose();
   }
@@ -383,7 +470,19 @@ class _HomePageState extends State<HomePage> {
     }
 
     final dt = _dateTime!;
-    final loc = _locationCtrl.text.trim();
+    if (_selectedLocation == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please pick a location from suggestions'),
+        ),
+      );
+      return;
+    }
+
+    final loc = _selectedLocation!.address;
+    final locLat = _selectedLocation!.lat;
+    final locLng = _selectedLocation!.lng;
     final fee = _courtFee;
     final each = _perPerson;
     final user = Supabase.instance.client.auth.currentUser;
@@ -403,6 +502,8 @@ class _HomePageState extends State<HomePage> {
             'sport': _sport,
             'starts_at': dt.toUtc().toIso8601String(),
             'location_text': loc,
+            'location_lat': locLat,
+            'location_lng': locLng,
             'players': _players,
             'court_fee': fee,
             'per_person': each,
@@ -421,8 +522,9 @@ class _HomePageState extends State<HomePage> {
         _sport = 'Tennis';
         _dateTime = null;
         _players = 4;
-        _locationCtrl.clear();
+        _selectedLocation = null;
         _courtFeeCtrl.text = '20';
+        // List updates via realtime stream (no manual refresh).
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _upcomingKey.currentContext;
@@ -456,6 +558,14 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      if (widget.joinedLocal.contains(gameId)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Already joined')),
+        );
+        return;
+      }
+
       // 1) 读当前 joined_count / players
       final row = await supabase
           .from('games')
@@ -467,8 +577,8 @@ class _HomePageState extends State<HomePage> {
         throw Exception('Game not found or blocked by RLS');
       }
 
-      final joined = (row['joined_count'] ?? 0) as int;
-      final players = (row['players'] ?? 0) as int;
+      final joined = (row['joined_count'] as num?)?.toInt() ?? 0;
+      final players = (row['players'] as num?)?.toInt() ?? 0;
 
       if (joined >= players) {
         if (!mounted) return;
@@ -497,10 +607,9 @@ class _HomePageState extends State<HomePage> {
         context,
       ).showSnackBar(const SnackBar(content: Text('✅ Joined!')));
 
-      // 3) ✅ 刷新 future，让 UI 重新 fetch 最新 joined_count
+      // Realtime stream updates joined_count for everyone; we only track local Joined UI.
       setState(() {
-        widget.joinedLocal.add(gameId); // ✅ 记住已加入
-        _gamesFuture = _fetchGames(); // ✅ 刷新列表
+        widget.joinedLocal.add(gameId);
       });
     } catch (e) {
       if (!mounted) return;
@@ -508,20 +617,6 @@ class _HomePageState extends State<HomePage> {
         context,
       ).showSnackBar(SnackBar(content: Text('❌ Join failed: $e')));
     }
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchGames() async {
-    final supabase = Supabase.instance.client;
-
-    final data = await supabase
-        .from('games')
-        .select(
-          'id, sport, starts_at, location_text, players, joined_count, per_person, created_at',
-        )
-        .order('created_at', ascending: false)
-        .limit(20);
-
-    return (data as List).cast<Map<String, dynamic>>();
   }
 
   @override
@@ -583,7 +678,7 @@ class _HomePageState extends State<HomePage> {
             // Sport
             _SectionCard(
               child: DropdownButtonFormField<String>(
-                value: _sport,
+                initialValue: _sport,
                 decoration: const InputDecoration(
                   labelText: 'Sport',
                   border: OutlineInputBorder(),
@@ -633,17 +728,13 @@ class _HomePageState extends State<HomePage> {
 
             // Location
             _SectionCard(
-              child: TextFormField(
-                controller: _locationCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Location',
-                  hintText: 'e.g. Kalinga Tennis Park',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  final s = (v ?? '').trim();
-                  if (s.isEmpty) return 'Please enter a location';
-                  return null;
+              child: LocationSearchField(
+                supabase: Supabase.instance.client,
+                labelText: 'Location',
+                hintText: 'Search a court, suburb, or full address',
+                initialValue: _selectedLocation,
+                onChanged: (value) {
+                  setState(() => _selectedLocation = value);
                 },
               ),
             ),
@@ -765,10 +856,11 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 10),
 
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _gamesFuture,
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _gamesStream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Center(child: CircularProgressIndicator()),
@@ -780,7 +872,10 @@ class _HomePageState extends State<HomePage> {
                 }
 
                 final games = snapshot.data ?? [];
-                if (games.isEmpty) {
+                // Reverse the list since stream ordering might differ
+                final sortedGames = games.reversed.toList();
+
+                if (sortedGames.isEmpty) {
                   return Text(
                     'No games yet. Create your first one!',
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -788,11 +883,11 @@ class _HomePageState extends State<HomePage> {
                 }
 
                 return Column(
-                  children: games.map((g) {
+                  children: sortedGames.map((g) {
                     final sport = g['sport'] ?? '';
                     final loc = g['location_text'] ?? '';
-                    final players = (g['players'] ?? 0) as int;
-                    final joined = (g['joined_count'] ?? 0) as int;
+                    final players = (g['players'] as num?)?.toInt() ?? 0;
+                    final joined = (g['joined_count'] as num?)?.toInt() ?? 0;
                     final remaining = (players - joined) < 0
                         ? 0
                         : (players - joined);
@@ -819,9 +914,10 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.12),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.12),
                         ),
                       ),
                       child: Row(
@@ -832,15 +928,15 @@ class _HomePageState extends State<HomePage> {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 12),
-
-                          /// 左侧：文字信息
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   '$sport • $players players • \$${perPerson.toStringAsFixed(2)}/pp',
-                                  style: Theme.of(context).textTheme.titleSmall
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
                                       ?.copyWith(fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 4),
@@ -857,15 +953,22 @@ class _HomePageState extends State<HomePage> {
                                 const SizedBox(height: 2),
                                 Text(
                                   'Remaining: $remaining',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: isFull
+                                            ? Colors.red
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                 ),
                               ],
                             ),
                           ),
-
                           const SizedBox(width: 12),
-
-                          /// 右侧：Join 按钮
                           FilledButton(
                             onPressed: (isFull || isJoined)
                                 ? null
@@ -883,8 +986,8 @@ class _HomePageState extends State<HomePage> {
                               isFull
                                   ? 'Full'
                                   : isJoined
-                                  ? 'Joined'
-                                  : 'Join',
+                                      ? 'Joined'
+                                      : 'Join',
                             ),
                           ),
                         ],
@@ -954,7 +1057,27 @@ class _SwipePageState extends State<SwipePage> {
 
   Future<void> _bootstrap() async {
     if (_user == null) {
-      setState(() => _error = 'Please login to use Swipe');
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+
+      try {
+        _myProfile = null;
+        await _loadGuestCandidates();
+        _index = 0;
+      } catch (e) {
+        if (mounted) {
+          setState(() => _error = e.toString());
+        } else {
+          _error = e.toString();
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _loading = false);
+        }
+      }
+
       return;
     }
 
@@ -979,7 +1102,9 @@ class _SwipePageState extends State<SwipePage> {
     final u = _user!;
     final row = await supabase
         .from('profiles')
-        .select('id, display_name, city, intro, avatar_url, sport_levels, availability')
+        .select(
+          'id, display_name, city, intro, avatar_url, sport_levels, availability',
+        )
         .eq('id', u.id)
         .maybeSingle();
 
@@ -988,6 +1113,21 @@ class _SwipePageState extends State<SwipePage> {
     }
 
     _myProfile = row;
+  }
+
+  /// Guest-mode candidate loader (read-only browsing).
+  /// Actions (like/pass) will still require login via `_swipe`.
+  Future<void> _loadGuestCandidates() async {
+    final supabase = Supabase.instance.client;
+
+    final raw = await supabase
+        .from('profiles')
+        .select(
+          'id, display_name, city, intro, avatar_url, sport_levels, availability',
+        )
+        .limit(50);
+
+    _candidates = (raw as List).cast<Map<String, dynamic>>();
   }
 
   // 判断：是否有共同运动
@@ -1040,7 +1180,9 @@ class _SwipePageState extends State<SwipePage> {
     // 2) 拉一批 profiles（简单MVP：先拉 50 个，再本地过滤）
     final raw = await supabase
         .from('profiles')
-        .select('id, display_name, city, intro, avatar_url, sport_levels, availability')
+        .select(
+          'id, display_name, city, intro, avatar_url, sport_levels, availability',
+        )
         .neq('id', u.id)
         .limit(50);
 
@@ -1065,9 +1207,17 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   Future<void> _swipe(String action) async {
-    final u = _user;
     final cur = _current;
-    if (u == null || cur == null) return;
+    if (cur == null) return;
+
+    var u = _user;
+    if (u == null) {
+      // Guest users can browse, but swipe actions require login.
+      final ok = await _ensureLoginAndPrompt(context);
+      if (!ok) return;
+      u = _user;
+    }
+    if (u == null) return;
 
     setState(() => _loading = true);
 
@@ -1076,11 +1226,10 @@ class _SwipePageState extends State<SwipePage> {
       final toUser = cur['id'].toString();
 
       // 1) 写入 swipes（upsert 防止重复）
-      await supabase.from('swipes').upsert({
-        'from_user': u.id,
-        'to_user': toUser,
-        'action': action,
-      });
+      await supabase.from('swipes').upsert(
+        {'from_user': u.id, 'to_user': toUser, 'action': action},
+        onConflict: 'from_user,to_user', // ✅ 就是这一句
+      );
 
       // 2) 如果 Like：检查对方是否也 Like 过我，成立则写入 matches
       if (action == 'like') {
@@ -1093,20 +1242,42 @@ class _SwipePageState extends State<SwipePage> {
             .maybeSingle();
 
         if (back != null) {
-          // 规范化 pair，避免 (a,b) / (b,a) 重复
+          // 1) 规范化 pair，避免重复
           final a = u.id.compareTo(toUser) < 0 ? u.id : toUser;
           final b = u.id.compareTo(toUser) < 0 ? toUser : u.id;
 
-          await supabase.from('matches').upsert({
-            'user_a': a,
-            'user_b': b,
-          });
+          // 2) 写入 matches（你原本就有）
+          await supabase.from('matches').upsert({'user_a': a, 'user_b': b});
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('🎉 Matched!')),
-            );
-          }
+          // 3) ✅ 创建一个 chat
+          final chatRow = await supabase
+              .from('chats')
+              .insert({})
+              .select('id')
+              .single();
+          final chatId = chatRow['id'];
+
+          // 4) ✅ 把双方加入 chat_members
+          await supabase.from('chat_members').insert([
+            {'chat_id': chatId, 'user_id': a},
+            {'chat_id': chatId, 'user_id': b},
+          ]);
+
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('🎉 Matched! Chat created')),
+          );
+
+          // ✅ 直接进入聊天室
+          final otherName = (cur['display_name'] ?? 'Chat').toString();
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ChatRoomPage(chatId: chatId.toString(), title: otherName),
+            ),
+          );
         }
       }
 
@@ -1116,9 +1287,9 @@ class _SwipePageState extends State<SwipePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Swipe failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Swipe failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -1160,31 +1331,6 @@ class _SwipePageState extends State<SwipePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    if (_user == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.swipe, size: 72, color: cs.primary),
-              const SizedBox(height: 12),
-              const Text('Login to use Swipe'),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AuthPage()),
-                  );
-                },
-                child: const Text('Login / Sign up'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     if (_loading && _candidates.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1198,10 +1344,17 @@ class _SwipePageState extends State<SwipePage> {
             children: [
               Text('❌ $_error', textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _bootstrap,
-                child: const Text('Retry'),
-              ),
+              if (_user == null)
+                FilledButton(
+                  onPressed: () async {
+                    final ok = await _ensureLoginAndPrompt(context);
+                    if (!ok) return;
+                    await _bootstrap();
+                  },
+                  child: const Text('Login / Retry'),
+                )
+              else
+                FilledButton(onPressed: _bootstrap, child: const Text('Retry')),
             ],
           ),
         ),
@@ -1226,10 +1379,7 @@ class _SwipePageState extends State<SwipePage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 14),
-              FilledButton(
-                onPressed: _bootstrap,
-                child: const Text('Refresh'),
-              ),
+              FilledButton(onPressed: _bootstrap, child: const Text('Refresh')),
             ],
           ),
         ),
@@ -1267,14 +1417,20 @@ class _SwipePageState extends State<SwipePage> {
                 children: [
                   // 头像/封面
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(22),
+                    ),
                     child: Container(
                       height: 260,
                       width: double.infinity,
                       color: cs.primary.withOpacity(0.08),
                       child: avatar.isEmpty
                           ? Center(
-                              child: Icon(Icons.person, size: 72, color: cs.primary),
+                              child: Icon(
+                                Icons.person,
+                                size: 72,
+                                color: cs.primary,
+                              ),
                             )
                           : Image.network(avatar, fit: BoxFit.cover),
                     ),
@@ -1287,16 +1443,14 @@ class _SwipePageState extends State<SwipePage> {
                       children: [
                         Text(
                           name,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           city.isEmpty ? 'City not set' : city,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: cs.onSurface.withOpacity(0.7)),
                         ),
                         const SizedBox(height: 10),
 
@@ -1306,13 +1460,14 @@ class _SwipePageState extends State<SwipePage> {
                           decoration: BoxDecoration(
                             color: cs.primary.withOpacity(0.06),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: cs.primary.withOpacity(0.12)),
+                            border: Border.all(
+                              color: cs.primary.withOpacity(0.12),
+                            ),
                           ),
                           child: Text(
                             _sportsText(cur),
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
 
@@ -1320,7 +1475,8 @@ class _SwipePageState extends State<SwipePage> {
                           const SizedBox(height: 10),
                           Text(
                             overlap,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   color: cs.secondary,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1374,7 +1530,6 @@ class _SwipePageState extends State<SwipePage> {
   }
 }
 
-
 /// --- 页面 3：My Game（我的局/我的预约） ---
 class MyGamePage extends StatefulWidget {
   final Set<String> joinedLocal;
@@ -1394,6 +1549,9 @@ class _MyGamePageState extends State<MyGamePage> {
   }
 
   Future<void> _leaveGame(String gameId) async {
+    final ok = await _ensureLoginAndPrompt(context);
+    if (!ok) return;
+
     try {
       final supabase = Supabase.instance.client;
 
@@ -1522,6 +1680,7 @@ class _MyGamePageState extends State<MyGamePage> {
 }
 
 /// --- 页面 4：Chat（聊天） ---
+///
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
 
@@ -1566,8 +1725,12 @@ class _ChatPageState extends State<ChatPage> {
     }).toList();
 
     chats.sort((a, b) {
-      final ta = DateTime.tryParse((a['last_message_at'] ?? '')?.toString() ?? '');
-      final tb = DateTime.tryParse((b['last_message_at'] ?? '')?.toString() ?? '');
+      final ta = DateTime.tryParse(
+        (a['last_message_at'] ?? '')?.toString() ?? '',
+      );
+      final tb = DateTime.tryParse(
+        (b['last_message_at'] ?? '')?.toString() ?? '',
+      );
       if (ta == null && tb == null) return 0;
       if (ta == null) return 1;
       if (tb == null) return -1;
@@ -1589,7 +1752,6 @@ class _ChatPageState extends State<ChatPage> {
         .neq('user_id', u.id)
         .limit(1)
         .maybeSingle();
-
     final otherId = other?['user_id']?.toString();
     if (otherId == null) return 'Chat';
 
@@ -1610,31 +1772,6 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    if (_user == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.chat_bubble_outline, size: 72, color: cs.primary),
-              const SizedBox(height: 12),
-              const Text('Login to use Chat'),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AuthPage()),
-                  );
-                },
-                child: const Text('Login / Sign up'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _chatsFuture,
       builder: (context, snapshot) {
@@ -1647,8 +1784,12 @@ class _ChatPageState extends State<ChatPage> {
 
         final chats = snapshot.data ?? [];
         if (chats.isEmpty) {
-          return const Center(
-            child: Text('No chats yet. Match someone first 🙂'),
+          return Center(
+            child: Text(
+              _user == null
+                  ? 'Login to start chatting.'
+                  : 'No chats yet. Match someone first 🙂',
+            ),
           );
         }
 
@@ -1692,12 +1833,15 @@ class _ChatPageState extends State<ChatPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       onTap: () async {
+                        final ok = await _ensureLoginAndPrompt(context);
+                        if (!ok) return;
+                        final title = nameSnap.data ?? 'Chat';
                         await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => ChatRoomPage(chatId: chatId),
+                            builder: (_) =>
+                                ChatRoomPage(chatId: chatId, title: title),
                           ),
                         );
-                        // 返回后刷新一下列表（更新 last message）
                         setState(() => _chatsFuture = _fetchMyChats());
                       },
                     ),
@@ -1714,7 +1858,9 @@ class _ChatPageState extends State<ChatPage> {
 
 class ChatRoomPage extends StatefulWidget {
   final String chatId;
-  const ChatRoomPage({super.key, required this.chatId});
+  final String title; // ✅ 新增这一行
+
+  const ChatRoomPage({super.key, required this.chatId, required this.title});
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -1722,18 +1868,31 @@ class ChatRoomPage extends StatefulWidget {
 
 class _ChatRoomPageState extends State<ChatRoomPage> {
   User? get _user => Supabase.instance.client.auth.currentUser;
-  final _ctrl = TextEditingController();
+
+  final TextEditingController _ctrl = TextEditingController();
+  final ScrollController _listCtrl = ScrollController();
+
+  String _appTitle = 'Chat';
+  int _lastMsgCount = 0;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _listCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _send() async {
-    final u = _user;
     final text = _ctrl.text.trim();
-    if (u == null || text.isEmpty) return;
+    if (text.isEmpty) return;
+
+    var u = _user;
+    if (u == null) {
+      final ok = await _ensureLoginAndPrompt(context);
+      if (!ok) return;
+      u = _user;
+    }
+    if (u == null) return;
 
     try {
       final supabase = Supabase.instance.client;
@@ -1745,9 +1904,55 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       _ctrl.clear();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Send failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Send failed: $e')));
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _appTitle = widget.title.isNotEmpty ? widget.title : 'Chat';
+    _loadOtherName().then((name) {
+      if (mounted) {
+        setState(() => _appTitle = name);
+      }
+    });
+  }
+
+  Future<String> _loadOtherName() async {
+    try {
+      final u = _user;
+      if (u == null) return 'Unknown';
+
+      final supabase = Supabase.instance.client;
+
+      final other = await supabase
+          .from('chat_members')
+          .select('user_id')
+          .eq('chat_id', widget.chatId)
+          .neq('user_id', u.id)
+          .limit(1)
+          .maybeSingle();
+
+      final otherId = other?['user_id']?.toString();
+      if (otherId == null) return 'Unknown';
+
+      final p = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', otherId)
+          .maybeSingle();
+
+      final name = (p?['display_name'] ?? '').toString().trim();
+      if (name.isNotEmpty) {
+        return name;
+      }
+
+      return 'User ${otherId.substring(0, 6)}';
+    } catch (_) {
+      return 'Chat';
     }
   }
 
@@ -1755,12 +1960,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   Widget build(BuildContext context) {
     final u = _user;
     final cs = Theme.of(context).colorScheme;
-
-    if (u == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please login')),
-      );
-    }
 
     // ✅ 实时流：messages 表按 chat_id 过滤
     final stream = Supabase.instance.client
@@ -1770,7 +1969,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         .order('id');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
+      appBar: AppBar(title: Text(_appTitle)),
+
       body: Column(
         children: [
           Expanded(
@@ -1785,24 +1985,46 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   return const Center(child: Text('Say hi 👋'));
                 }
 
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final newCount = msgs.length;
+                  final hasNewMessage = newCount > _lastMsgCount;
+
+                  _lastMsgCount = newCount;
+
+                  if (hasNewMessage && _listCtrl.hasClients) {
+                    _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+                  }
+                });
+
                 return ListView.builder(
+                  controller: _listCtrl,
                   padding: const EdgeInsets.all(12),
                   itemCount: msgs.length,
                   itemBuilder: (context, i) {
                     final m = msgs[i];
-                    final isMe = m['user_id']?.toString() == u.id;
+                    final isMe =
+                        u != null && m['user_id']?.toString() == u.id;
                     final text = (m['content'] ?? '').toString();
 
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMe
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         constraints: const BoxConstraints(maxWidth: 280),
                         decoration: BoxDecoration(
-                          color: isMe ? cs.primary.withOpacity(0.18) : Colors.white,
+                          color: isMe
+                              ? cs.primary.withOpacity(0.18)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.primary.withOpacity(0.10)),
+                          border: Border.all(
+                            color: cs.primary.withOpacity(0.10),
+                          ),
                         ),
                         child: Text(text),
                       ),
@@ -1831,10 +2053,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  FilledButton(
-                    onPressed: _send,
-                    child: const Text('Send'),
-                  ),
+                  FilledButton(onPressed: _send, child: const Text('Send')),
                 ],
               ),
             ),
@@ -1844,7 +2063,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     );
   }
 }
-
 
 /// --- 页面 5：Profile（个人信息） ---
 
@@ -1951,6 +2169,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ..clear()
             ..addAll(sl.map((k, v) => MapEntry(k.toString(), v.toString())));
         }
+        // ✅ 防止已存在的 sport 还留在 dropdown 里
+        if (_sportToAdd != null && _sportLevels.containsKey(_sportToAdd)) {
+          _sportToAdd = null;
+        }
 
         final avail = row['availability'];
         if (avail is Map) {
@@ -2004,7 +2226,6 @@ class _ProfilePageState extends State<ProfilePage> {
         'avatar_url': _avatarUrl,
         'sport_levels': _sportLevels,
         'availability': availabilityJson,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
 
       if (!mounted) return;
@@ -2021,9 +2242,8 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  /// 统一上传到 Storage(media bucket)，返回 public url
-  Future<String> _uploadToMediaBucket(
-    File file, {
+  Future<String> _uploadToMediaBucketXFile(
+    XFile xfile, {
     required String folder,
   }) async {
     final user = _user;
@@ -2032,21 +2252,32 @@ class _ProfilePageState extends State<ProfilePage> {
     final supabase = Supabase.instance.client;
     final uuid = const Uuid().v4();
 
-    final ext = file.path.split('.').last.toLowerCase();
+    final ext = (xfile.name.split('.').last).toLowerCase();
     final path = '${user.id}/$folder/$uuid.$ext';
 
-    await supabase.storage.from('media').upload(path, file);
+    final Uint8List bytes = await xfile.readAsBytes();
 
-    final url = supabase.storage.from('media').getPublicUrl(path);
-    return url;
+    String contentType = 'application/octet-stream';
+    if (ext == 'png') contentType = 'image/png';
+    if (ext == 'jpg' || ext == 'jpeg') contentType = 'image/jpeg';
+    if (ext == 'mp4') contentType = 'video/mp4';
+    if (ext == 'mov') contentType = 'video/quicktime';
+
+    await supabase.storage
+        .from('media')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+
+    return supabase.storage.from('media').getPublicUrl(path);
   }
 
   Future<void> _pickAndUploadAvatar() async {
     if (_user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login to upload avatar')),
-      );
-      return;
+      final ok = await _ensureLoginAndPrompt(context);
+      if (!ok) return;
     }
 
     final picker = ImagePicker();
@@ -2058,7 +2289,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     setState(() => _loading = true);
     try {
-      final url = await _uploadToMediaBucket(File(x.path), folder: 'avatar');
+      final url = await _uploadToMediaBucketXFile(x, folder: 'avatar');
       setState(() => _avatarUrl = url);
       await _saveProfile(); // 上传完顺便保存
     } catch (e) {
@@ -2078,20 +2309,20 @@ class _ProfilePageState extends State<ProfilePage> {
     final supabase = Supabase.instance.client;
     final data = await supabase
         .from('posts')
-        .select('id,caption,media_type,media_url,created_at')
-        .eq('user_id', user.id)
+        .select('id, caption, media_type, media_urls, created_at, author_id')
+        .eq('author_id', user.id)
         .order('created_at', ascending: false);
 
     return (data as List).cast<Map<String, dynamic>>();
   }
 
   Future<void> _createPost({required String mediaType}) async {
-    final user = _user;
+    var user = _user;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please login to post')));
-      return;
+      final ok = await _ensureLoginAndPrompt(context);
+      if (!ok) return;
+      user = _user;
+      if (user == null) return;
     }
 
     final picker = ImagePicker();
@@ -2111,15 +2342,33 @@ class _ProfilePageState extends State<ProfilePage> {
 
     setState(() => _loading = true);
     try {
-      final url = await _uploadToMediaBucket(File(x.path), folder: 'posts');
+      final url = await _uploadToMediaBucketXFile(x, folder: 'posts');
 
       final supabase = Supabase.instance.client;
-      await supabase.from('posts').insert({
-        'user_id': user.id,
-        'caption': caption.trim(),
-        'media_type': mediaType,
-        'media_url': url,
-      });
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please login to post')));
+        return;
+      }
+      final inserted = await supabase
+          .from('posts')
+          .insert({
+            'author_id': user.id,
+            'sport': 'tennis',
+            'visibility': 'public',
+            'media_urls': [url],
+            'media_type': mediaType,
+            'caption': caption.trim(),
+            'content': caption.trim(),
+          })
+          .select('id, author_id, created_at')
+          .single();
+
+      debugPrint('✅ INSERT OK => $inserted');
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -2395,30 +2644,43 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ?.copyWith(fontWeight: FontWeight.w900),
                                 ),
                                 const SizedBox(height: 10),
-                                DropdownButtonFormField<String>(
-                                  value: _sportToAdd,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Choose a sport',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  items: _sports
-                                      .where(
-                                        (s) => !_sportLevels.containsKey(s),
-                                      )
-                                      .map(
-                                        (s) => DropdownMenuItem(
-                                          value: s,
-                                          child: Text(s),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) =>
-                                      setState(() => _sportToAdd = v),
+                                // ✅ 防止 Dropdown value 不在 items 里导致红屏
+                                Builder(
+                                  builder: (context) {
+                                    final availableSports = _sports
+                                        .where(
+                                          (s) => !_sportLevels.containsKey(s),
+                                        )
+                                        .toList();
+                                    final safeValue =
+                                        availableSports.contains(_sportToAdd)
+                                        ? _sportToAdd
+                                        : null;
+
+                                    return DropdownButtonFormField<String>(
+                                      initialValue: safeValue,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Choose a sport',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: availableSports
+                                          .map(
+                                            (s) => DropdownMenuItem(
+                                              value: s,
+                                              child: Text(s),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) =>
+                                          setState(() => _sportToAdd = v),
+                                    );
+                                  },
                                 ),
+
                                 const SizedBox(height: 10),
                                 if (_sportToAdd != null)
                                   DropdownButtonFormField<String>(
-                                    value:
+                                    initialValue:
                                         _sportLevels[_sportToAdd!] ??
                                         _levels.first,
                                     decoration: InputDecoration(
@@ -2461,8 +2723,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                         onDeleted: () {
                                           setState(() {
                                             _sportLevels.remove(e.key);
-                                            if (_sportToAdd == e.key)
+                                            if (_sportToAdd == e.key) {
                                               _sportToAdd = null;
+                                            }
                                           });
                                         },
                                       );
@@ -2601,11 +2864,23 @@ class _ProfilePageState extends State<ProfilePage> {
                                 itemCount: posts.length,
                                 itemBuilder: (context, i) {
                                   final p = posts[i];
-                                  final caption =
-                                      (p['caption'] ?? '') as String;
-                                  final type =
-                                      (p['media_type'] ?? 'image') as String;
-                                  final url = (p['media_url'] ?? '') as String;
+
+                                  // 1) 读字段
+                                  final caption = (p['caption'] ?? '')
+                                      .toString();
+                                  final type = (p['media_type'] ?? 'image')
+                                      .toString()
+                                      .toLowerCase();
+
+                                  // ✅ 正确：从 media_urls 数组里取
+                                  final List mediaUrls =
+                                      (p['media_urls'] ?? []) as List;
+                                  final String url = mediaUrls.isNotEmpty
+                                      ? mediaUrls.first.toString()
+                                      : '';
+
+                                  // 2) ✅ Debug：看类型和URL到底是什么
+                                  debugPrint('POST[$i] type=$type url=$url');
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
@@ -2623,36 +2898,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        if (type == 'image')
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            child: AspectRatio(
-                                              aspectRatio: 4 / 3,
-                                              child: Image.network(
-                                                url,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          )
-                                        else
-                                          Container(
-                                            height: 220,
-                                            alignment: Alignment.center,
-                                            decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withOpacity(0.08),
-                                            ),
-                                            child: const Icon(
-                                              Icons.play_circle_outline,
-                                              size: 56,
-                                            ),
-                                          ),
+                                        // 3) ✅ 用 _PostMedia 统一渲染 image / video（视频可直接点播）
+                                        _PostMedia(type: type, url: url),
+
                                         const SizedBox(height: 10),
                                         Text(caption),
                                       ],
@@ -2751,6 +2999,320 @@ class _PlaceholderPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PostMedia extends StatefulWidget {
+  final String type; // 'image' | 'video'
+  final String url;
+
+  const _PostMedia({required this.type, required this.url});
+
+  @override
+  State<_PostMedia> createState() => _PostMediaState();
+}
+
+class _PostMediaState extends State<_PostMedia> {
+  VideoPlayerController? _vc;
+  Future<void>? _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _setup();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PostMedia oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 如果类型或URL变了，重新初始化 controller
+    if (oldWidget.url != widget.url || oldWidget.type != widget.type) {
+      _disposeVc();
+      _setup();
+    }
+  }
+
+  void _setup() {
+    if (widget.type != 'video' || widget.url.isEmpty) return;
+
+    final uri = Uri.parse(widget.url);
+    _vc = VideoPlayerController.networkUrl(uri);
+    _initFuture = _vc!.initialize().then((_) {
+      // 可选：默认静音，避免刷屏有声音
+      _vc!.setVolume(0);
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _disposeVc() {
+    _vc?.dispose();
+    _vc = null;
+    _initFuture = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeVc();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    // IMAGE
+    if (widget.type == 'image') {
+      if (widget.url.isEmpty) {
+        return _emptyBox(context, icon: Icons.image_not_supported);
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Image.network(
+            widget.url,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _emptyBox(context, label: 'Image failed');
+            },
+          ),
+        ),
+      );
+    }
+
+    // VIDEO
+    if (widget.type == 'video') {
+      if (widget.url.isEmpty) {
+        return _emptyBox(context, icon: Icons.play_disabled, label: 'No video');
+      }
+
+      if (_vc == null || _initFuture == null) {
+        return _emptyBox(
+          context,
+          icon: Icons.play_circle_outline,
+          label: 'Init',
+        );
+      }
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          color: Colors.black,
+          child: FutureBuilder<void>(
+            future: _initFuture,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation(cs.primary),
+                    ),
+                  ),
+                );
+              }
+
+              final ar =
+                  (_vc!.value.isInitialized && _vc!.value.aspectRatio > 0)
+                  ? _vc!.value.aspectRatio
+                  : (4 / 3);
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  AspectRatio(aspectRatio: ar, child: VideoPlayer(_vc!)),
+                  // 播放/暂停按钮
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (_vc!.value.isPlaying) {
+                          _vc!.pause();
+                        } else {
+                          _vc!.play();
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _vc!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                        size: 36,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    // unknown type fallback
+    return _emptyBox(context, icon: Icons.help_outline);
+  }
+
+  Widget _emptyBox(BuildContext context, {IconData? icon, String? label}) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      height: 220,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: cs.primary.withOpacity(0.08),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon ?? Icons.broken_image, size: 56),
+          if (label != null) ...[const SizedBox(height: 6), Text(label)],
+        ],
+      ),
+    );
+  }
+}
+
+class MatchesPage extends StatefulWidget {
+  const MatchesPage({super.key});
+
+  @override
+  State<MatchesPage> createState() => _MatchesPageState();
+}
+
+class _MatchesPageState extends State<MatchesPage> {
+  User? get _user => Supabase.instance.client.auth.currentUser;
+
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _fetchMatches();
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchMatches() async {
+    final u = _user;
+    if (u == null) return [];
+
+    final supabase = Supabase.instance.client;
+
+    // matches: user_a, user_b
+    final rows = await supabase
+        .from('matches')
+        .select('user_a,user_b,created_at')
+        .or('user_a.eq.${u.id},user_b.eq.${u.id}')
+        .order('created_at', ascending: false);
+
+    final list = (rows as List).cast<Map<String, dynamic>>();
+
+    // 取出 other ids
+    final otherIds = list
+        .map((m) {
+          final a = m['user_a'].toString();
+          final b = m['user_b'].toString();
+          return a == u.id ? b : a;
+        })
+        .toSet()
+        .toList();
+
+    if (otherIds.isEmpty) return [];
+
+    final prof = await supabase
+        .from('profiles')
+        .select(
+          'id,display_name,city,intro,avatar_url,sport_levels,availability',
+        )
+        .inFilter('id', otherIds);
+
+    final profiles = (prof as List).cast<Map<String, dynamic>>();
+
+    // 按 otherIds 顺序排一下
+    final map = {for (final p in profiles) p['id'].toString(): p};
+    return otherIds.map((id) => map[id] ?? {'id': id}).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Matches')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snap.data ?? [];
+          if (items.isEmpty) {
+            return const Center(child: Text('No matches yet.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            itemBuilder: (context, i) {
+              final p = items[i];
+              final name = (p['display_name'] ?? 'Unknown').toString();
+              final city = (p['city'] ?? '').toString();
+              final avatar = (p['avatar_url'] ?? '').toString();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: cs.primary.withOpacity(0.10)),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: cs.primary.withOpacity(0.12),
+                    backgroundImage: avatar.isEmpty
+                        ? null
+                        : NetworkImage(avatar),
+                    child: avatar.isEmpty
+                        ? Icon(Icons.person, color: cs.primary)
+                        : null,
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(city.isEmpty ? 'City not set' : city),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    // MVP：先弹出简介（你后面可以做完整 ProfileViewPage）
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: Text(name),
+                        content: Text(
+                          (p['intro'] ?? '').toString().isEmpty
+                              ? 'No bio yet.'
+                              : (p['intro'] ?? '').toString(),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

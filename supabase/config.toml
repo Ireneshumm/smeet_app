@@ -1,0 +1,10 @@
+# Link project: `supabase link --project-ref <your-project-ref>`
+# Local: `supabase start` then `supabase functions serve`
+#
+# Secrets (Dashboard → Edge Functions → Secrets, or CLI):
+#   supabase secrets set GOOGLE_MAPS_API_KEY=your_key
+# Optional CORS allowlist (comma-separated origins; if unset, * is used for dev):
+#   supabase secrets set PLACES_ALLOWED_ORIGINS=https://yourapp.com,http://localhost:8080
+
+[functions.google-places]
+verify_jwt = false
