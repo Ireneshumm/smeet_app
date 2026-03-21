@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LocationResult {
@@ -22,13 +23,17 @@ class LocationSearchField extends StatefulWidget {
   final String labelText;
   final String hintText;
   final bool enabled;
+  /// Called whenever the value changes (including cleared).
   final ValueChanged<LocationResult?> onChanged;
+  /// Fired when user picks a suggestion (address + coordinates from Place Details).
+  final void Function(String address, double lat, double lng) onLocationSelected;
   final LocationResult? initialValue;
 
   const LocationSearchField({
     super.key,
     required this.supabase,
     required this.onChanged,
+    required this.onLocationSelected,
     this.labelText = 'Location',
     this.hintText = 'Search address',
     this.enabled = true,
@@ -43,12 +48,17 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   Timer? _debounce;
+  /// Delayed hide so tapping a suggestion isn't cancelled by immediate blur-clear.
+  Timer? _blurHideSuggestionsTimer;
 
   bool _loading = false;
   String? _error;
   List<Map<String, dynamic>> _predictions = const [];
   String _sessionToken = '';
   LocationResult? _selected;
+
+  /// When true, the next [TextField.onChanged] is from us setting text after a pick — do not clear selection.
+  bool _ignoreNextControllerChange = false;
 
   @override
   void initState() {
@@ -58,7 +68,21 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     if (_selected != null) {
       _controller.text = _selected!.address;
     }
-    _focusNode.addListener(() {
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    _blurHideSuggestionsTimer?.cancel();
+    _blurHideSuggestionsTimer = null;
+
+    if (_focusNode.hasFocus) {
+      return;
+    }
+
+    // Wait before clearing: on Web, focus leaves the field before ListTile onTap runs.
+    _blurHideSuggestionsTimer = Timer(const Duration(milliseconds: 200), () {
+      _blurHideSuggestionsTimer = null;
+      if (!mounted) return;
       if (!_focusNode.hasFocus) {
         setState(() => _predictions = const []);
       }
@@ -68,6 +92,8 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _blurHideSuggestionsTimer?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -84,7 +110,55 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     return '$fallback ($status)';
   }
 
+  /// Parses Edge Function payload `{ address, latitude, longitude }` or raw Google
+  /// `result.formatted_address` + `result.geometry.location.{lat,lng}`.
+  LocationResult? _parsePlaceDetailsBody(Map<String, dynamic> body) {
+    final addrNorm = body['address']?.toString().trim();
+    final latNorm = body['latitude'];
+    final lngNorm = body['longitude'];
+    if (addrNorm != null &&
+        addrNorm.isNotEmpty &&
+        latNorm != null &&
+        lngNorm != null) {
+      return LocationResult(
+        address: addrNorm,
+        lat: (latNorm as num).toDouble(),
+        lng: (lngNorm as num).toDouble(),
+      );
+    }
+
+    final resultRaw = body['result'];
+    if (resultRaw is Map) {
+      final result = Map<String, dynamic>.from(resultRaw);
+      final geometryRaw = result['geometry'];
+      if (geometryRaw is Map) {
+        final geometry = Map<String, dynamic>.from(geometryRaw);
+        final locationRaw = geometry['location'];
+        if (locationRaw is Map) {
+          final loc = Map<String, dynamic>.from(locationRaw);
+          final lat = loc['lat'];
+          final lng = loc['lng'];
+          final formatted =
+              (result['formatted_address'] ?? '').toString().trim();
+          if (lat != null && lng != null && formatted.isNotEmpty) {
+            return LocationResult(
+              address: formatted,
+              lat: (lat as num).toDouble(),
+              lng: (lng as num).toDouble(),
+            );
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   void _onTextChanged(String value) {
+    if (_ignoreNextControllerChange) {
+      _ignoreNextControllerChange = false;
+      return;
+    }
+
     _debounce?.cancel();
     _selected = null;
     widget.onChanged(null);
@@ -163,14 +237,25 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     }
   }
 
-  Future<void> _selectPrediction(Map<String, dynamic> item) async {
-    final placeId = (item['place_id'] ?? '').toString();
+  Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
+    _blurHideSuggestionsTimer?.cancel();
+    _blurHideSuggestionsTimer = null;
+
+    // ignore: avoid_print
+    print('Selecting place: ${prediction['description']}');
+
+    final placeId = (prediction['place_id'] ?? '').toString().trim();
     if (placeId.isEmpty) return;
 
+    // 点击后立刻关闭建议列表并收起键盘，再请求详情
+    if (!mounted) return;
     setState(() {
+      _predictions = const [];
       _loading = true;
       _error = null;
     });
+    FocusScope.of(context).unfocus();
+    _focusNode.unfocus();
 
     try {
       final supabase = widget.supabase;
@@ -179,7 +264,6 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         body: {
           'action': 'details',
           'placeId': placeId,
-          'sessionToken': _sessionToken,
         },
       );
 
@@ -188,30 +272,45 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         throw Exception(_errorMessage(data, res.status, 'Place details failed'));
       }
 
-      final body = data is Map<String, dynamic>
+      final root = data is Map<String, dynamic>
           ? data
           : jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
 
-      final address = (body['address'] ?? '').toString().trim();
-      final lat = (body['latitude'] as num?)?.toDouble();
-      final lng = (body['longitude'] as num?)?.toDouble();
-
-      if (lat == null || lng == null || address.isEmpty) {
-        throw Exception('Invalid place details payload');
+      final detailsRaw = root['result'];
+      if (detailsRaw is! Map) {
+        final fallback = _parsePlaceDetailsBody(root);
+        if (fallback == null) {
+          throw Exception('Invalid place details: missing result');
+        }
+        _applySelectedPlace(fallback);
+        return;
       }
 
-      final selected = LocationResult(address: address, lat: lat, lng: lng);
-      _selected = selected;
-      _controller.text = selected.address;
-      _sessionToken = _newSessionToken();
+      final details = Map<String, dynamic>.from(detailsRaw);
+      final String address =
+          (details['formatted_address'] ?? '').toString().trim();
 
-      if (!mounted) return;
-      setState(() {
-        _predictions = const [];
-        _loading = false;
-      });
-      widget.onChanged(selected);
-      _focusNode.unfocus();
+      final geometryRaw = details['geometry'];
+      if (geometryRaw is! Map) {
+        throw Exception('Invalid place details: missing geometry');
+      }
+      final geometry = Map<String, dynamic>.from(geometryRaw);
+
+      final locationRaw = geometry['location'];
+      if (locationRaw is! Map) {
+        throw Exception('Invalid place details: missing location');
+      }
+      final location = Map<String, dynamic>.from(locationRaw);
+
+      final latRaw = location['lat'];
+      final lngRaw = location['lng'];
+      if (latRaw == null || lngRaw == null || address.isEmpty) {
+        throw Exception('Invalid place details: missing lat/lng or address');
+      }
+      final double lat = (latRaw as num).toDouble();
+      final double lng = (lngRaw as num).toDouble();
+
+      _applySelectedPlace(LocationResult(address: address, lat: lat, lng: lng));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -219,6 +318,35 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         _loading = false;
       });
     }
+  }
+
+  void _applySelectedPlace(LocationResult selected) {
+    final address = selected.address;
+    final lat = selected.lat;
+    final lng = selected.lng;
+
+    _selected = selected;
+    _sessionToken = _newSessionToken();
+
+    if (!mounted) return;
+    _ignoreNextControllerChange = true;
+    setState(() {
+      _predictions = const [];
+      _loading = false;
+    });
+
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ignoreNextControllerChange = true;
+      setState(() {
+        _controller.text = address;
+      });
+      widget.onLocationSelected(address, lat, lng);
+      widget.onChanged(selected);
+
+      FocusScope.of(context).unfocus();
+      _focusNode.unfocus();
+    });
   }
 
   @override
@@ -316,12 +444,21 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
                         .toString();
                 final description = (item['description'] ?? '').toString();
 
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.place_outlined),
-                  title: Text(main.isEmpty ? description : main),
-                  subtitle: secondary.isEmpty ? null : Text(secondary),
-                  onTap: () => _selectPrediction(item),
+                return Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (_) {
+                    // Runs before focus leaves the TextField — critical on Flutter Web.
+                    _selectPrediction(item);
+                  },
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.place_outlined),
+                      title: Text(main.isEmpty ? description : main),
+                      subtitle: secondary.isEmpty ? null : Text(secondary),
+                    ),
+                  ),
                 );
               },
             ),

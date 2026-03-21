@@ -736,6 +736,15 @@ class _HomePageState extends State<HomePage> {
                 onChanged: (value) {
                   setState(() => _selectedLocation = value);
                 },
+                onLocationSelected: (address, lat, lng) {
+                  setState(() {
+                    _selectedLocation = LocationResult(
+                      address: address,
+                      lat: lat,
+                      lng: lng,
+                    );
+                  });
+                },
               ),
             ),
 

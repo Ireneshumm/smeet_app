@@ -10,7 +10,7 @@
  *
  * Responses:
  *   - autocomplete → same JSON as Google Autocomplete API
- *   - details → { address, latitude, longitude }
+ *   - details → full Google Details JSON (`status`, `result` with `formatted_address`, `geometry.location`)
  */
 
 const GOOGLE_AUTOCOMPLETE =
@@ -236,15 +236,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Invalid place details payload" }, 502, ch);
     }
 
-    return json(
-      {
-        address,
-        latitude,
-        longitude,
-      },
-      200,
-      ch,
-    );
+    // Return full Google JSON so clients can use res.data['result'].geometry.location
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { ...ch, "Content-Type": "application/json" },
+    });
   }
 
   return json({ error: "Unknown action" }, 400, ch);
