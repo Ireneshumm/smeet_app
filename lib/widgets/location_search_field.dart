@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LocationResult {
@@ -17,15 +16,14 @@ class LocationResult {
   });
 }
 
-/// Location search via Supabase Edge Function `google-places` (Google key stays server-side).
+/// Location search via Supabase Edge Function `google-places`.
+/// Suggestions render in an [Overlay] + [CompositedTransformFollower] so Web taps are not swallowed.
 class LocationSearchField extends StatefulWidget {
   final SupabaseClient supabase;
   final String labelText;
   final String hintText;
   final bool enabled;
-  /// Called whenever the value changes (including cleared).
   final ValueChanged<LocationResult?> onChanged;
-  /// Fired when user picks a suggestion (address + coordinates from Place Details).
   final void Function(String address, double lat, double lng) onLocationSelected;
   final LocationResult? initialValue;
 
@@ -47,9 +45,13 @@ class LocationSearchField extends StatefulWidget {
 class _LocationSearchFieldState extends State<LocationSearchField> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final LayerLink _layerLink = LayerLink();
+  final GlobalKey _targetKey = GlobalKey();
+
   Timer? _debounce;
-  /// Delayed hide so tapping a suggestion isn't cancelled by immediate blur-clear.
-  Timer? _blurHideSuggestionsTimer;
+  Timer? _blurHideTimer;
+
+  OverlayEntry? _overlayEntry;
 
   bool _loading = false;
   String? _error;
@@ -57,7 +59,6 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   String _sessionToken = '';
   LocationResult? _selected;
 
-  /// When true, the next [TextField.onChanged] is from us setting text after a pick — do not clear selection.
   bool _ignoreNextControllerChange = false;
 
   @override
@@ -68,32 +69,139 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     if (_selected != null) {
       _controller.text = _selected!.address;
     }
+    _controller.addListener(_onControllerChanged);
     _focusNode.addListener(_onFocusChanged);
   }
 
   void _onFocusChanged() {
-    _blurHideSuggestionsTimer?.cancel();
-    _blurHideSuggestionsTimer = null;
+    _blurHideTimer?.cancel();
+    _blurHideTimer = null;
 
     if (_focusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showOrUpdateOverlay();
+      });
       return;
     }
 
-    // Wait before clearing: on Web, focus leaves the field before ListTile onTap runs.
-    _blurHideSuggestionsTimer = Timer(const Duration(milliseconds: 200), () {
-      _blurHideSuggestionsTimer = null;
-      if (!mounted) return;
-      if (!_focusNode.hasFocus) {
-        setState(() => _predictions = const []);
-      }
+    _blurHideTimer = Timer(const Duration(milliseconds: 220), () {
+      _blurHideTimer = null;
+      if (!mounted || _focusNode.hasFocus) return;
+      setState(() => _predictions = const []);
+      _hideOverlay();
     });
+  }
+
+  void _hideOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _showOrUpdateOverlay() {
+    if (!mounted) return;
+    if (_predictions.isEmpty || !_focusNode.hasFocus) {
+      _hideOverlay();
+      return;
+    }
+
+    final ctx = _targetKey.currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showOrUpdateOverlay();
+      });
+      return;
+    }
+
+    final width = box.size.width;
+    final predictions = List<Map<String, dynamic>>.from(_predictions);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    _hideOverlay();
+
+    _overlayEntry = OverlayEntry(
+      builder: (overlayContext) {
+        return CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          followerAnchor: Alignment.topLeft,
+          targetAnchor: Alignment.bottomLeft,
+          offset: const Offset(0, 6),
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            color: theme.colorScheme.surface,
+            child: SizedBox(
+              width: width,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: predictions.length,
+                  separatorBuilder: (_, _) => Divider(
+                    height: 1,
+                    color: cs.outlineVariant.withOpacity(0.35),
+                  ),
+                  itemBuilder: (_, i) {
+                    final prediction = predictions[i];
+                    final main =
+                        (prediction['structured_formatting']?['main_text'] ??
+                                '')
+                            .toString();
+                    final secondary =
+                        (prediction['structured_formatting']?['secondary_text'] ??
+                                '')
+                            .toString();
+                    final description =
+                        (prediction['description'] ?? '').toString();
+
+                    return Listener(
+                      behavior: HitTestBehavior.opaque,
+                      onPointerDown: (PointerDownEvent event) {
+                        if (!mounted) return;
+                        // Raw pointer: bypass gesture arena / blur race on Web.
+                        _focusNode.unfocus();
+                        _ignoreNextControllerChange = true;
+                        _controller.text =
+                            (prediction['description'] ?? '').toString();
+                        _selectPrediction(prediction);
+                      },
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.place_outlined,
+                          color: cs.primary,
+                        ),
+                        title: Text(main.isEmpty ? description : main),
+                        subtitle: secondary.isEmpty
+                            ? null
+                            : Text(secondary),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _blurHideSuggestionsTimer?.cancel();
+    _blurHideTimer?.cancel();
+    _controller.removeListener(_onControllerChanged);
     _focusNode.removeListener(_onFocusChanged);
+    _hideOverlay();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -110,12 +218,10 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     return '$fallback ($status)';
   }
 
-  /// Parses Edge Function payload `{ address, latitude, longitude }` or raw Google
-  /// `result.formatted_address` + `result.geometry.location.{lat,lng}`.
-  LocationResult? _parsePlaceDetailsBody(Map<String, dynamic> body) {
-    final addrNorm = body['address']?.toString().trim();
-    final latNorm = body['latitude'];
-    final lngNorm = body['longitude'];
+  LocationResult? _parseDetailsRoot(Map<String, dynamic> root) {
+    final addrNorm = root['address']?.toString().trim();
+    final latNorm = root['latitude'];
+    final lngNorm = root['longitude'];
     if (addrNorm != null &&
         addrNorm.isNotEmpty &&
         latNorm != null &&
@@ -127,7 +233,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
       );
     }
 
-    final resultRaw = body['result'];
+    final resultRaw = root['result'];
     if (resultRaw is Map) {
       final result = Map<String, dynamic>.from(resultRaw);
       final geometryRaw = result['geometry'];
@@ -153,16 +259,21 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     return null;
   }
 
-  void _onTextChanged(String value) {
+  /// Drives search from [TextEditingController] so programmatic updates can be ignored.
+  void _onControllerChanged() {
+    // Skips search when we inject description (pointer down) or full address (after details).
     if (_ignoreNextControllerChange) {
       _ignoreNextControllerChange = false;
       return;
     }
 
+    if (!mounted) return;
+
     _debounce?.cancel();
     _selected = null;
     widget.onChanged(null);
 
+    final value = _controller.text;
     final q = value.trim();
     if (q.isEmpty) {
       setState(() {
@@ -170,6 +281,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         _error = null;
         _loading = false;
       });
+      _hideOverlay();
       return;
     }
 
@@ -187,8 +299,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     });
 
     try {
-      final supabase = widget.supabase;
-      final res = await supabase.functions.invoke(
+      final res = await widget.supabase.functions.invoke(
         'google-places',
         body: {
           'action': 'autocomplete',
@@ -210,23 +321,31 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
 
       if (status == 'OK') {
         final raw = (body['predictions'] as List?) ?? const [];
+        if (!mounted) return;
         setState(() {
-          _predictions = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _predictions =
+              raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
           _loading = false;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showOrUpdateOverlay();
         });
         return;
       }
 
       if (status == 'ZERO_RESULTS') {
+        if (!mounted) return;
         setState(() {
           _predictions = const [];
           _loading = false;
         });
+        _hideOverlay();
         return;
       }
 
-      final apiError = (body['error_message'] ?? '').toString();
-      throw Exception('Autocomplete status=$status $apiError');
+      throw Exception(
+        'Autocomplete status=$status ${body['error_message'] ?? ''}',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -234,32 +353,27 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         _predictions = const [];
         _loading = false;
       });
+      _hideOverlay();
     }
   }
 
   Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
-    _blurHideSuggestionsTimer?.cancel();
-    _blurHideSuggestionsTimer = null;
-
-    // ignore: avoid_print
-    print('Selecting place: ${prediction['description']}');
+    _blurHideTimer?.cancel();
+    _blurHideTimer = null;
+    _hideOverlay();
 
     final placeId = (prediction['place_id'] ?? '').toString().trim();
     if (placeId.isEmpty) return;
 
-    // 点击后立刻关闭建议列表并收起键盘，再请求详情
     if (!mounted) return;
     setState(() {
       _predictions = const [];
       _loading = true;
       _error = null;
     });
-    FocusScope.of(context).unfocus();
-    _focusNode.unfocus();
 
     try {
-      final supabase = widget.supabase;
-      final res = await supabase.functions.invoke(
+      final res = await widget.supabase.functions.invoke(
         'google-places',
         body: {
           'action': 'details',
@@ -276,122 +390,94 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
           ? data
           : jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
 
-      final detailsRaw = root['result'];
-      if (detailsRaw is! Map) {
-        final fallback = _parsePlaceDetailsBody(root);
-        if (fallback == null) {
-          throw Exception('Invalid place details: missing result');
-        }
-        _applySelectedPlace(fallback);
-        return;
+      final selected = _parseDetailsRoot(root);
+      if (selected == null) {
+        throw Exception('Invalid place details payload');
       }
 
-      final details = Map<String, dynamic>.from(detailsRaw);
-      final String address =
-          (details['formatted_address'] ?? '').toString().trim();
+      final address = selected.address;
+      final lat = selected.lat;
+      final lng = selected.lng;
 
-      final geometryRaw = details['geometry'];
-      if (geometryRaw is! Map) {
-        throw Exception('Invalid place details: missing geometry');
-      }
-      final geometry = Map<String, dynamic>.from(geometryRaw);
+      _selected = selected;
+      _sessionToken = _newSessionToken();
 
-      final locationRaw = geometry['location'];
-      if (locationRaw is! Map) {
-        throw Exception('Invalid place details: missing location');
-      }
-      final location = Map<String, dynamic>.from(locationRaw);
+      if (!mounted) return;
 
-      final latRaw = location['lat'];
-      final lngRaw = location['lng'];
-      if (latRaw == null || lngRaw == null || address.isEmpty) {
-        throw Exception('Invalid place details: missing lat/lng or address');
-      }
-      final double lat = (latRaw as num).toDouble();
-      final double lng = (lngRaw as num).toDouble();
+      // Must be true before assigning text so [_onControllerChanged] skips search / clearing selection.
+      _ignoreNextControllerChange = true;
+      setState(() {
+        _controller.text = address;
+        _loading = false;
+      });
 
-      _applySelectedPlace(LocationResult(address: address, lat: lat, lng: lng));
+      widget.onLocationSelected(address, lat, lng);
+      widget.onChanged(selected);
+
+      _hideOverlay();
+
+      _focusNode.unfocus();
+      FocusManager.instance.primaryFocus?.unfocus();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+      _hideOverlay();
     }
-  }
-
-  void _applySelectedPlace(LocationResult selected) {
-    final address = selected.address;
-    final lat = selected.lat;
-    final lng = selected.lng;
-
-    _selected = selected;
-    _sessionToken = _newSessionToken();
-
-    if (!mounted) return;
-    _ignoreNextControllerChange = true;
-    setState(() {
-      _predictions = const [];
-      _loading = false;
-    });
-
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _ignoreNextControllerChange = true;
-      setState(() {
-        _controller.text = address;
-      });
-      widget.onLocationSelected(address, lat, lng);
-      widget.onChanged(selected);
-
-      FocusScope.of(context).unfocus();
-      _focusNode.unfocus();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasSuggestions = _predictions.isNotEmpty && _focusNode.hasFocus;
+    final hasFocus = _focusNode.hasFocus;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          enabled: widget.enabled,
-          focusNode: _focusNode,
-          controller: _controller,
-          onChanged: _onTextChanged,
-          decoration: InputDecoration(
-            labelText: widget.labelText,
-            hintText: widget.hintText,
-            border: const OutlineInputBorder(),
-            filled: true,
-            fillColor: Colors.white,
-            prefixIcon: const Icon(Icons.location_on_outlined),
-            suffixIcon: _loading
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : (_controller.text.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _controller.clear();
-                          _selected = null;
-                          widget.onChanged(null);
-                          setState(() {
-                            _predictions = const [];
-                            _error = null;
-                          });
-                        },
-                        icon: const Icon(Icons.close),
-                      )),
+        CompositedTransformTarget(
+          link: _layerLink,
+          child: SizedBox(
+            key: _targetKey,
+            width: double.infinity,
+            child: TextField(
+              enabled: widget.enabled,
+              focusNode: _focusNode,
+              controller: _controller,
+              decoration: InputDecoration(
+                labelText: widget.labelText,
+                hintText: widget.hintText,
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.location_on_outlined),
+                suffixIcon: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : (_controller.text.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _controller.clear();
+                              _selected = null;
+                              widget.onChanged(null);
+                              setState(() {
+                                _predictions = const [];
+                                _error = null;
+                              });
+                              _hideOverlay();
+                            },
+                            icon: const Icon(Icons.close),
+                          )),
+              ),
+            ),
           ),
         ),
         if (_error != null && _error!.isNotEmpty) ...[
@@ -405,63 +491,11 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
             _controller.text.trim().isNotEmpty &&
             _predictions.isEmpty &&
             _error == null &&
-            _focusNode.hasFocus) ...[
+            hasFocus) ...[
           const SizedBox(height: 8),
           Text(
             'No results found.',
             style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-        if (hasSuggestions) ...[
-          const SizedBox(height: 8),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 260),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: _predictions.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                color: cs.outlineVariant.withOpacity(0.4),
-              ),
-              itemBuilder: (context, i) {
-                final item = _predictions[i];
-                final main = (item['structured_formatting']?['main_text'] ?? '')
-                    .toString();
-                final secondary =
-                    (item['structured_formatting']?['secondary_text'] ?? '')
-                        .toString();
-                final description = (item['description'] ?? '').toString();
-
-                return Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: (_) {
-                    // Runs before focus leaves the TextField — critical on Flutter Web.
-                    _selectPrediction(item);
-                  },
-                  child: Material(
-                    color: Colors.transparent,
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.place_outlined),
-                      title: Text(main.isEmpty ? description : main),
-                      subtitle: secondary.isEmpty ? null : Text(secondary),
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ],
