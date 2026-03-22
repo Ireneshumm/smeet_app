@@ -195,6 +195,22 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => _AuthPageState();
 }
 
+/// User-facing copy for common Supabase login failures (no backend changes).
+String _friendlyLoginFailureMessage(Object error) {
+  final raw = error.toString();
+  final low = raw.toLowerCase();
+  if (low.contains('invalid login credentials') ||
+      low.contains('invalid credentials') ||
+      low.contains('email not confirmed') ||
+      low.contains('email_not_confirmed') ||
+      low.contains('user not found')) {
+    return 'Login failed. Please check:\n'
+        '- Have you signed up?\n'
+        '- Is your password correct?';
+  }
+  return raw;
+}
+
 class _AuthPageState extends State<AuthPage> {
   final _emailCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
@@ -243,32 +259,80 @@ class _AuthPageState extends State<AuthPage> {
 
       if (_isLogin) {
         await auth.signInWithPassword(email: email, password: password);
+        // #region agent log
+        debugPrint(
+          '[agent_ndjson] ${jsonEncode({
+            'sessionId': '2e4d4f',
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+            'location': 'main.dart:_AuthPageState._submit',
+            'message': 'auth_ok',
+            'hypothesisId': 'H0_success',
+            'data': {
+              'isWeb': kIsWeb,
+              if (kIsWeb) 'origin': Uri.base.origin,
+              'mode': 'login',
+            },
+          })}',
+        );
+        // #endregion
+        if (mounted) Navigator.of(context).pop();
       } else {
         // On web, Supabase may require the redirect URL to be on the allow list
         // (URL Configuration -> Redirect URLs) for email confirmation flows.
-        await auth.signUp(
+        final res = await auth.signUp(
           email: email,
           password: password,
           emailRedirectTo: kIsWeb ? '${Uri.base.origin}/' : null,
         );
+        // #region agent log
+        debugPrint(
+          '[agent_ndjson] ${jsonEncode({
+            'sessionId': '2e4d4f',
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+            'location': 'main.dart:_AuthPageState._submit',
+            'message': 'auth_ok',
+            'hypothesisId': 'H0_success',
+            'data': {
+              'isWeb': kIsWeb,
+              if (kIsWeb) 'origin': Uri.base.origin,
+              'mode': 'signup',
+              'hasSession': res.session != null,
+            },
+          })}',
+        );
+        // #endregion
+        if (!mounted) return;
+        final hasSession = res.session != null;
+        final signupMessage = hasSession
+            ? 'Account created. You can now log in.'
+            : 'Account created.\n\nPlease check your email to verify your '
+                'account.';
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Success'),
+            content: Text(signupMessage),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (!mounted) return;
+                  if (hasSession) {
+                    Navigator.of(context).pop();
+                  } else {
+                    setState(() {
+                      _isLogin = true;
+                      _pwCtrl.clear();
+                    });
+                  }
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
-      // #region agent log
-      debugPrint(
-        '[agent_ndjson] ${jsonEncode({
-          'sessionId': '2e4d4f',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'location': 'main.dart:_AuthPageState._submit',
-          'message': 'auth_ok',
-          'hypothesisId': 'H0_success',
-          'data': {
-            'isWeb': kIsWeb,
-            if (kIsWeb) 'origin': Uri.base.origin,
-            'mode': _isLogin ? 'login' : 'signup',
-          },
-        })}',
-      );
-      // #endregion
-      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       debugPrint('[auth] failed: $e');
@@ -292,19 +356,21 @@ class _AuthPageState extends State<AuthPage> {
         })}',
       );
       // #endregion
+      final snackText = isWebFetchFail
+          ? '❌ Browser could not reach Supabase (no HTTP status). '
+              'Use a fixed port: run "Smeet: Chrome (web port 8080)" or '
+              'flutter run -d chrome --web-port=8080, then in Supabase → '
+              'Authentication → URL Configuration set Site URL + Redirect URLs '
+              'for http://localhost:8080 (see WEB_AUTH.md). DevTools → Network '
+              'for details. Raw: $msg'
+          : _isLogin
+              ? '❌ ${_friendlyLoginFailureMessage(e)}'
+              : '❌ Could not create account: $msg';
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: const Duration(seconds: 12),
-          content: Text(
-            isWebFetchFail
-                ? '❌ Browser could not reach Supabase (no HTTP status). '
-                    'Use a fixed port: run "Smeet: Chrome (web port 8080)" or '
-                    'flutter run -d chrome --web-port=8080, then in Supabase → '
-                    'Authentication → URL Configuration set Site URL + Redirect URLs '
-                    'for http://localhost:8080 (see WEB_AUTH.md). DevTools → Network '
-                    'for details. Raw: $msg'
-                : '❌ Auth failed: $msg',
-          ),
+          duration: Duration(seconds: _isLogin ? 14 : 12),
+          content: Text(snackText),
         ),
       );
     } finally {
@@ -314,41 +380,86 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(_isLogin ? 'Login' : 'Sign Up')),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _pwCtrl,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _loading ? null : _submit,
-                child: Text(
-                  _loading ? '...' : (_isLogin ? 'Login' : 'Create account'),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_isLogin) ...[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: cs.primary.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      'New here? Please sign up first, verify your email, '
+                      'then log in.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                Text(
+                  'How it works',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '1. Create your account below\n'
+                  '2. Open your email and verify your address\n'
+                  '3. Return here, switch to Login, and sign in',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.45,
+                        color: cs.onSurface.withOpacity(0.85),
+                      ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextField(
+                controller: _emailCtrl,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _pwCtrl,
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _loading ? null : _submit,
+                  child: Text(
+                    _loading ? '...' : (_isLogin ? 'Login' : 'Create account'),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => setState(() => _isLogin = !_isLogin),
-              child: Text(
-                _isLogin ? 'No account? Sign up' : 'Have an account? Login',
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => setState(() => _isLogin = !_isLogin),
+                child: Text(
+                  _isLogin ? 'No account? Sign up' : 'Have an account? Login',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -377,18 +488,88 @@ class SmeetShell extends StatefulWidget {
 }
 
 class _SmeetShellState extends State<SmeetShell> {
+  static const int _kProfileTabIndex = 4;
+
   int _index = 0;
   final Set<String> _joinedLocal = {};
   /// Bumps when joins / DB sync changes so My Game & related lists refetch.
   int _gamesListRevision = 0;
 
+  StreamSubscription<AuthState>? _authSub;
+  /// Dedupes concurrent profile-row checks (e.g. `initialSession` + post-frame).
+  Future<void>? _profileOnboardingCheck;
+  /// Avoid duplicate welcome SnackBars for the same signed-in user this session.
+  String? _profileWelcomeSnackUserId;
+
   @override
   void initState() {
     super.initState();
-    _syncJoinedFromDb();
-    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final ev = data.event;
+      if (ev == AuthChangeEvent.signedIn ||
+          ev == AuthChangeEvent.initialSession) {
+        _scheduleProfileOnboardingIfNeeded();
+      }
       _syncJoinedFromDb();
     });
+    _syncJoinedFromDb();
+    // Cold start / edge cases: ensure check runs once the shell is mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleProfileOnboardingIfNeeded();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  /// After login or restore, if `public.profiles` has no row for this user,
+  /// switch to Profile and show a one-time welcome message. On query errors,
+  /// fail closed (do not change tab).
+  void _scheduleProfileOnboardingIfNeeded() {
+    _profileOnboardingCheck ??=
+        _runProfileOnboardingCheck().whenComplete(() {
+      _profileOnboardingCheck = null;
+    });
+  }
+
+  Future<void> _runProfileOnboardingCheck() async {
+    final client = Supabase.instance.client;
+    final u = client.auth.currentUser;
+    if (u == null) {
+      _profileWelcomeSnackUserId = null;
+      return;
+    }
+    try {
+      final row = await client
+          .from('profiles')
+          .select('id')
+          .eq('id', u.id)
+          .maybeSingle();
+      if (!mounted) return;
+      if (row != null) return;
+
+      setState(() => _index = _kProfileTabIndex);
+
+      final showWelcome = _profileWelcomeSnackUserId != u.id;
+      if (showWelcome) {
+        _profileWelcomeSnackUserId = u.id;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text('Welcome! Please complete your profile first.'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        });
+      }
+    } catch (e, st) {
+      debugPrint('[profile_onboarding] profiles check failed (skip nav): $e');
+      debugPrint('$st');
+    }
   }
 
   Future<void> _syncJoinedFromDb() async {
@@ -1124,7 +1305,7 @@ class _HomePageState extends State<HomePage> {
             // Game level (target level for this game)
             _SectionCard(
               child: DropdownButtonFormField<String>(
-                value: _gameLevel,
+                initialValue: _gameLevel,
                 decoration: const InputDecoration(
                   labelText: 'Game level (target for this game)',
                   border: OutlineInputBorder(),
@@ -1339,7 +1520,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _filterCountry,
+                    initialValue: _filterCountry,
                     decoration: const InputDecoration(
                       labelText: 'Country',
                       border: OutlineInputBorder(),
@@ -1372,7 +1553,7 @@ class _HomePageState extends State<HomePage> {
                       final cityVal =
                           cities.contains(_filterCity) ? _filterCity : cities.first;
                       return DropdownButtonFormField<String>(
-                        value: cityVal,
+                        initialValue: cityVal,
                         decoration: const InputDecoration(
                           labelText: 'City / area',
                           border: OutlineInputBorder(),
@@ -2888,12 +3069,27 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _listCtrl = ScrollController();
 
+  /// Single subscription for the lifetime of this screen — do not recreate in
+  /// [build] or [StreamBuilder] will cancel/resubscribe every frame and miss
+  /// or delay realtime events.
+  late final Stream<List<Map<String, dynamic>>> _messagesStream;
+
   String _appTitle = 'Chat';
   String _gameSubtitle = '';
   String? _directPeerId;
   String? _directPeerAvatar;
   int _prevMsgLen = -1;
+  /// Last count logged for [ChatMessages] debug (avoid spam).
+  int _debugLastLoggedStreamLen = -1;
   Timer? _readDebounce;
+
+  /// Rows returned from `insert().select()` until the realtime stream includes them.
+  final List<Map<String, dynamic>> _pendingServerRows = [];
+
+  /// Local-only bubbles while waiting for Postgres (removed on insert success).
+  final List<Map<String, dynamic>> _optimisticMessages = [];
+
+  bool _prunePendingPostFrameScheduled = false;
 
   @override
   void dispose() {
@@ -2939,6 +3135,47 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
   }
 
+  void _schedulePrunePendingServerRows(Set<String> streamIds) {
+    if (_prunePendingPostFrameScheduled) return;
+    if (!_pendingServerRows.any((r) => streamIds.contains(r['id'].toString()))) {
+      return;
+    }
+    _prunePendingPostFrameScheduled = true;
+    final ids = Set<String>.from(streamIds);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prunePendingPostFrameScheduled = false;
+      if (!mounted) return;
+      setState(() {
+        _pendingServerRows.removeWhere((r) => ids.contains(r['id'].toString()));
+      });
+    });
+  }
+
+  /// Stream snapshot + pending insert rows + optimistic rows, deduped by real `id`.
+  List<Map<String, dynamic>> _mergeVisibleMessages(
+    List<Map<String, dynamic>> streamRows,
+  ) {
+    final streamIds = streamRows.map((m) => m['id'].toString()).toSet();
+    _schedulePrunePendingServerRows(streamIds);
+
+    final byId = <String, Map<String, dynamic>>{};
+    for (final m in streamRows) {
+      byId[m['id'].toString()] = Map<String, dynamic>.from(m);
+    }
+    for (final r in _pendingServerRows) {
+      final id = r['id'].toString();
+      if (!streamIds.contains(id)) {
+        byId.putIfAbsent(id, () => Map<String, dynamic>.from(r));
+      }
+    }
+    for (final o in _optimisticMessages) {
+      final cid = o['_client_id']?.toString() ?? '';
+      if (cid.isEmpty) continue;
+      byId['__client__$cid'] = Map<String, dynamic>.from(o);
+    }
+    return sortedChatMessages(byId.values.toList());
+  }
+
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
@@ -2951,20 +3188,61 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
     if (u == null) return;
 
+    final userId = u.id;
+    final clientId = const Uuid().v4();
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    setState(() {
+      _optimisticMessages.add({
+        '_client_id': clientId,
+        '_pending': true,
+        'user_id': userId,
+        'content': text,
+        'created_at': nowIso,
+        'id': '__pending__$clientId',
+        'chat_id': widget.chatId,
+      });
+    });
+    debugPrint(
+      '[ChatMessages] optimistic insert client_id=$clientId chat_id=${widget.chatId} '
+      'user_id=$userId len=${text.length}',
+    );
+
+    _ctrl.clear();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _scrollChatToBottom(animate: true));
+
     try {
       final supabase = Supabase.instance.client;
-      await supabase.from('messages').insert({
-        'chat_id': widget.chatId,
-        'user_id': u.id,
-        'content': text,
-      });
-      _ctrl.clear();
+      final row = await supabase
+          .from('messages')
+          .insert({
+            'chat_id': widget.chatId,
+            'user_id': userId,
+            'content': text,
+          })
+          .select()
+          .single();
+      debugPrint(
+        '[ChatMessages] DB insert success id=${row['id']} chat_id=${widget.chatId} '
+        'user_id=$userId — reconciling optimistic client_id=$clientId',
+      );
       if (!mounted) return;
+      setState(() {
+        _optimisticMessages.removeWhere(
+          (m) => m['_client_id']?.toString() == clientId,
+        );
+        _pendingServerRows.add(Map<String, dynamic>.from(row));
+      });
       _scheduleMarkRead();
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _scrollChatToBottom(animate: true));
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _optimisticMessages.removeWhere(
+          (m) => m['_client_id']?.toString() == clientId,
+        );
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('❌ Send failed: $e')));
@@ -2974,6 +3252,15 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   @override
   void initState() {
     super.initState();
+    _messagesStream = Supabase.instance.client
+        .from('messages')
+        .stream(primaryKey: const ['id'])
+        .eq('chat_id', widget.chatId)
+        .order('id');
+    debugPrint(
+      '[ChatMessages] stream created once for chat_id=${widget.chatId} '
+      '(primaryKey=id, order=id)',
+    );
     _appTitle = widget.title.isNotEmpty ? widget.title : 'Chat';
     if (widget.chatKind == 'direct') {
       _loadDirectHeader();
@@ -3121,13 +3408,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final u = _user;
     final cs = Theme.of(context).colorScheme;
 
-    // ✅ 实时流：messages 表按 chat_id 过滤
-    final stream = Supabase.instance.client
-        .from('messages')
-        .stream(primaryKey: ['id'])
-        .eq('chat_id', widget.chatId)
-        .order('id');
-
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
@@ -3232,12 +3512,47 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         children: [
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: stream,
+              stream: _messagesStream,
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
+                final rawLen = snapshot.hasData ? snapshot.data!.length : -1;
+                debugPrint(
+                  '[ChatMessages] StreamBuilder build: '
+                  'connectionState=${snapshot.connectionState} '
+                  'hasData=${snapshot.hasData} hasError=${snapshot.hasError} '
+                  'rawCount=$rawLen',
+                );
+                if (snapshot.hasError) {
+                  debugPrint(
+                    '[ChatMessages] StreamBuilder error: ${snapshot.error}',
+                  );
+                }
+                if (snapshot.hasData && rawLen > _debugLastLoggedStreamLen) {
+                  debugPrint(
+                    '[ChatMessages] stream event received: rawCount '
+                    '$_debugLastLoggedStreamLen → $rawLen (chat_id=${widget.chatId})',
+                  );
+                  _debugLastLoggedStreamLen = rawLen;
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final msgs = sortedChatMessages(snapshot.data!);
+                if (!snapshot.hasData) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Messages stream error:\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final msgs = _mergeVisibleMessages(snapshot.data!);
                 if (msgs.isEmpty) {
                   return const Center(child: Text('Say hi 👋'));
                 }
@@ -3246,6 +3561,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
                 final len = msgs.length;
                 if (len != _prevMsgLen) {
+                  debugPrint(
+                    '[ChatMessages] rebuild with sorted len=$len '
+                    '(was $_prevMsgLen) — scheduling scroll to bottom',
+                  );
                   _prevMsgLen = len;
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
@@ -3264,6 +3583,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     final isMe =
                         u != null && m['user_id']?.toString() == u.id;
                     final text = (m['content'] ?? '').toString();
+                    final pending = m['_pending'] == true;
                     final uidStr = m['user_id']?.toString() ?? '';
                     final prefix = widget.chatKind == 'game' && !isMe
                         ? '${uidStr.length >= 8 ? uidStr.substring(0, 8) : uidStr} · '
@@ -3286,10 +3606,30 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                               : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: cs.primary.withOpacity(0.10),
+                            color: pending
+                                ? cs.outline.withOpacity(0.35)
+                                : cs.primary.withOpacity(0.10),
                           ),
                         ),
-                        child: Text('$prefix$text'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text('$prefix$text'),
+                            ),
+                            if (pending) ...[
+                              const SizedBox(width: 6),
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: cs.primary.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     );
                   },
