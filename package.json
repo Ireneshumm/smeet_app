@@ -1,0 +1,8 @@
+{
+  "name": "smeet_app_web",
+  "private": true,
+  "description": "Vercel build entry only — Flutter web is built by scripts/vercel_flutter_build.sh",
+  "scripts": {
+    "build": "bash scripts/vercel_flutter_build.sh"
+  }
+}

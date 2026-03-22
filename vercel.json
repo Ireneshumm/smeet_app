@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "echo 'No npm install; Flutter runs in buildCommand'",
-  "buildCommand": "bash scripts/vercel_flutter_build.sh",
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "npm run build",
   "outputDirectory": "build/web",
   "rewrites": [
     {

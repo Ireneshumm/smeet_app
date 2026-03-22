@@ -72,11 +72,13 @@ If production is **not** built from the same machine/repo (e.g. old manual uploa
 
 **What this repo does now:**
 
+- `package.json` — `npm run build` → `bash scripts/vercel_flutter_build.sh` (helps Vercel run a normal Node build step).
 - `vercel.json` sets:
-  - `buildCommand`: `bash scripts/vercel_flutter_build.sh` (installs Flutter stable shallow clone, then `flutter build web --release`)
+  - `installCommand`: `npm install` (no app deps; satisfies Vercel’s install phase)
+  - `buildCommand`: `npm run build`
   - `outputDirectory`: `build/web`
   - `rewrites`: SPA fallback to `/index.html` (static files still win when present)
-- `scripts/vercel_flutter_build.sh` — run on Vercel’s Linux builders
+- `scripts/vercel_flutter_build.sh` — Flutter stable shallow clone + `flutter build web --release`
 
 **Dashboard checks (Vercel → Project → Settings → General / Build & Development):**
 
