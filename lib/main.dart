@@ -6,13 +6,17 @@ import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:postgrest/postgrest.dart' show PostgrestException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:smeet_app/game_balance.dart';
 import 'package:smeet_app/geo_utils.dart';
 import 'package:smeet_app/other_profile_page.dart';
+import 'package:smeet_app/services/block_service.dart';
+import 'package:smeet_app/widgets/app_page_states.dart';
+import 'package:smeet_app/widgets/legal_section_card.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
+import 'package:smeet_app/widgets/report_bottom_sheet.dart';
+import 'package:smeet_app/widgets/signup_legal_agreement.dart';
 
 /// 12h time like "2:00 PM"
 String formatTime12h(DateTime dt) {
@@ -97,7 +101,36 @@ Future<void> markChatRead(
         .update({'last_read_at': now})
         .eq('chat_id', chatId)
         .eq('user_id', userId);
+    debugPrint('[Unread] markChatRead chat_id=$chatId user=$userId at=$now');
   } catch (_) {}
+}
+
+/// When a [ChatRoomPage] is on the stack, list + tab badge treat that thread as read.
+final ValueNotifier<String?> smeetOpenChatRoomId = ValueNotifier<String?>(null);
+
+/// Shell-level Chat tab unread indicator (implementation detail).
+///
+/// Prefer [SmeetShell.reportChatTabUnread], [SmeetShell.clearChatTabUnreadBadge], and
+/// [SmeetShell.requestChatInboxRefresh] at call sites — lightweight hooks, no messaging rewrite.
+/// [SmeetShell] binds the badge via [ValueListenableBuilder] on this notifier.
+final ValueNotifier<int> smeetChatTabUnreadTotal = ValueNotifier<int>(0);
+
+/// Lightweight refresh hook: [ChatPage] listens (debounced) and refetches the chat list.
+/// Used when `last_read_at` changes without a new message row (e.g. after leaving [ChatRoomPage]).
+final ValueNotifier<int> smeetChatInboxRefreshSignal = ValueNotifier<int>(0);
+
+/// Per-row unread pill (compact).
+String unreadLabelForChatRow(int n) {
+  if (n <= 0) return '';
+  if (n > 9) return '9+';
+  return '$n';
+}
+
+/// Bottom nav Chat tab (larger cap).
+String unreadLabelForChatTab(int n) {
+  if (n <= 0) return '';
+  if (n > 99) return '99+';
+  return '$n';
 }
 
 Future<void> main() async {
@@ -418,6 +451,8 @@ class _AuthPageState extends State<AuthPage> {
   bool _isLogin = true;
   bool _loading = false;
   bool _obscurePassword = true;
+  /// Required before sign-up can proceed (login unaffected).
+  bool _acceptedTermsAndPrivacy = false;
 
   @override
   void dispose() {
@@ -469,6 +504,18 @@ class _AuthPageState extends State<AuthPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your password.')),
+      );
+      return;
+    }
+    if (!_isLogin && !_acceptedTermsAndPrivacy) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please agree to the Terms of Use and Privacy Policy '
+            'before creating your account.',
+          ),
+        ),
       );
       return;
     }
@@ -780,6 +827,15 @@ class _AuthPageState extends State<AuthPage> {
                   if (!_loading) _submit();
                 },
               ),
+              if (!_isLogin) ...[
+                const SizedBox(height: 14),
+                SignupLegalAgreement(
+                  accepted: _acceptedTermsAndPrivacy,
+                  loading: _loading,
+                  onChanged: (v) =>
+                      setState(() => _acceptedTermsAndPrivacy = v ?? false),
+                ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -808,6 +864,9 @@ class _AuthPageState extends State<AuthPage> {
                     ? null
                     : () => setState(() {
                           _isLogin = !_isLogin;
+                          if (!_isLogin) {
+                            _acceptedTermsAndPrivacy = false;
+                          }
                         }),
                 child: Text(
                   _isLogin
@@ -863,6 +922,24 @@ class SmeetShell extends StatefulWidget {
     });
   }
 
+  // --- Chat tab unread (shell-level indicator; [ChatPage] aggregates, no messaging rewrite) ---
+
+  /// Updates the Chat tab badge total. Called from [ChatPage] when the aggregate unread changes.
+  static void reportChatTabUnread(int total) {
+    smeetChatTabUnreadTotal.value = total < 0 ? 0 : total;
+  }
+
+  /// Clears the Chat tab badge (signed out, no session, etc.).
+  static void clearChatTabUnreadBadge() {
+    smeetChatTabUnreadTotal.value = 0;
+  }
+
+  /// Nudges [ChatPage] to refetch (debounced there) after read state is persisted without a
+  /// new message — e.g. [markChatRead] when popping [ChatRoomPage].
+  static void requestChatInboxRefresh() {
+    smeetChatInboxRefreshSignal.value++;
+  }
+
   @override
   State<SmeetShell> createState() => _SmeetShellState();
 }
@@ -910,6 +987,7 @@ class _SmeetShellState extends State<SmeetShell> {
             _index = 0;
             _profileWelcomeSnackUserId = null;
             _profileSessionKey++;
+            SmeetShell.clearChatTabUnreadBadge();
           });
         }
         _syncJoinedFromDb();
@@ -974,6 +1052,7 @@ class _SmeetShellState extends State<SmeetShell> {
         _phase = ShellAuthPhase.signedOut;
         _profileWelcomeSnackUserId = null;
         _index = 0;
+        SmeetShell.clearChatTabUnreadBadge();
       });
       return;
     }
@@ -1059,6 +1138,26 @@ class _SmeetShellState extends State<SmeetShell> {
     _syncJoinedFromDb();
   }
 
+  Widget _chatNavIcon({required bool selected, required int unread}) {
+    final icon = Icon(
+      selected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+    );
+    if (unread <= 0) return icon;
+    final cs = Theme.of(context).colorScheme;
+    return Badge(
+      backgroundColor: cs.error,
+      textColor: cs.onError,
+      label: Text(
+        unreadLabelForChatTab(unread),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      child: icon,
+    );
+  }
+
   List<Widget> get _pages => [
         HomePage(
           joinedLocal: _joinedLocal,
@@ -1071,7 +1170,9 @@ class _SmeetShellState extends State<SmeetShell> {
           listRevision: _gamesListRevision,
           onGamesMutated: _onGamesMutated,
         ),
-        ChatPage(key: ValueKey(_gamesListRevision)),
+        ChatPage(
+          key: ValueKey(_gamesListRevision),
+        ),
         ProfilePage(key: ValueKey(_profileSessionKey)),
       ];
 
@@ -1150,18 +1251,32 @@ class _SmeetShellState extends State<SmeetShell> {
             debugPrint('[Nav] Profile tab selected (index $_kProfileTabIndex)');
           }
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.swipe), label: 'Swipe'),
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
+          ),
+          const NavigationDestination(icon: Icon(Icons.swipe), label: 'Swipe'),
+          const NavigationDestination(
             icon: Icon(Icons.sports_tennis),
             label: 'MyGame',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
+            icon: ValueListenableBuilder<int>(
+              valueListenable: smeetChatTabUnreadTotal,
+              builder: (context, unread, _) {
+                return _chatNavIcon(selected: false, unread: unread);
+              },
+            ),
+            selectedIcon: ValueListenableBuilder<int>(
+              valueListenable: smeetChatTabUnreadTotal,
+              builder: (context, unread, _) {
+                return _chatNavIcon(selected: true, unread: unread);
+              },
+            ),
             label: 'Chat',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             label: 'Profile',
           ),
@@ -1218,6 +1333,9 @@ class _HomePageState extends State<HomePage> {
   LocationResult? _selectedLocation;
   final _courtFeeCtrl = TextEditingController(text: '20');
 
+  /// True while Create Game is awaiting network; prevents double-submit and disables the CTA.
+  bool _createGameSubmitting = false;
+
   /// Upcoming list filter (Phase 1) — default Australia / Brisbane / 15 km.
   String _filterCountry = 'Australia';
   String _filterCity = 'Brisbane';
@@ -1271,6 +1389,14 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _gamesStream = _fetchGamesStream();
+  }
+
+  /// Recreate the games stream after an error (lightweight retry).
+  void _retryGamesStream() {
+    if (!mounted) return;
+    setState(() {
+      _gamesStream = _fetchGamesStream();
+    });
   }
 
   Stream<List<Map<String, dynamic>>> _fetchGamesStream() {
@@ -1344,50 +1470,104 @@ class _HomePageState extends State<HomePage> {
     setState(() => _endTime = time);
   }
 
-  Future<void> _createGame() async {
-    if (!await _ensureLogin()) return;
-    if (!_formKey.currentState!.validate()) return;
+  /// Start/end on [_gameDate], with overnight sessions rolling `endsAt` to the next day.
+  ({DateTime startsAt, DateTime endsAt})? _computeGameSchedule() {
     if (_gameDate == null || _startTime == null || _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select game date, start time, and end time'),
-        ),
-      );
-      return;
+      return null;
     }
-
     DateTime combine(DateTime d, TimeOfDay t) =>
         DateTime(d.year, d.month, d.day, t.hour, t.minute);
-
-    var startsAt = combine(_gameDate!, _startTime!);
+    final startsAt = combine(_gameDate!, _startTime!);
     var endsAt = combine(_gameDate!, _endTime!);
     if (!endsAt.isAfter(startsAt)) {
       endsAt = endsAt.add(const Duration(days: 1));
     }
+    if (!endsAt.isAfter(startsAt)) {
+      return null;
+    }
+    return (startsAt: startsAt, endsAt: endsAt);
+  }
 
+  /// Sync checks for Create Game (after [FormState.validate]). Returns a user-facing message or null.
+  String? _validateCreateGameFields() {
+    if (_sport.trim().isEmpty) {
+      return 'Please select a sport.';
+    }
+    if (_gameLevel.trim().isEmpty) {
+      return 'Please select a game level.';
+    }
+    if (_gameDate == null || _startTime == null || _endTime == null) {
+      return 'Please select date, start time, and end time.';
+    }
+    if (_computeGameSchedule() == null) {
+      return 'End time must be after start time.';
+    }
+    if (_players < 2 || _players > 12) {
+      return 'Please choose a valid number of players.';
+    }
+    final feeRaw = _courtFeeCtrl.text.trim();
+    final feeVal = double.tryParse(feeRaw);
+    if (feeVal == null || feeVal < 0) {
+      return 'Please enter a valid court fee.';
+    }
+    // Require a structured pick from suggestions, not only free-typed text.
     if (_selectedLocation == null) {
+      return 'Please choose a location from the suggestions.';
+    }
+    final loc = _selectedLocation!;
+    if (loc.address.trim().isEmpty ||
+        !loc.lat.isFinite ||
+        !loc.lng.isFinite) {
+      return 'Please choose a location from the suggestions.';
+    }
+    return null;
+  }
+
+  String _friendlyGameInsertError(Object e) {
+    debugPrint('[CreateGame] games.insert failed: $e');
+    if (e is PostgrestException) {
+      debugPrint(
+        '[CreateGame] PostgrestException code=${e.code} message=${e.message} '
+        'details=${e.details} hint=${e.hint}',
+      );
+    }
+    return 'Couldn’t create the game. Please check your details and try again.';
+  }
+
+  Future<void> _createGame() async {
+    if (_createGameSubmitting) return;
+    if (!await _ensureLogin()) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    final validationError = _validateCreateGameFields();
+    if (validationError != null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please pick a location from suggestions'),
-        ),
+        SnackBar(content: Text(validationError)),
       );
       return;
     }
 
-    final loc = _selectedLocation!.address;
-    final locLat = _selectedLocation!.lat;
-    final locLng = _selectedLocation!.lng;
+    final sched = _computeGameSchedule()!;
+    final startsAt = sched.startsAt;
+    final endsAt = sched.endsAt;
+
+    final loc = _selectedLocation!;
+    final locAddress = loc.address.trim();
+    final locLat = loc.lat;
+    final locLng = loc.lng;
     final fee = _courtFee;
     final each = _perPerson;
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please login first')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to create a game.')),
+      );
       return;
     }
 
+    setState(() => _createGameSubmitting = true);
     try {
       final supabase = Supabase.instance.client;
 
@@ -1398,7 +1578,7 @@ class _HomePageState extends State<HomePage> {
             'game_level': _gameLevel,
             'starts_at': startsAt.toUtc().toIso8601String(),
             'ends_at': endsAt.toUtc().toIso8601String(),
-            'location_text': loc,
+            'location_text': locAddress,
             'location_lat': locLat,
             'location_lng': locLng,
             'players': _players,
@@ -1412,14 +1592,10 @@ class _HomePageState extends State<HomePage> {
       final gameId = result['id'].toString();
       debugPrint('[CreateGameChat] Game inserted OK id=$gameId');
 
-      // Group chat: insert chats → update games.game_chat_id → join_game (RPC).
-      String? setupNote;
-      String? joinGameError;
-      var chatSetupErrorShown = false;
+      var chatRowInserted = false;
+      var gameLinkedToChat = false;
 
       try {
-        // Match working manual inserts: only chat_kind, game_id, title.
-        // DB defaults fill id, created_at, last_message, last_message_at.
         final chatTitle = '$_sport game';
         final chatPayload = <String, dynamic>{
           'chat_kind': 'game',
@@ -1431,7 +1607,6 @@ class _HomePageState extends State<HomePage> {
           '${jsonEncode(chatPayload)}',
         );
 
-        // Prefer returning only id — broad .select() can fail under RLS even when INSERT succeeded.
         final chatRow = await supabase
             .from('chats')
             .insert(chatPayload)
@@ -1445,6 +1620,7 @@ class _HomePageState extends State<HomePage> {
         if (chatId == null || chatId.isEmpty) {
           throw StateError('chats.insert returned no id (row=$chatRow)');
         }
+        chatRowInserted = true;
         debugPrint('[CreateGameChat] Step A: resolved chat_id=$chatId');
 
         debugPrint(
@@ -1457,39 +1633,28 @@ class _HomePageState extends State<HomePage> {
             .select('id, game_chat_id')
             .maybeSingle();
 
-        debugPrint('[CreateGameChat] Step B: games update select result = $afterUpdate');
+        debugPrint(
+          '[CreateGameChat] Step B: games update select result = $afterUpdate',
+        );
 
         if (afterUpdate == null) {
-          const msg =
-              'UPDATE games returned no row — often RLS blocks UPDATE on games, or game id mismatch.';
-          debugPrint('[CreateGameChat] Step B FAILED: $msg');
-          setupNote = msg;
-          if (mounted) {
-            chatSetupErrorShown = true;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                content: Text(
-                  'Game created, but linking chat failed:\n$msg',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                ),
-                duration: const Duration(seconds: 8),
-              ),
-            );
-          }
+          debugPrint(
+            '[CreateGameChat] Step B FAILED: UPDATE games returned no row — '
+            'often RLS blocks UPDATE on games, or game id mismatch.',
+          );
+          gameLinkedToChat = false;
         } else {
           final linked = afterUpdate['game_chat_id']?.toString();
           if (linked != chatId) {
             debugPrint(
               '[CreateGameChat] Step B WARNING: DB game_chat_id=$linked expected $chatId',
             );
-            setupNote = 'game_chat_id mismatch after update (got $linked)';
+            gameLinkedToChat = false;
           } else {
             debugPrint(
               '[CreateGameChat] Step B OK: games.game_chat_id is set to $linked',
             );
+            gameLinkedToChat = true;
           }
         }
       } catch (e, st) {
@@ -1505,29 +1670,19 @@ class _HomePageState extends State<HomePage> {
             'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
           );
         }
-        setupNote = 'Group chat setup failed: $e';
-        if (mounted) {
-          chatSetupErrorShown = true;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              content: Text(
-                'Chat creation failed (game still saved):\n$e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onError,
-                ),
-              ),
-              duration: const Duration(seconds: 10),
-            ),
-          );
-        }
+        // Do not clear [chatRowInserted]: insert may have succeeded before a later step failed.
+        gameLinkedToChat = false;
       }
 
+      var joinOk = true;
       try {
-        debugPrint('[CreateGameChat] Step C: RPC join_game(p_game_id=$gameId) ...');
+        debugPrint(
+          '[CreateGameChat] Step C: RPC join_game(p_game_id=$gameId) ...',
+        );
         await supabase.rpc('join_game', params: {'p_game_id': gameId});
         debugPrint('[CreateGameChat] Step C OK: join_game finished');
       } catch (e, st) {
+        joinOk = false;
         debugPrint('[CreateGameChat] Step C FAILED join_game: $e');
         debugPrint('[CreateGameChat] stackTrace: $st');
         if (e is PostgrestException) {
@@ -1535,56 +1690,45 @@ class _HomePageState extends State<HomePage> {
             '[CreateGameChat] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
           );
         }
-        joinGameError = '$e';
       }
 
       if (!mounted) return;
-      if (!chatSetupErrorShown) {
-        if (joinGameError == null && setupNote == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Game & group chat ready!')),
-          );
-        } else if (joinGameError == null && setupNote != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('✅ Game saved. Note: $setupNote')),
-          );
-        } else if (joinGameError != null && setupNote == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 8),
-              content: Text(
-                '✅ Game & chat linked. join_game failed:\n$joinGameError',
-              ),
+
+      if (!chatRowInserted || !gameLinkedToChat) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Game created, but group chat setup is incomplete. '
+              'Your game still appears in the list below.',
             ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 8),
-              content: Text(
-                '✅ Game saved. $setupNote · join_game: $joinGameError',
-              ),
+            duration: Duration(seconds: 6),
+          ),
+        );
+      } else if (!joinOk) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Game created successfully.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'We couldn’t add you to the roster automatically. '
+              'Open My Game to join this session.',
             ),
-          );
-        }
+            duration: Duration(seconds: 8),
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            duration: Duration(seconds: 6),
-            content: Text(
-              '✅ Game was saved. Chat linking failed — see previous message and console [CreateGameChat].',
-            ),
+            content: Text('Game created successfully.'),
+            duration: Duration(seconds: 4),
           ),
         );
-        if (joinGameError != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 8),
-              content: Text('join_game also failed:\n$joinGameError'),
-            ),
-          );
-        }
       }
+
       setState(() {
         _sport = 'Tennis';
         _gameLevel = 'Beginner';
@@ -1594,7 +1738,6 @@ class _HomePageState extends State<HomePage> {
         _players = 4;
         _selectedLocation = null;
         _courtFeeCtrl.text = '20';
-        // List updates via realtime stream (no manual refresh).
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _upcomingKey.currentContext;
@@ -1609,9 +1752,13 @@ class _HomePageState extends State<HomePage> {
       widget.onGamesMutated?.call();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Save failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyGameInsertError(e))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _createGameSubmitting = false);
+      }
     }
   }
 
@@ -1965,16 +2112,27 @@ class _HomePageState extends State<HomePage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _createGame,
-                icon: const Icon(Icons.add),
-                label: const Text('Create Game'),
+                onPressed: _createGameSubmitting ? null : _createGame,
+                icon: _createGameSubmitting
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.add),
+                label: Text(
+                  _createGameSubmitting ? 'Creating…' : 'Create Game',
+                ),
               ),
             ),
 
             const SizedBox(height: 10),
 
             Text(
-              'Next step: Save to Supabase + share link + join/pay flow',
+              'Games you create appear in the list below.',
 
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: cs.onSurface.withOpacity(0.55),
@@ -2083,14 +2241,17 @@ class _HomePageState extends State<HomePage> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(child: CircularProgressIndicator()),
+                  return const AppLoadingState(
+                    message: 'Loading games…',
                   );
                 }
 
                 if (snapshot.hasError) {
-                  return Text('Load failed: ${snapshot.error}');
+                  return AppErrorState(
+                    message:
+                        'Something went wrong while loading games. Please try again.',
+                    onRetry: _retryGamesStream,
+                  );
                 }
 
                 final games = snapshot.data ?? [];
@@ -2098,16 +2259,21 @@ class _HomePageState extends State<HomePage> {
                 final visible = _filterUpcoming(sortedGames);
 
                 if (sortedGames.isEmpty) {
-                  return Text(
-                    'No games yet. Create your first one!',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  return const AppEmptyState(
+                    icon: Icons.sports_tennis,
+                    title: 'No games yet.',
+                    subtitle:
+                        'Be the first — create a game above, or check back soon.',
                   );
                 }
 
                 if (visible.isEmpty) {
-                  return Text(
-                    'No joinable games within ${_radiusKm.toInt()} km of $_filterCity. Try a larger radius or another city.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  return AppEmptyState(
+                    icon: Icons.location_searching,
+                    title: 'No games in this area yet.',
+                    subtitle:
+                        'No joinable games within ${_radiusKm.toInt()} km of $_filterCity. '
+                        'Try a larger radius or another city.',
                   );
                 }
 
@@ -2405,12 +2571,20 @@ class _SwipePageState extends State<SwipePage> {
     final list = (raw as List).cast<Map<String, dynamic>>();
 
     // 3) 本地过滤：没 swipe 过 + 有共同运动（不限定等级或 availability）
-    final filtered = list.where((p) {
+    var filtered = list.where((p) {
       final id = p['id']?.toString();
       if (id == null) return false;
       if (swipedIds.contains(id)) return false;
       if (!_hasCommonSport(p)) return false;
       return true;
+    }).toList();
+
+    final blockSets = await BlockService.fetchMyBlockSets();
+    filtered = filtered.where((p) {
+      final id = p['id']?.toString();
+      if (id == null) return false;
+      return !blockSets.iBlocked.contains(id) &&
+          !blockSets.blockedMe.contains(id);
     }).toList();
 
     _candidates = filtered;
@@ -2551,57 +2725,34 @@ class _SwipePageState extends State<SwipePage> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading && _candidates.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingState(message: 'Loading matches…');
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('❌ $_error', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              if (_user == null)
-                FilledButton(
-                  onPressed: () async {
-                    final ok = await _ensureLoginAndPrompt(context);
-                    if (!ok) return;
-                    await _bootstrap();
-                  },
-                  child: const Text('Login / Retry'),
-                )
-              else
-                FilledButton(onPressed: _bootstrap, child: const Text('Retry')),
-            ],
-          ),
-        ),
+      return AppErrorState(
+        message:
+            'Something went wrong while loading this page. Please try again.',
+        onRetry: _user == null
+            ? () async {
+                final ok = await _ensureLoginAndPrompt(context);
+                if (!ok) return;
+                await _bootstrap();
+              }
+            : _bootstrap,
+        retryLabel: _user == null ? 'Log in / Retry' : 'Retry',
       );
     }
 
     final cur = _current;
     if (cur == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle_outline, size: 64, color: cs.primary),
-              const SizedBox(height: 12),
-              const Text('No more matches right now.'),
-              const SizedBox(height: 6),
-              Text(
-                'Tip: add more sports in Profile so others can find you.',
-                style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 14),
-              FilledButton(onPressed: _bootstrap, child: const Text('Refresh')),
-            ],
-          ),
-        ),
+      return AppEmptyState(
+        icon: Icons.people_outline,
+        title: 'No matches available right now.',
+            subtitle: _user == null
+                ? 'Sign in and complete your profile to get tailored matches.'
+                : 'Add more sports in Profile so others can find you, then tap Refresh.',
+        actionLabel: 'Refresh',
+        onAction: _bootstrap,
       );
     }
 
@@ -2615,6 +2766,35 @@ class _SwipePageState extends State<SwipePage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          if (_user == null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: cs.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 20, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Browsing as a guest — sign in to like or pass.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface.withValues(alpha: 0.85),
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // 卡片
           Expanded(
             child: Container(
@@ -2965,15 +3145,38 @@ class _MyGamePageState extends State<MyGamePage> {
       future: _myGamesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const AppLoadingState(message: 'Loading your games…');
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Load failed: ${snapshot.error}'));
+          return AppErrorState(
+            message:
+                'Something went wrong while loading your games. Please try again.',
+            onRetry: () {
+              setState(() => _myGamesFuture = _fetchMyGames());
+            },
+          );
         }
 
         final games = snapshot.data ?? [];
         if (games.isEmpty) {
-          return const Center(child: Text('No joined games yet.'));
+          final loggedIn = Supabase.instance.client.auth.currentUser != null;
+          return AppEmptyState(
+            icon: Icons.sports_outlined,
+            title: loggedIn
+                ? 'No joined games yet.'
+                : 'No games to show yet.',
+            subtitle: loggedIn
+                ? 'Join a game from the Home tab or create your own.'
+                : 'Sign in to see games you’ve joined. You can still browse Home as a guest.',
+            actionLabel: loggedIn ? null : 'Log in',
+            onAction: loggedIn
+                ? null
+                : () async {
+                    final ok = await _ensureLoginAndPrompt(context);
+                    if (!mounted || !ok) return;
+                    setState(() => _myGamesFuture = _fetchMyGames());
+                  },
+          );
         }
 
         return ListView.builder(
@@ -3182,7 +3385,10 @@ class _MyGamePageState extends State<MyGamePage> {
 /// --- 页面 4：Chat（聊天） ---
 ///
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  const ChatPage({super.key, this.onTotalUnreadChanged});
+
+  /// Notifies parent (e.g. [SmeetShell]) of aggregate unread for the Chat tab badge.
+  final ValueChanged<int>? onTotalUnreadChanged;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -3193,15 +3399,138 @@ class _ChatPageState extends State<ChatPage> {
 
   late Future<List<Map<String, dynamic>>> _chatsFuture;
 
+  StreamSubscription<List<Map<String, dynamic>>>? _messagesRealtimeSub;
+  List<String> _boundChatIds = const [];
+  Timer? _realtimeRefreshDebounce;
+  Timer? _inboxSignalDebounce;
+
+  int _lastPushedUnreadTotal = -1;
+  String? _lastPushedOpenId;
+
+  /// After [markChatRead] (e.g. leaving a room), refetch so row unreads + tab badge match DB.
+  void _onInboxRefreshSignal() {
+    _inboxSignalDebounce?.cancel();
+    _inboxSignalDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _chatsFuture = _fetchMyChats());
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _chatsFuture = _fetchMyChats();
+    smeetChatInboxRefreshSignal.addListener(_onInboxRefreshSignal);
+  }
+
+  @override
+  void dispose() {
+    smeetChatInboxRefreshSignal.removeListener(_onInboxRefreshSignal);
+    _inboxSignalDebounce?.cancel();
+    _realtimeRefreshDebounce?.cancel();
+    _messagesRealtimeSub?.cancel();
+    super.dispose();
+  }
+
+  bool _sameChatIdList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final sa = [...a]..sort();
+    final sb = [...b]..sort();
+    for (var i = 0; i < sa.length; i++) {
+      if (sa[i] != sb[i]) return false;
+    }
+    return true;
+  }
+
+  int _sumUnreadForOpen(
+    List<Map<String, dynamic>> chats,
+    String? openChatId,
+  ) {
+    var s = 0;
+    for (final c in chats) {
+      final id = c['chat_id'].toString();
+      final u = (c['unread'] as num?)?.toInt() ?? 0;
+      if (openChatId != null && openChatId == id) continue;
+      s += u;
+    }
+    return s;
+  }
+
+  void _pushUnreadToShell(
+    List<Map<String, dynamic>> chats,
+    String? openChatId,
+  ) {
+    final total = _sumUnreadForOpen(chats, openChatId);
+    if (total == _lastPushedUnreadTotal && openChatId == _lastPushedOpenId) {
+      return;
+    }
+    _lastPushedUnreadTotal = total;
+    _lastPushedOpenId = openChatId;
+    SmeetShell.reportChatTabUnread(total);
+    widget.onTotalUnreadChanged?.call(total);
+    debugPrint('[Unread] shell total=$total openChat=$openChatId');
+    for (final c in chats) {
+      final id = c['chat_id'].toString();
+      final raw = (c['unread'] as num?)?.toInt() ?? 0;
+      final disp = (openChatId != null && openChatId == id) ? 0 : raw;
+      if (raw > 0) {
+        debugPrint('[Unread] chat $id raw=$raw display_for_row=$disp');
+      }
+    }
+  }
+
+  void _bindMessagesRealtime(List<String> chatIds) {
+    if (_sameChatIdList(chatIds, _boundChatIds) &&
+        _messagesRealtimeSub != null) {
+      return;
+    }
+    _messagesRealtimeSub?.cancel();
+    _messagesRealtimeSub = null;
+    _boundChatIds = List<String>.from(chatIds);
+    if (chatIds.isEmpty) return;
+
+    try {
+      _messagesRealtimeSub = Supabase.instance.client
+          .from('messages')
+          .stream(primaryKey: const ['id'])
+          .inFilter('chat_id', chatIds)
+          .listen(
+        (_) => _scheduleChatsRefreshFromRealtime(),
+        onError: (Object e) {
+          debugPrint('[Unread] messages realtime stream error: $e');
+        },
+      );
+      debugPrint(
+        '[Unread] subscribed messages stream for ${chatIds.length} chat(s)',
+      );
+    } catch (e) {
+      debugPrint('[Unread] messages realtime bind failed: $e');
+    }
+  }
+
+  void _scheduleChatsRefreshFromRealtime() {
+    _realtimeRefreshDebounce?.cancel();
+    _realtimeRefreshDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      debugPrint('[Unread] realtime → refetch chat list');
+      setState(() => _chatsFuture = _fetchMyChats());
+    });
   }
 
   Future<List<Map<String, dynamic>>> _fetchMyChats() async {
     final u = _user;
-    if (u == null) return [];
+    if (u == null) {
+      _messagesRealtimeSub?.cancel();
+      _messagesRealtimeSub = null;
+      _boundChatIds = [];
+      _lastPushedUnreadTotal = -1;
+      _lastPushedOpenId = null;
+      if (mounted) {
+        SmeetShell.clearChatTabUnreadBadge();
+        widget.onTotalUnreadChanged?.call(0);
+      }
+      return [];
+    }
 
     final supabase = Supabase.instance.client;
 
@@ -3253,7 +3582,25 @@ class _ChatPageState extends State<ChatPage> {
 
     final enriched =
         await Future.wait(chats.map((c) => _enrichChatRow(c, u.id)));
-    return enriched;
+    if (!mounted) return enriched;
+
+    final blockSets = await BlockService.fetchMyBlockSets();
+    if (!mounted) return enriched;
+
+    final filtered = enriched.where((c) {
+      final kind = (c['chat_kind'] ?? 'direct').toString();
+      if (kind == 'game') return true;
+      final peer = c['direct_peer_id']?.toString();
+      if (peer == null || peer.isEmpty) return true;
+      return !blockSets.iBlocked.contains(peer) &&
+          !blockSets.blockedMe.contains(peer);
+    }).toList();
+
+    final ids = filtered.map((e) => e['chat_id'].toString()).toList();
+    _bindMessagesRealtime(ids);
+    _pushUnreadToShell(filtered, smeetOpenChatRoomId.value);
+
+    return filtered;
   }
 
   Future<int> _gameMemberCount(String chatId) async {
@@ -3330,21 +3677,23 @@ class _ChatPageState extends State<ChatPage> {
     };
   }
 
-  Widget _unreadTrailing(int n) {
-    if (n <= 0) return const SizedBox.shrink();
-    final label = n >= 50 ? '50+' : '$n';
+  Widget _compactUnreadBadge(BuildContext context, int unreadShown) {
+    final label = unreadLabelForChatRow(unreadShown);
+    if (label.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(12),
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.error.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: cs.onErrorContainer,
           fontWeight: FontWeight.w800,
-          fontSize: 12,
+          fontSize: 11,
         ),
       ),
     );
@@ -3358,159 +3707,205 @@ class _ChatPageState extends State<ChatPage> {
       future: _chatsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const AppLoadingState(message: 'Loading chats…');
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Load chats failed: ${snapshot.error}'));
+          return AppErrorState(
+            message:
+                'Something went wrong while loading chats. Please try again.',
+            onRetry: () {
+              setState(() => _chatsFuture = _fetchMyChats());
+            },
+          );
         }
 
         final chats = snapshot.data ?? [];
         if (chats.isEmpty) {
-          return Center(
-            child: Text(
-              _user == null
-                  ? 'Login to start chatting.'
-                  : 'No chats yet. Match someone first 🙂',
-            ),
+          return AppEmptyState(
+            icon: _user == null ? Icons.login : Icons.chat_bubble_outline,
+            title: _user == null
+                ? 'Sign in to chat'
+                : 'No chats yet.',
+            subtitle: _user == null
+                ? 'Log in to message people you meet on Smeet.'
+                : 'Match with someone from Swipe to start a conversation.',
+            actionLabel: _user == null ? 'Log in' : null,
+            onAction: _user == null
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AuthPage(),
+                      ),
+                    );
+                  }
+                : null,
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            setState(() => _chatsFuture = _fetchMyChats());
-            await _chatsFuture;
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: chats.length,
-            itemBuilder: (context, i) {
-              final c = chats[i];
-              final chatId = c['chat_id'].toString();
-              final last = (c['last_message'] ?? '').toString();
-              final isGame = (c['chat_kind'] ?? 'direct') == 'game';
-              final uiTitle = (c['ui_title'] ?? c['title'] ?? 'Chat').toString();
-              final uiAvatar = c['ui_avatar']?.toString();
-              final unread = (c['unread'] as num?)?.toInt() ?? 0;
-              final n = (c['member_count'] as num?)?.toInt() ?? 0;
-              final peerId = c['direct_peer_id']?.toString();
+        return ValueListenableBuilder<String?>(
+          valueListenable: smeetOpenChatRoomId,
+          builder: (context, openChatId, _) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _pushUnreadToShell(chats, openChatId);
+            });
 
-              if (isGame) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: cs.primary.withOpacity(0.10),
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: cs.primary.withOpacity(0.12),
-                      child: Icon(Icons.groups, color: cs.primary),
-                    ),
-                    title: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: cs.secondary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'GROUP',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: cs.secondary,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            uiTitle,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      last.isEmpty
-                          ? 'Group chat · $n people'
-                          : last,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: _unreadTrailing(unread),
-                    onTap: () async {
-                      final ok = await _ensureLoginAndPrompt(context);
-                      if (!ok) return;
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatRoomPage(
-                            chatId: chatId,
-                            title: uiTitle,
-                            chatKind: 'game',
-                          ),
-                        ),
-                      );
-                      setState(() => _chatsFuture = _fetchMyChats());
-                    },
-                  ),
-                );
-              }
+            return RefreshIndicator(
+              onRefresh: () async {
+                setState(() => _chatsFuture = _fetchMyChats());
+                await _chatsFuture;
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: chats.length,
+                itemBuilder: (context, i) {
+                  final c = chats[i];
+                  final chatId = c['chat_id'].toString();
+                  final last = (c['last_message'] ?? '').toString();
+                  final isGame = (c['chat_kind'] ?? 'direct') == 'game';
+                  final uiTitle =
+                      (c['ui_title'] ?? c['title'] ?? 'Chat').toString();
+                  final uiAvatar = c['ui_avatar']?.toString();
+                  final rawUnread = (c['unread'] as num?)?.toInt() ?? 0;
+                  final unreadShown = (openChatId != null && openChatId == chatId)
+                      ? 0
+                      : rawUnread;
+                  final n = (c['member_count'] as num?)?.toInt() ?? 0;
+                  final peerId = c['direct_peer_id']?.toString();
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: cs.primary.withOpacity(0.10)),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: cs.primary.withOpacity(0.12),
-                    backgroundImage: uiAvatar != null && uiAvatar.isNotEmpty
-                        ? NetworkImage(uiAvatar)
-                        : null,
-                    child: uiAvatar == null || uiAvatar.isEmpty
-                        ? Icon(Icons.person, color: cs.primary)
-                        : null,
-                  ),
-                  title: Text(
-                    uiTitle,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(
-                    last.isEmpty ? 'Say hi 👋' : last,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: _unreadTrailing(unread),
-                  onTap: () async {
-                    final ok = await _ensureLoginAndPrompt(context);
-                    if (!ok) return;
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatRoomPage(
-                          chatId: chatId,
-                          title: uiTitle,
-                          chatKind: 'direct',
-                          directPeerUserId: peerId,
+                  if (isGame) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: cs.primary.withOpacity(0.10),
                         ),
                       ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: cs.primary.withOpacity(0.12),
+                          child: Icon(Icons.groups, color: cs.primary),
+                        ),
+                        title: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: cs.secondary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'GROUP',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: cs.secondary,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                uiTitle,
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.w800),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (unreadShown > 0) ...[
+                              const SizedBox(width: 8),
+                              _compactUnreadBadge(context, unreadShown),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text(
+                          last.isEmpty
+                              ? 'Group chat · $n people'
+                              : last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () async {
+                          final ok = await _ensureLoginAndPrompt(context);
+                          if (!ok) return;
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatRoomPage(
+                                chatId: chatId,
+                                title: uiTitle,
+                                chatKind: 'game',
+                              ),
+                            ),
+                          );
+                          setState(() => _chatsFuture = _fetchMyChats());
+                        },
+                      ),
                     );
-                    setState(() => _chatsFuture = _fetchMyChats());
-                  },
-                ),
-              );
-            },
-          ),
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: cs.primary.withOpacity(0.10)),
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: cs.primary.withOpacity(0.12),
+                        backgroundImage: uiAvatar != null && uiAvatar.isNotEmpty
+                            ? NetworkImage(uiAvatar)
+                            : null,
+                        child: uiAvatar == null || uiAvatar.isEmpty
+                            ? Icon(Icons.person, color: cs.primary)
+                            : null,
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              uiTitle,
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (unreadShown > 0) ...[
+                            const SizedBox(width: 8),
+                            _compactUnreadBadge(context, unreadShown),
+                          ],
+                        ],
+                      ),
+                      subtitle: Text(
+                        last.isEmpty ? 'Say hi 👋' : last,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () async {
+                        final ok = await _ensureLoginAndPrompt(context);
+                        if (!ok) return;
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatRoomPage(
+                              chatId: chatId,
+                              title: uiTitle,
+                              chatKind: 'direct',
+                              directPeerUserId: peerId,
+                            ),
+                          ),
+                        );
+                        setState(() => _chatsFuture = _fetchMyChats());
+                      },
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );
@@ -3565,16 +3960,26 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   bool _prunePendingPostFrameScheduled = false;
 
+  /// Direct chat only: true if either party blocked the other (client-side).
+  bool _eitherBlocked = false;
+  bool _iBlockedThem = false;
+
   @override
   void dispose() {
     _readDebounce?.cancel();
+    if (smeetOpenChatRoomId.value == widget.chatId) {
+      smeetOpenChatRoomId.value = null;
+      debugPrint('[Unread] closed chat room chat_id=${widget.chatId}');
+    }
     final u = _user;
     if (u != null) {
       markChatRead(
         Supabase.instance.client,
         chatId: widget.chatId,
         userId: u.id,
-      );
+      ).then((_) {
+        SmeetShell.requestChatInboxRefresh();
+      });
     }
     _ctrl.dispose();
     _listCtrl.dispose();
@@ -3653,6 +4058,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
+    if (widget.chatKind == 'direct' && _eitherBlocked) return;
 
     var u = _user;
     if (u == null) {
@@ -3726,6 +4132,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   @override
   void initState() {
     super.initState();
+    smeetOpenChatRoomId.value = widget.chatId;
+    debugPrint('[Unread] opened chat room chat_id=${widget.chatId}');
     _messagesStream = Supabase.instance.client
         .from('messages')
         .stream(primaryKey: const ['id'])
@@ -3738,6 +4146,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     _appTitle = widget.title.isNotEmpty ? widget.title : 'Chat';
     if (widget.chatKind == 'direct') {
       _loadDirectHeader();
+      final pid = widget.directPeerUserId;
+      if (pid != null && pid.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _refreshDirectBlockStateForPeer(pid);
+        });
+      }
     } else {
       _loadGameHeaderMeta();
     }
@@ -3799,6 +4213,22 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           _appTitle =
               'User ${peerId.length >= 6 ? peerId.substring(0, 6) : peerId}';
         }
+      });
+      await _refreshDirectBlockStateForPeer(peerId);
+    } catch (_) {}
+  }
+
+  Future<void> _refreshDirectBlockStateForPeer(String peerId) async {
+    if (widget.chatKind != 'direct') return;
+    final u = _user;
+    if (u == null) return;
+    try {
+      final s = await BlockService.fetchMyBlockSets();
+      if (!mounted) return;
+      setState(() {
+        _iBlockedThem = s.iBlocked.contains(peerId);
+        _eitherBlocked =
+            s.iBlocked.contains(peerId) || s.blockedMe.contains(peerId);
       });
     } catch (_) {}
   }
@@ -3877,6 +4307,80 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
   }
 
+  /// Server-backed message id (excludes optimistic / pending placeholders).
+  String? _reportableMessageId(Map<String, dynamic> m) {
+    final id = m['id']?.toString() ?? '';
+    if (id.isEmpty || id.startsWith('__')) return null;
+    return id;
+  }
+
+  Widget _directChatBlockBanner(BuildContext context, ColorScheme cs) {
+    return Material(
+      color: cs.errorContainer.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.block, size: 20, color: cs.onErrorContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _iBlockedThem
+                    ? 'You blocked this player. Unblock from their profile to chat.'
+                    : 'You can’t message this player right now.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onErrorContainer,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onLongPressOtherUserMessage(
+    BuildContext context, {
+    required Map<String, dynamic> m,
+    required String authorUserId,
+  }) {
+    final mid = _reportableMessageId(m);
+    if (mid == null) return;
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.flag_outlined, color: cs.primary),
+              title: const Text('Report message'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                showReportBottomSheet(
+                  context,
+                  title: 'Report message',
+                  subtitle:
+                      'We’ll review this message and the sender. '
+                      'Thank you for helping keep Smeet safe.',
+                  targetUserId:
+                      authorUserId.isNotEmpty ? authorUserId : null,
+                  messageId: mid,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final u = _user;
@@ -3930,15 +4434,20 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 ),
               )
             : InkWell(
-                onTap: _directPeerId == null
+                onTap: (widget.directPeerUserId == null && _directPeerId == null)
                     ? null
-                    : () {
-                        Navigator.of(context).push(
+                    : () async {
+                        final id =
+                            widget.directPeerUserId ?? _directPeerId ?? '';
+                        if (id.isEmpty) return;
+                        await Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) =>
-                                OtherProfilePage(userId: _directPeerId!),
+                            builder: (_) => OtherProfilePage(userId: id),
                           ),
                         );
+                        if (mounted) {
+                          await _refreshDirectBlockStateForPeer(id);
+                        }
                       },
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
@@ -4028,12 +4537,58 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 }
                 final msgs = _mergeVisibleMessages(snapshot.data!);
                 if (msgs.isEmpty) {
-                  return const Center(child: Text('Say hi 👋'));
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.chatKind == 'direct' && _eitherBlocked) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: _directChatBlockBanner(context, cs),
+                        ),
+                      ],
+                      const Expanded(
+                        child: Center(child: Text('Say hi 👋')),
+                      ),
+                    ],
+                  );
                 }
 
-                final newestFirst = msgs.reversed.toList();
+                final displayMsgs = (widget.chatKind == 'direct' &&
+                        _eitherBlocked &&
+                        u != null)
+                    ? msgs
+                        .where((m) => m['user_id']?.toString() == u.id)
+                        .toList()
+                    : msgs;
 
-                final len = msgs.length;
+                if (displayMsgs.isEmpty) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.chatKind == 'direct' && _eitherBlocked) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: _directChatBlockBanner(context, cs),
+                        ),
+                      ],
+                      const Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'Messages are hidden while you and this player can’t chat.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                final newestFirst = displayMsgs.reversed.toList();
+
+                final len = displayMsgs.length;
                 if (len != _prevMsgLen) {
                   debugPrint(
                     '[ChatMessages] rebuild with sorted len=$len '
@@ -4047,7 +4602,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   });
                 }
 
-                return ListView.builder(
+                final listView = ListView.builder(
                   reverse: true,
                   controller: _listCtrl,
                   padding: const EdgeInsets.all(12),
@@ -4062,52 +4617,80 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     final prefix = widget.chatKind == 'game' && !isMe
                         ? '${uidStr.length >= 8 ? uidStr.substring(0, 8) : uidStr} · '
                         : '';
+                    final reportableId = _reportableMessageId(m);
+
+                    Widget bubble = Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      decoration: BoxDecoration(
+                        color: isMe
+                            ? cs.primary.withOpacity(0.18)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: pending
+                              ? cs.outline.withOpacity(0.35)
+                              : cs.primary.withOpacity(0.10),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text('$prefix$text'),
+                          ),
+                          if (pending) ...[
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+
+                    if (!isMe && reportableId != null) {
+                      bubble = GestureDetector(
+                        onLongPress: () => _onLongPressOtherUserMessage(
+                          context,
+                          m: m,
+                          authorUserId: uidStr,
+                        ),
+                        child: bubble,
+                      );
+                    }
 
                     return Align(
                       alignment: isMe
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        constraints: const BoxConstraints(maxWidth: 280),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? cs.primary.withOpacity(0.18)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: pending
-                                ? cs.outline.withOpacity(0.35)
-                                : cs.primary.withOpacity(0.10),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text('$prefix$text'),
-                            ),
-                            if (pending) ...[
-                              const SizedBox(width: 6),
-                              SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: cs.primary.withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                      child: bubble,
                     );
                   },
                 );
+
+                if (widget.chatKind == 'direct' && _eitherBlocked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: _directChatBlockBanner(context, cs),
+                      ),
+                      Expanded(child: listView),
+                    ],
+                  );
+                }
+                return listView;
               },
             ),
           ),
@@ -4117,22 +4700,35 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      decoration: const InputDecoration(
-                        hintText: 'Message...',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _send(),
+              child: widget.chatKind == 'direct' && _eitherBlocked
+                  ? Text(
+                      _iBlockedThem
+                          ? 'Messaging is off until you unblock this player from their profile.'
+                          : 'You can’t send messages in this chat right now.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.78),
+                            height: 1.4,
+                          ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _ctrl,
+                            decoration: const InputDecoration(
+                              hintText: 'Message...',
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => _send(),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton(
+                          onPressed: _send,
+                          child: const Text('Send'),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton(onPressed: _send, child: const Text('Send')),
-                ],
-              ),
             ),
           ),
         ],
@@ -4593,13 +5189,15 @@ class _ProfilePageState extends State<ProfilePage> {
               },
               child: const Text('Login / Sign up'),
             ),
+            const SizedBox(height: 24),
+            const LegalSectionCard(guestMode: true),
           ],
         ),
       );
     }
 
     if (!_loaded && _loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingState(message: 'Loading your profile…');
     }
 
     final slots = const ['Morning', 'Afternoon', 'Night'];
@@ -4937,6 +5535,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
 
+                          const SizedBox(height: 12),
+                          const LegalSectionCard(),
+
+                          const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
@@ -4984,23 +5586,30 @@ class _ProfilePageState extends State<ProfilePage> {
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
+                                return const AppLoadingState(
+                                  message: 'Loading posts…',
                                 );
                               }
 
                               if (snapshot.hasError) {
-                                return Center(
-                                  child: Text(
-                                    'Load posts failed: ${snapshot.error}',
-                                  ),
+                                return AppErrorState(
+                                  message:
+                                      'Something went wrong while loading posts. Please try again.',
+                                  onRetry: () {
+                                    setState(() {
+                                      _myPostsFuture = _fetchMyPosts();
+                                    });
+                                  },
                                 );
                               }
 
                               final posts = snapshot.data ?? [];
                               if (posts.isEmpty) {
-                                return const Center(
-                                  child: Text('No posts yet.'),
+                                return const AppEmptyState(
+                                  icon: Icons.photo_library_outlined,
+                                  title: 'No posts yet.',
+                                  subtitle:
+                                      'Share a photo or video from a session — your grid will show up here.',
                                 );
                               }
 

@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Smeet uses your photo library so you can choose a profile picture and select photos or videos to share in your posts.</string>
 </dict>
 </plist>

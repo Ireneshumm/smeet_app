@@ -80,6 +80,10 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   /// True while resolving place details after user picks an option (skips duplicate searches).
   bool _resolvingPick = false;
 
+  /// Confirmed address string last applied to [_controller] for a successful pick (or parent sync).
+  /// Used to ignore spurious controller notifications that would otherwise clear [_selected].
+  String? _lastConfirmedAddress;
+
   /// When we call [onChanged](null) because the user edited text after a pick, the parent
   /// sets [initialValue] to null; we must not treat that as "reset form" and clear the field.
   bool _suppressNextInitialNullSync = false;
@@ -116,6 +120,9 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     super.initState();
     _sessionToken = _newSessionToken();
     _selected = widget.initialValue;
+    final initialAddr = widget.initialValue?.address.trim();
+    _lastConfirmedAddress =
+        (initialAddr != null && initialAddr.isNotEmpty) ? initialAddr : null;
     _controller.text = widget.initialValue?.address ?? '';
     _controller.addListener(_onControllerChanged);
   }
@@ -126,13 +133,25 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     if (!_sameLocation(oldWidget.initialValue, widget.initialValue)) {
       _selected = widget.initialValue;
       if (widget.initialValue != null) {
-        _armControllerChangeIgnore(extraSkips: 3);
+        final addr = widget.initialValue!.address.trim();
+        _lastConfirmedAddress = addr.isEmpty ? null : addr;
+        _armControllerChangeIgnore(extraSkips: 6);
         _controller.text = widget.initialValue!.address;
       } else if (_suppressNextInitialNullSync) {
         _suppressNextInitialNullSync = false;
       } else {
-        _armControllerChangeIgnore(extraSkips: 3);
+        _lastConfirmedAddress = null;
+        _armControllerChangeIgnore(extraSkips: 6);
         _controller.clear();
+      }
+    } else if (widget.initialValue != null && !_focusNode.hasFocus) {
+      // Parent still holds a confirmed location but the field drifted (e.g. transient query text).
+      final want = widget.initialValue!.address.trim();
+      if (want.isNotEmpty && _controller.text.trim() != want) {
+        _selected = widget.initialValue;
+        _lastConfirmedAddress = want;
+        _armControllerChangeIgnore(extraSkips: 6);
+        _controller.text = widget.initialValue!.address;
       }
     }
   }
@@ -198,13 +217,18 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   }
 
   void _applyResolvedPlace(LocationResult item) {
-    _resolvingPick = false;
-
+    _fetchGeneration++;
     _selected = item;
+    final trimmed = item.address.trim();
+    _lastConfirmedAddress = trimmed.isEmpty ? null : trimmed;
     _sessionToken = _newSessionToken();
 
-    _armControllerChangeIgnore(extraSkips: 3);
+    // Apply resolved address before clearing [_resolvingPick] so [optionsBuilder] does not run
+    // with stale query text while we still consider this pick in progress.
+    _armControllerChangeIgnore(extraSkips: 8);
     _controller.text = item.address;
+
+    _resolvingPick = false;
 
     if (mounted) {
       setState(() {
@@ -233,7 +257,14 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     if (!mounted) return;
 
     if (_selected != null) {
+      final current = _controller.text.trim();
+      final confirmed = _lastConfirmedAddress ?? _selected!.address.trim();
+      // Spurious notifications often fire after we set the resolved address; do not drop selection.
+      if (current == confirmed) {
+        return;
+      }
       _selected = null;
+      _lastConfirmedAddress = null;
       _suppressNextInitialNullSync = true;
       widget.onChanged(null);
     }
@@ -428,6 +459,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
                         : IconButton(
                             onPressed: () {
                               _fetchGeneration++;
+                              _lastConfirmedAddress = null;
                               _controller.clear();
                               _selected = null;
                               widget.onChanged(null);
