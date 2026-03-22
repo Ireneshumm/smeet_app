@@ -985,6 +985,12 @@ class _SmeetShellState extends State<SmeetShell> {
     if (!mounted || startEpoch != _authResolveEpoch) return;
 
     if (row == null) {
+      if (kDebugMode) {
+        debugPrint(
+          '[shell_auth] profile row missing → Profile tab '
+          'user=${u.id} (was index=$_index)',
+        );
+      }
       setState(() {
         _phase = ShellAuthPhase.signedInProfileMissing;
         _index = _kProfileTabIndex;
@@ -1127,7 +1133,10 @@ class _SmeetShellState extends State<SmeetShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          setState(() => _index = i);
+          debugPrint('[Nav] switch tab -> $_index');
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.swipe), label: 'Swipe'),
@@ -4181,6 +4190,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[ProfilePage] initState');
     final u = _user;
     if (u != null) {
       _lastLoadedProfileUserId = u.id;
@@ -4500,6 +4510,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final cs = Theme.of(context).colorScheme;
     final u = _user;
 
+    debugPrint('[ProfilePage] build');
+
     // Logged in after starting as guest: reload profile once session exists.
     if (u != null && _lastLoadedProfileUserId != u.id) {
       final id = u.id;
@@ -4559,14 +4571,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final slots = const ['Morning', 'Afternoon', 'Night'];
 
+    // No nested Scaffold (parent [SmeetShell] already has one) — avoids mobile
+    // primary-scroll / inset bugs. [Expanded] + [TabBarView] uses remaining height
+    // instead of a fixed 900px box (broken on short viewports / some devices).
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
               // Top header
               Container(
                 width: double.infinity,
@@ -4651,8 +4665,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 12),
 
-              SizedBox(
-                height: 900, // 简单处理：给 TabBarView 一个高度
+              Expanded(
                 child: TabBarView(
                   children: [
                     // ========== TAB 1: Profile ==========
@@ -4995,7 +5008,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ],
-          ),
         ),
       ),
     );
@@ -5064,6 +5076,12 @@ class _PostMediaState extends State<_PostMedia> {
       // 可选：默认静音，避免刷屏有声音
       _vc!.setVolume(0);
       if (mounted) setState(() {});
+    }).catchError((Object e, StackTrace st) {
+      if (kDebugMode) {
+        debugPrint('[PostMedia] VideoPlayer.initialize failed: $e');
+        debugPrint('$st');
+      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -5124,6 +5142,16 @@ class _PostMediaState extends State<_PostMedia> {
           child: FutureBuilder<void>(
             future: _initFuture,
             builder: (context, snap) {
+              if (snap.hasError) {
+                return AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: _emptyBox(
+                    context,
+                    icon: Icons.error_outline,
+                    label: 'Video failed to load',
+                  ),
+                );
+              }
               if (snap.connectionState != ConnectionState.done) {
                 return AspectRatio(
                   aspectRatio: 4 / 3,
