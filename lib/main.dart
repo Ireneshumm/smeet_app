@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:smeet_app/game_balance.dart';
+import 'package:smeet_app/geo_utils.dart';
+import 'package:smeet_app/other_profile_page.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
 
 Future<void> main() async {
@@ -287,14 +290,69 @@ class SmeetShell extends StatefulWidget {
 class _SmeetShellState extends State<SmeetShell> {
   int _index = 0;
   final Set<String> _joinedLocal = {};
+  /// Bumps when joins / DB sync changes so My Game & related lists refetch.
+  int _gamesListRevision = 0;
 
-  late final List<Widget> _pages = [
-    HomePage(joinedLocal: _joinedLocal), // 👈 这里传进去
-    const SwipePage(),
-    MyGamePage(joinedLocal: _joinedLocal), // 👈 这里也传
-    const ChatPage(),
-    const ProfilePage(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _syncJoinedFromDb();
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      _syncJoinedFromDb();
+    });
+  }
+
+  Future<void> _syncJoinedFromDb() async {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) {
+      if (mounted) {
+        setState(() {
+          _joinedLocal.clear();
+          _gamesListRevision++;
+        });
+      }
+      return;
+    }
+    try {
+      final rows = await Supabase.instance.client
+          .from('game_participants')
+          .select('game_id')
+          .eq('user_id', u.id)
+          .eq('status', 'joined');
+      final ids = (rows as List)
+          .map((e) => e['game_id'].toString())
+          .toSet();
+      if (!mounted) return;
+      setState(() {
+        _joinedLocal
+          ..clear()
+          ..addAll(ids);
+        _gamesListRevision++;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _gamesListRevision++);
+    }
+  }
+
+  void _onGamesMutated() {
+    _syncJoinedFromDb();
+  }
+
+  List<Widget> get _pages => [
+        HomePage(
+          joinedLocal: _joinedLocal,
+          onGamesMutated: _onGamesMutated,
+        ),
+        const SwipePage(),
+        MyGamePage(
+          key: ValueKey(_gamesListRevision),
+          joinedLocal: _joinedLocal,
+          listRevision: _gamesListRevision,
+          onGamesMutated: _onGamesMutated,
+        ),
+        ChatPage(key: ValueKey(_gamesListRevision)),
+        const ProfilePage(),
+      ];
 
   String get _title {
     switch (_index) {
@@ -372,8 +430,13 @@ class _SmeetShellState extends State<SmeetShell> {
 /// --- 页面 1：Home（Create Game） ---
 class HomePage extends StatefulWidget {
   final Set<String> joinedLocal;
+  final VoidCallback? onGamesMutated;
 
-  const HomePage({super.key, required this.joinedLocal});
+  const HomePage({
+    super.key,
+    required this.joinedLocal,
+    this.onGamesMutated,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -399,6 +462,55 @@ class _HomePageState extends State<HomePage> {
   int _players = 4;
   LocationResult? _selectedLocation;
   final _courtFeeCtrl = TextEditingController(text: '20');
+
+  /// Upcoming list filter (Phase 1) — default Australia / Brisbane / 15 km.
+  String _filterCountry = 'Australia';
+  String _filterCity = 'Brisbane';
+  double _radiusKm = 15;
+
+  (double, double) get _searchCenter {
+    final m = kPresetCityCenters[_filterCountry];
+    if (m != null && m.containsKey(_filterCity)) {
+      final r = m[_filterCity]!;
+      return (r.$1, r.$2);
+    }
+    return kPresetCityCenters['Australia']!['Brisbane']!;
+  }
+
+  List<Map<String, dynamic>> _filterUpcoming(
+    List<Map<String, dynamic>> games,
+  ) {
+    final (lat0, lng0) = _searchCenter;
+    final out = <Map<String, dynamic>>[];
+    for (final g in games) {
+      final players = (g['players'] as num?)?.toInt() ?? 0;
+      final joined = (g['joined_count'] as num?)?.toInt() ?? 0;
+      if (players <= 0 || joined >= players) continue;
+
+      final la = g['location_lat'];
+      final ln = g['location_lng'];
+      if (la == null || ln == null) continue;
+
+      final d = haversineKm(
+        lat0,
+        lng0,
+        (la as num).toDouble(),
+        (ln as num).toDouble(),
+      );
+      if (d <= _radiusKm) {
+        out.add({...g, '_distance_km': d});
+      }
+    }
+    out.sort((a, b) {
+      final ta = DateTime.tryParse(a['starts_at']?.toString() ?? '');
+      final tb = DateTime.tryParse(b['starts_at']?.toString() ?? '');
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return ta.compareTo(tb);
+    });
+    return out;
+  }
 
   @override
   void initState() {
@@ -512,7 +624,32 @@ class _HomePageState extends State<HomePage> {
           .select('id')
           .single();
 
-      final gameId = result['id'];
+      final gameId = result['id'].toString();
+
+      // Phase 3: group chat for this game (ignored if DB columns not migrated yet).
+      try {
+        final shortLoc = loc.split(',').first.trim();
+        final chatRow = await supabase
+            .from('chats')
+            .insert({
+              'chat_kind': 'game',
+              'game_id': gameId,
+              'title': 'Game — $_sport @ $shortLoc',
+            })
+            .select('id')
+            .single();
+        final chatId = chatRow['id'].toString();
+        await supabase
+            .from('games')
+            .update({'game_chat_id': chatId})
+            .eq('id', gameId);
+        await supabase.from('chat_members').insert({
+          'chat_id': chatId,
+          'user_id': user.id,
+        });
+      } catch (_) {
+        // Migration not applied or RLS — game still created.
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -549,7 +686,6 @@ class _HomePageState extends State<HomePage> {
     try {
       final supabase = Supabase.instance.client;
       final user = Supabase.instance.client.auth.currentUser;
-      debugPrint('USER = ${user?.id}');
       if (user == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -566,51 +702,64 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      // 1) 读当前 joined_count / players
-      final row = await supabase
-          .from('games')
-          .select('joined_count, players')
-          .eq('id', gameId)
-          .maybeSingle();
-
-      if (row == null) {
-        throw Exception('Game not found or blocked by RLS');
+      // Phase 2: prefer RPC + game_participants (run supabase migration).
+      try {
+        await supabase.rpc('join_game', params: {'p_game_id': gameId});
+      } catch (e) {
+        // Legacy fallback if RPC / table not deployed yet
+        final row = await supabase
+            .from('games')
+            .select('joined_count, players')
+            .eq('id', gameId)
+            .maybeSingle();
+        if (row == null) {
+          throw Exception('Game not found or blocked by RLS');
+        }
+        final joined = (row['joined_count'] as num?)?.toInt() ?? 0;
+        final players = (row['players'] as num?)?.toInt() ?? 0;
+        if (joined >= players) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('❌ Full already')),
+          );
+          return;
+        }
+        final updated = await supabase
+            .from('games')
+            .update({'joined_count': joined + 1})
+            .eq('id', gameId)
+            .select('id, joined_count')
+            .maybeSingle();
+        if (updated == null) {
+          throw Exception('No row updated (RLS?)');
+        }
       }
 
-      final joined = (row['joined_count'] as num?)?.toInt() ?? 0;
-      final players = (row['players'] as num?)?.toInt() ?? 0;
-
-      if (joined >= players) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('❌ Full already')));
-        return;
-      }
-
-      // 2) ✅ update 后立刻 select 返回新值（关键！）
-      final updated = await supabase
-          .from('games')
-          .update({'joined_count': joined + 1})
-          .eq('id', gameId)
-          .select('id, joined_count')
-          .maybeSingle();
-
-      if (updated == null) {
-        throw Exception(
-          'No row updated (blocked by RLS/permission or id not found)',
-        );
-      }
+      // Add to game group chat when present (Phase 3).
+      try {
+        final g = await supabase
+            .from('games')
+            .select('game_chat_id')
+            .eq('id', gameId)
+            .maybeSingle();
+        final cid = g?['game_chat_id']?.toString();
+        if (cid != null) {
+          await supabase.from('chat_members').insert({
+            'chat_id': cid,
+            'user_id': user.id,
+          });
+        }
+      } catch (_) {}
 
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('✅ Joined!')));
 
-      // Realtime stream updates joined_count for everyone; we only track local Joined UI.
       setState(() {
         widget.joinedLocal.add(gameId);
       });
+      widget.onGamesMutated?.call();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -844,6 +993,90 @@ class _HomePageState extends State<HomePage> {
             ),
 
             const SizedBox(height: 18),
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Browse near you',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _filterCountry,
+                    decoration: const InputDecoration(
+                      labelText: 'Country',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: kPresetCityCenters.keys
+                        .map(
+                          (c) => DropdownMenuItem(value: c, child: Text(c)),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() {
+                        _filterCountry = v;
+                        final cities = kPresetCityCenters[v]?.keys.toList();
+                        if (cities != null &&
+                            cities.isNotEmpty &&
+                            !cities.contains(_filterCity)) {
+                          _filterCity = cities.first;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Builder(
+                    builder: (context) {
+                      final cities = kPresetCityCenters[_filterCountry]
+                              ?.keys
+                              .toList() ??
+                          <String>['Brisbane'];
+                      final cityVal =
+                          cities.contains(_filterCity) ? _filterCity : cities.first;
+                      return DropdownButtonFormField<String>(
+                        value: cityVal,
+                        decoration: const InputDecoration(
+                          labelText: 'City / area',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: cities
+                            .map(
+                              (c) =>
+                                  DropdownMenuItem(value: c, child: Text(c)),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => _filterCity = v);
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Radius',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5.0, 10.0, 15.0, 25.0, 50.0].map((km) {
+                      final sel = _radiusKm == km;
+                      return ChoiceChip(
+                        label: Text('${km.toInt()} km'),
+                        selected: sel,
+                        onSelected: (_) => setState(() => _radiusKm = km),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
             Align(
               key: _upcomingKey,
               alignment: Alignment.centerLeft,
@@ -872,8 +1105,8 @@ class _HomePageState extends State<HomePage> {
                 }
 
                 final games = snapshot.data ?? [];
-                // Reverse the list since stream ordering might differ
                 final sortedGames = games.reversed.toList();
+                final visible = _filterUpcoming(sortedGames);
 
                 if (sortedGames.isEmpty) {
                   return Text(
@@ -882,8 +1115,15 @@ class _HomePageState extends State<HomePage> {
                   );
                 }
 
+                if (visible.isEmpty) {
+                  return Text(
+                    'No joinable games within ${_radiusKm.toInt()} km of $_filterCity. Try a larger radius or another city.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  );
+                }
+
                 return Column(
-                  children: sortedGames.map((g) {
+                  children: visible.map((g) {
                     final sport = g['sport'] ?? '';
                     final loc = g['location_text'] ?? '';
                     final players = (g['players'] as num?)?.toInt() ?? 0;
@@ -891,10 +1131,10 @@ class _HomePageState extends State<HomePage> {
                     final remaining = (players - joined) < 0
                         ? 0
                         : (players - joined);
-                    final isFull = remaining == 0;
                     final gameId = g['id'].toString();
                     final perPerson = (g['per_person'] ?? 0.0) as num;
                     final isJoined = widget.joinedLocal.contains(gameId);
+                    final distKm = (g['_distance_km'] as double?) ?? 0.0;
 
                     DateTime? startsAt;
                     if (g['starts_at'] != null) {
@@ -904,7 +1144,9 @@ class _HomePageState extends State<HomePage> {
                     final when = startsAt == null
                         ? '-'
                         : '${startsAt.year}-${startsAt.month.toString().padLeft(2, '0')}-${startsAt.day.toString().padLeft(2, '0')} '
-                              '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+                            '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+
+                    final suburb = loc.split(',').first.trim();
 
                     return Container(
                       width: double.infinity,
@@ -933,7 +1175,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '$sport • $players players • \$${perPerson.toStringAsFixed(2)}/pp',
+                                  sport.toString(),
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleSmall
@@ -941,38 +1183,41 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  loc,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
                                   when,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Remaining: $remaining',
+                                  suburb,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  formatDistanceKm(distKm),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        color: isFull
-                                            ? Colors.red
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .secondary,
-                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
+                                        fontWeight: FontWeight.w600,
                                       ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$remaining spots left · \$${perPerson.toStringAsFixed(2)} each',
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(width: 12),
                           FilledButton(
-                            onPressed: (isFull || isJoined)
-                                ? null
-                                : () => _joinGame(gameId),
+                            onPressed:
+                                isJoined ? null : () => _joinGame(gameId),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -982,13 +1227,7 @@ class _HomePageState extends State<HomePage> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            child: Text(
-                              isFull
-                                  ? 'Full'
-                                  : isJoined
-                                      ? 'Joined'
-                                      : 'Join',
-                            ),
+                            child: Text(isJoined ? 'Joined' : 'Join'),
                           ),
                         ],
                       ),
@@ -1533,7 +1772,15 @@ class _SwipePageState extends State<SwipePage> {
 /// --- 页面 3：My Game（我的局/我的预约） ---
 class MyGamePage extends StatefulWidget {
   final Set<String> joinedLocal;
-  const MyGamePage({super.key, required this.joinedLocal});
+  final int listRevision;
+  final VoidCallback? onGamesMutated;
+
+  const MyGamePage({
+    super.key,
+    required this.joinedLocal,
+    this.listRevision = 0,
+    this.onGamesMutated,
+  });
 
   @override
   State<MyGamePage> createState() => _MyGamePageState();
@@ -1548,6 +1795,14 @@ class _MyGamePageState extends State<MyGamePage> {
     _myGamesFuture = _fetchMyGames();
   }
 
+  @override
+  void didUpdateWidget(MyGamePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.listRevision != widget.listRevision) {
+      _myGamesFuture = _fetchMyGames();
+    }
+  }
+
   Future<void> _leaveGame(String gameId) async {
     final ok = await _ensureLoginAndPrompt(context);
     if (!ok) return;
@@ -1555,10 +1810,41 @@ class _MyGamePageState extends State<MyGamePage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // 1) 调用 RPC 扣 joined_count
-      await supabase.rpc('leave_game', params: {'p_game_id': gameId});
+      try {
+        await supabase.rpc('leave_game', params: {'p_game_id': gameId});
+      } catch (e) {
+        // Legacy: decrement joined_count only
+        final row = await supabase
+            .from('games')
+            .select('joined_count')
+            .eq('id', gameId)
+            .maybeSingle();
+        final j = (row?['joined_count'] as num?)?.toInt() ?? 0;
+        await supabase
+            .from('games')
+            .update({
+              'joined_count': j > 0 ? j - 1 : 0,
+            })
+            .eq('id', gameId);
+      }
 
-      // 2) 本地移除已加入记录
+      try {
+        final g = await supabase
+            .from('games')
+            .select('game_chat_id')
+            .eq('id', gameId)
+            .maybeSingle();
+        final cid = g?['game_chat_id']?.toString();
+        final u = supabase.auth.currentUser;
+        if (cid != null && u != null) {
+          await supabase
+              .from('chat_members')
+              .delete()
+              .eq('chat_id', cid)
+              .eq('user_id', u.id);
+        }
+      } catch (_) {}
+
       widget.joinedLocal.remove(gameId);
 
       if (!mounted) return;
@@ -1567,10 +1853,10 @@ class _MyGamePageState extends State<MyGamePage> {
         context,
       ).showSnackBar(const SnackBar(content: Text('✅ Left game')));
 
-      // 3) 刷新 MyGame 列表
       setState(() {
         _myGamesFuture = _fetchMyGames();
       });
+      widget.onGamesMutated?.call();
     } catch (e) {
       if (!mounted) return;
 
@@ -1582,24 +1868,91 @@ class _MyGamePageState extends State<MyGamePage> {
     }
   }
 
+  Future<void> _attachRoster(Map<String, dynamic> g) async {
+    final gid = g['id'].toString();
+    final supabase = Supabase.instance.client;
+    try {
+      final parts = await supabase
+          .from('game_participants')
+          .select('user_id')
+          .eq('game_id', gid)
+          .eq('status', 'joined');
+      final ids = (parts as List).map((e) => e['user_id'].toString()).toList();
+      if (ids.isEmpty) {
+        g['_profiles'] = <Map<String, dynamic>>[];
+        return;
+      }
+      final profs = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, city, sport_levels')
+          .inFilter('id', ids);
+      g['_profiles'] = (profs as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      g['_profiles'] = <Map<String, dynamic>>[];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _fetchMyGames() async {
     final supabase = Supabase.instance.client;
+    final u = supabase.auth.currentUser;
 
-    if (widget.joinedLocal.isEmpty) return [];
+    List<Map<String, dynamic>> games;
 
-    final data = await supabase
-        .from('games')
-        .select(
-          'id, sport, starts_at, location_text, players, joined_count, per_person, created_at',
-        )
-        .inFilter('id', widget.joinedLocal.toList())
-        .order('starts_at', ascending: true);
+    if (u != null) {
+      try {
+        final rows = await supabase
+            .from('game_participants')
+            .select(
+              'game_id, games(id, sport, starts_at, location_text, players, joined_count, per_person, created_by)',
+            )
+            .eq('user_id', u.id)
+            .eq('status', 'joined');
 
-    return (data as List).cast<Map<String, dynamic>>();
+        games = [];
+        for (final r in rows as List) {
+          final nested = r['games'];
+          if (nested is Map) {
+            games.add(
+              Map<String, dynamic>.from(Map<Object?, Object?>.from(nested)),
+            );
+          }
+        }
+        games.sort((a, b) {
+          final ta = DateTime.tryParse(a['starts_at']?.toString() ?? '');
+          final tb = DateTime.tryParse(b['starts_at']?.toString() ?? '');
+          if (ta == null && tb == null) return 0;
+          if (ta == null) return 1;
+          if (tb == null) return -1;
+          return ta.compareTo(tb);
+        });
+      } catch (_) {
+        games = [];
+      }
+    } else {
+      games = [];
+    }
+
+    if (games.isEmpty && widget.joinedLocal.isNotEmpty) {
+      final data = await supabase
+          .from('games')
+          .select(
+            'id, sport, starts_at, location_text, players, joined_count, per_person, created_by, created_at',
+          )
+          .inFilter('id', widget.joinedLocal.toList())
+          .order('starts_at', ascending: true);
+      games = (data as List).cast<Map<String, dynamic>>();
+    }
+
+    for (final g in games) {
+      await _attachRoster(g);
+    }
+    return games;
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _myGamesFuture,
       builder: (context, snapshot) {
@@ -1620,9 +1973,14 @@ class _MyGamePageState extends State<MyGamePage> {
           itemCount: games.length,
           itemBuilder: (context, i) {
             final g = games[i];
-            final sport = g['sport'] ?? '';
-            final loc = g['location_text'] ?? '';
+            final sport = (g['sport'] ?? '').toString();
+            final loc = (g['location_text'] ?? '').toString();
             final perPerson = (g['per_person'] ?? 0) as num;
+            final createdBy = (g['created_by'] ?? '').toString();
+            final joinedC = (g['joined_count'] as num?)?.toInt() ?? 0;
+            final profiles =
+                (g['_profiles'] as List?)?.cast<Map<String, dynamic>>() ??
+                    const <Map<String, dynamic>>[];
 
             DateTime? startsAt;
             if (g['starts_at'] != null) {
@@ -1632,41 +1990,114 @@ class _MyGamePageState extends State<MyGamePage> {
             final when = startsAt == null
                 ? '-'
                 : '${startsAt.year}-${startsAt.month.toString().padLeft(2, '0')}-${startsAt.day.toString().padLeft(2, '0')} '
-                      '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+                    '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+
+            final balance = balanceLabelForGroup(
+              sportKey: sport,
+              playerProfiles: profiles.map((e) => e).toList(),
+            );
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.12),
+                  color: cs.primary.withOpacity(0.12),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$sport • \$${perPerson.toStringAsFixed(2)}/pp',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          sport,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      Text(
+                        '\$${perPerson.toStringAsFixed(2)} each',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: cs.secondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(loc, maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
                   Text(when, style: Theme.of(context).textTheme.bodySmall),
-
+                  const SizedBox(height: 4),
+                  Text(
+                    loc,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$joinedC / ${g['players'] ?? '?'} players · $balance',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withOpacity(0.75),
+                        ),
+                  ),
                   const SizedBox(height: 10),
-
+                  Text(
+                    'Who\'s in',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: profiles.map((p) {
+                      final id = p['id']?.toString() ?? '';
+                      final name =
+                          (p['display_name'] ?? 'Player').toString().trim();
+                      final avatar = (p['avatar_url'] ?? '').toString();
+                      final host = id.isNotEmpty && id == createdBy;
+                      return InputChip(
+                        avatar: CircleAvatar(
+                          radius: 14,
+                          backgroundImage:
+                              avatar.isEmpty ? null : NetworkImage(avatar),
+                          child: avatar.isEmpty
+                              ? const Icon(Icons.person, size: 16)
+                              : null,
+                        ),
+                        label: Text(
+                          host ? '$name (host)' : name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: id.isEmpty
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        OtherProfilePage(userId: id),
+                                  ),
+                                );
+                              },
+                      );
+                    }).toList(),
+                  ),
+                  if (profiles.isEmpty)
+                    Text(
+                      'Roster loads after migration (game_participants).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.tonal(
                       onPressed: () => _leaveGame(g['id'].toString()),
-                      child: const Text('Leave'),
+                      child: const Text('Leave game'),
                     ),
                   ),
                 ],
@@ -1705,15 +2136,25 @@ class _ChatPageState extends State<ChatPage> {
 
     final supabase = Supabase.instance.client;
 
-    // 通过 membership 查我的聊天室，并把 chats 信息一起带出来
-    final data = await supabase
-        .from('chat_members')
-        .select('chat_id, chats(id, last_message, last_message_at, created_at)')
-        .eq('user_id', u.id);
+    List<Map<String, dynamic>> list;
+    try {
+      final data = await supabase
+          .from('chat_members')
+          .select(
+            'chat_id, chats(id, last_message, last_message_at, created_at, chat_kind, game_id, title)',
+          )
+          .eq('user_id', u.id);
+      list = (data as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      final data = await supabase
+          .from('chat_members')
+          .select(
+            'chat_id, chats(id, last_message, last_message_at, created_at)',
+          )
+          .eq('user_id', u.id);
+      list = (data as List).cast<Map<String, dynamic>>();
+    }
 
-    final list = (data as List).cast<Map<String, dynamic>>();
-
-    // 展平成 [{chat_id, last_message, last_message_at...}]
     final chats = list.map((row) {
       final chat = (row['chats'] ?? {}) as Map;
       return {
@@ -1721,6 +2162,9 @@ class _ChatPageState extends State<ChatPage> {
         'last_message': chat['last_message'],
         'last_message_at': chat['last_message_at'],
         'created_at': chat['created_at'],
+        'chat_kind': (chat['chat_kind'] ?? 'direct').toString(),
+        'game_id': chat['game_id'],
+        'title': chat['title'],
       };
     }).toList();
 
@@ -1768,6 +2212,18 @@ class _ChatPageState extends State<ChatPage> {
     return 'User ${otherId.substring(0, 6)}';
   }
 
+  Future<int> _gameMemberCount(String chatId) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('chat_members')
+          .select('user_id')
+          .eq('chat_id', chatId);
+      return (rows as List).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1805,6 +2261,58 @@ class _ChatPageState extends State<ChatPage> {
               final c = chats[i];
               final chatId = c['chat_id'].toString();
               final last = (c['last_message'] ?? '').toString();
+              final isGame = (c['chat_kind'] ?? 'direct') == 'game';
+              final gameTitle = (c['title'] ?? 'Game chat').toString();
+
+              if (isGame) {
+                return FutureBuilder<int>(
+                  future: _gameMemberCount(chatId),
+                  builder: (context, cntSnap) {
+                    final n = cntSnap.data ?? 0;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: cs.primary.withOpacity(0.10),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: cs.primary.withOpacity(0.12),
+                          child: Icon(Icons.groups, color: cs.primary),
+                        ),
+                        title: Text(
+                          'Game — $gameTitle',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          last.isEmpty
+                              ? 'Group chat · $n people'
+                              : last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () async {
+                          final ok = await _ensureLoginAndPrompt(context);
+                          if (!ok) return;
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatRoomPage(
+                                chatId: chatId,
+                                title: gameTitle,
+                                chatKind: 'game',
+                              ),
+                            ),
+                          );
+                          setState(() => _chatsFuture = _fetchMyChats());
+                        },
+                      ),
+                    );
+                  },
+                );
+              }
 
               return FutureBuilder<String>(
                 future: _otherUserLabel(chatId),
@@ -1835,11 +2343,14 @@ class _ChatPageState extends State<ChatPage> {
                       onTap: () async {
                         final ok = await _ensureLoginAndPrompt(context);
                         if (!ok) return;
-                        final title = nameSnap.data ?? 'Chat';
+                        final t = nameSnap.data ?? 'Chat';
                         await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) =>
-                                ChatRoomPage(chatId: chatId, title: title),
+                            builder: (_) => ChatRoomPage(
+                              chatId: chatId,
+                              title: t,
+                              chatKind: 'direct',
+                            ),
                           ),
                         );
                         setState(() => _chatsFuture = _fetchMyChats());
@@ -1858,9 +2369,16 @@ class _ChatPageState extends State<ChatPage> {
 
 class ChatRoomPage extends StatefulWidget {
   final String chatId;
-  final String title; // ✅ 新增这一行
+  final String title;
+  /// `direct` (1:1 match) or `game` (group).
+  final String chatKind;
 
-  const ChatRoomPage({super.key, required this.chatId, required this.title});
+  const ChatRoomPage({
+    super.key,
+    required this.chatId,
+    required this.title,
+    this.chatKind = 'direct',
+  });
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -1914,11 +2432,13 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   void initState() {
     super.initState();
     _appTitle = widget.title.isNotEmpty ? widget.title : 'Chat';
-    _loadOtherName().then((name) {
-      if (mounted) {
-        setState(() => _appTitle = name);
-      }
-    });
+    if (widget.chatKind == 'direct') {
+      _loadOtherName().then((name) {
+        if (mounted) {
+          setState(() => _appTitle = name);
+        }
+      });
+    }
   }
 
   Future<String> _loadOtherName() async {
@@ -1956,6 +2476,80 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
   }
 
+  Future<void> _showGameMembers(BuildContext context) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final rows = await supabase
+          .from('chat_members')
+          .select('user_id')
+          .eq('chat_id', widget.chatId);
+      final ids =
+          (rows as List).map((e) => e['user_id'].toString()).toList();
+      if (ids.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No members found')),
+          );
+        }
+        return;
+      }
+      final profs = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url, city')
+          .inFilter('id', ids);
+      final list = (profs as List).cast<Map<String, dynamic>>();
+      if (!context.mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) {
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                'Players in this game',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              ...list.map((p) {
+                final id = p['id'].toString();
+                final name =
+                    (p['display_name'] ?? 'Player').toString().trim();
+                final av = (p['avatar_url'] ?? '').toString();
+                final city = (p['city'] ?? '').toString();
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage:
+                        av.isEmpty ? null : NetworkImage(av),
+                    child: av.isEmpty ? const Icon(Icons.person) : null,
+                  ),
+                  title: Text(name.isEmpty ? id.substring(0, 8) : name),
+                  subtitle: city.isEmpty ? null : Text(city),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => OtherProfilePage(userId: id),
+                      ),
+                    );
+                  },
+                );
+              }),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load members: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final u = _user;
@@ -1969,7 +2563,17 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         .order('id');
 
     return Scaffold(
-      appBar: AppBar(title: Text(_appTitle)),
+      appBar: AppBar(
+        title: Text(_appTitle),
+        actions: [
+          if (widget.chatKind == 'game')
+            IconButton(
+              tooltip: 'Participants',
+              icon: const Icon(Icons.people_outline),
+              onPressed: () => _showGameMembers(context),
+            ),
+        ],
+      ),
 
       body: Column(
         children: [
@@ -2005,6 +2609,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     final isMe =
                         u != null && m['user_id']?.toString() == u.id;
                     final text = (m['content'] ?? '').toString();
+                    final uidStr = m['user_id']?.toString() ?? '';
+                    final prefix = widget.chatKind == 'game' && !isMe
+                        ? '${uidStr.length >= 8 ? uidStr.substring(0, 8) : uidStr} · '
+                        : '';
 
                     return Align(
                       alignment: isMe
@@ -2026,7 +2634,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             color: cs.primary.withOpacity(0.10),
                           ),
                         ),
-                        child: Text(text),
+                        child: Text('$prefix$text'),
                       ),
                     );
                   },
@@ -2947,63 +3555,6 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 /// 一个统一的占位页（后面再替换成真实页面）
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _PlaceholderPage({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 72, color: cs.primary),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface.withOpacity(0.75),
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Next: we will build this page.'),
-                  ),
-                );
-              },
-              child: const Text('Start building'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _PostMedia extends StatefulWidget {
   final String type; // 'image' | 'video'
   final String url;
