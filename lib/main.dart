@@ -195,20 +195,221 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => _AuthPageState();
 }
 
-/// User-facing copy for common Supabase login failures (no backend changes).
-String _friendlyLoginFailureMessage(Object error) {
-  final raw = error.toString();
-  final low = raw.toLowerCase();
-  if (low.contains('invalid login credentials') ||
-      low.contains('invalid credentials') ||
-      low.contains('email not confirmed') ||
-      low.contains('email_not_confirmed') ||
-      low.contains('user not found')) {
-    return 'Login failed. Please check:\n'
-        '- Have you signed up?\n'
-        '- Is your password correct?';
+/// Friendly login errors — never show raw Supabase strings in the UI.
+String _loginFailureUserMessage(Object error) {
+  const fallback = 'Oops, we couldn’t log you in.\n\n'
+      'New to Smeet?\n'
+      'Tap “Sign up” below to create your account.\n\n'
+      'Already have an account?\n'
+      'Check your email and password, then try again.';
+
+  if (error is AuthException) {
+    final code = (error.code ?? '').toLowerCase();
+    final msg = error.message.toLowerCase();
+
+    if (code == 'email_not_confirmed' ||
+        msg.contains('email not confirmed') ||
+        msg.contains('email_not_confirmed')) {
+      return 'Please verify your email before logging in. '
+          'Check your inbox (and spam folder).';
+    }
+    if (code == 'user_not_found' || msg.contains('user not found')) {
+      return 'This account doesn’t exist yet. '
+          'Tap “Sign up” below to create your account.';
+    }
+    if (code == 'invalid_credentials' ||
+        code == 'invalid_grant' ||
+        msg.contains('invalid login') ||
+        msg.contains('invalid credentials')) {
+      return 'That email or password doesn’t look right. Please try again.';
+    }
   }
-  return raw;
+
+  final raw = error.toString().toLowerCase();
+  if (raw.contains('email not confirmed') || raw.contains('email_not_confirmed')) {
+    return 'Please verify your email before logging in. '
+        'Check your inbox (and spam folder).';
+  }
+  if (raw.contains('user not found')) {
+    return 'This account doesn’t exist yet. '
+        'Tap “Sign up” below to create your account.';
+  }
+  if (raw.contains('invalid login') || raw.contains('invalid credentials')) {
+    return 'That email or password doesn’t look right. Please try again.';
+  }
+  return fallback;
+}
+
+String _signupFailureUserMessage(Object error) {
+  if (error is AuthException) {
+    final code = (error.code ?? '').toLowerCase();
+    final msg = error.message.toLowerCase();
+    if (code == 'user_already_exists' ||
+        msg.contains('already registered') ||
+        msg.contains('already been registered') ||
+        (msg.contains('user') && msg.contains('already'))) {
+      return 'That email is already on Smeet. Try logging in instead.';
+    }
+    if (msg.contains('password') &&
+        (msg.contains('weak') || msg.contains('short') || msg.contains('least'))) {
+      return 'Please choose a stronger password (longer is better).';
+    }
+    if (msg.contains('email') && msg.contains('invalid')) {
+      return 'That email doesn’t look valid. Double-check and try again.';
+    }
+  }
+  return 'We couldn’t create your account. '
+      'Check your email and password, then try again.';
+}
+
+String _forgotPasswordUserMessage(Object error) {
+  if (error is AuthException) {
+    final msg = error.message.toLowerCase();
+    if (msg.contains('rate limit') || msg.contains('too many')) {
+      return 'Too many attempts. Please wait a bit and try again.';
+    }
+    if (msg.contains('invalid') && msg.contains('email')) {
+      return 'That email doesn’t look valid. Please check and try again.';
+    }
+  }
+  return 'We couldn’t send the email. Check your connection and try again.';
+}
+
+bool _emailLooksReasonable(String email) {
+  final t = email.trim();
+  return t.contains('@') && t.length > 3 && !t.startsWith('@');
+}
+
+Widget _authGuidanceLine(BuildContext context, String index, String text) {
+  final cs = Theme.of(context).colorScheme;
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: cs.primary.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          index,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cs.primary,
+              ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final TextEditingController emailController;
+
+  const _ForgotPasswordDialog({required this.emailController});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  bool _sending = false;
+  String? _errorText;
+
+  Future<void> _send() async {
+    final email = widget.emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _errorText = 'Please enter your email');
+      return;
+    }
+    if (!_emailLooksReasonable(email)) {
+      setState(() => _errorText = 'Please enter a valid email address');
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _errorText = null;
+    });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: kIsWeb ? '${Uri.base.origin}/' : null,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      debugPrint('[auth] resetPasswordForEmail failed: $e');
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _errorText = _forgotPasswordUserMessage(e);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset your password'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Enter your email and we’ll send you a link to choose a new password.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: widget.emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                errorText: _errorText,
+              ),
+              autofocus: true,
+              onSubmitted: (_) {
+                if (!_sending) _send();
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sending ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _sending ? null : _send,
+          child: _sending
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Send reset link'),
+        ),
+      ],
+    );
+  }
 }
 
 class _AuthPageState extends State<AuthPage> {
@@ -216,6 +417,7 @@ class _AuthPageState extends State<AuthPage> {
   final _pwCtrl = TextEditingController();
   bool _isLogin = true;
   bool _loading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -224,10 +426,54 @@ class _AuthPageState extends State<AuthPage> {
     super.dispose();
   }
 
+  Future<void> _showForgotPassword() async {
+    final ctrl = TextEditingController(text: _emailCtrl.text.trim());
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => _ForgotPasswordDialog(emailController: ctrl),
+    );
+    ctrl.dispose();
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Check your email to reset your password.',
+          ),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    }
+  }
+
   Future<void> _submit() async {
-    setState(() => _loading = true);
     final email = _emailCtrl.text.trim();
     final password = _pwCtrl.text;
+
+    if (email.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email.')),
+      );
+      return;
+    }
+    if (!_emailLooksReasonable(email)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That email doesn’t look quite right. Please check it.'),
+        ),
+      );
+      return;
+    }
+    if (password.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your password.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
 
     try {
       final auth = Supabase.instance.client.auth;
@@ -276,6 +522,10 @@ class _AuthPageState extends State<AuthPage> {
         );
         // #endregion
         if (mounted) Navigator.of(context).pop();
+        // Shell may miss auth stream timing when this route pops; ensure onboarding runs.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          SmeetShell.requestPostLoginProfileCheck();
+        });
       } else {
         // On web, Supabase may require the redirect URL to be on the allow list
         // (URL Configuration -> Redirect URLs) for email confirmation flows.
@@ -303,23 +553,51 @@ class _AuthPageState extends State<AuthPage> {
         // #endregion
         if (!mounted) return;
         final hasSession = res.session != null;
+        final signupTitle = 'Welcome to Smeet';
         final signupMessage = hasSession
             ? 'Account created. You can now log in.'
-            : 'Account created.\n\nPlease check your email to verify your '
-                'account.';
+            : 'Account created. Please check your email and verify your '
+                'account before logging in.';
+        final signupHint = hasSession
+            ? null
+            : 'Tip: check your spam folder if you don’t see the message.';
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            title: const Text('Success'),
-            content: Text(signupMessage),
+            title: Text(signupTitle),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    signupMessage,
+                    style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(height: 1.45),
+                  ),
+                  if (signupHint != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      signupHint,
+                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                            height: 1.4,
+                            fontStyle: FontStyle.italic,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             actions: [
-              TextButton(
+              FilledButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   if (!mounted) return;
                   if (hasSession) {
                     Navigator.of(context).pop();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      SmeetShell.requestPostLoginProfileCheck();
+                    });
                   } else {
                     setState(() {
                       _isLogin = true;
@@ -327,7 +605,7 @@ class _AuthPageState extends State<AuthPage> {
                     });
                   }
                 },
-                child: const Text('OK'),
+                child: const Text('Got it'),
               ),
             ],
           ),
@@ -357,19 +635,18 @@ class _AuthPageState extends State<AuthPage> {
       );
       // #endregion
       final snackText = isWebFetchFail
-          ? '❌ Browser could not reach Supabase (no HTTP status). '
-              'Use a fixed port: run "Smeet: Chrome (web port 8080)" or '
-              'flutter run -d chrome --web-port=8080, then in Supabase → '
-              'Authentication → URL Configuration set Site URL + Redirect URLs '
-              'for http://localhost:8080 (see WEB_AUTH.md). DevTools → Network '
-              'for details. Raw: $msg'
+          ? 'We can’t reach the sign-in service from this browser.\n\n'
+              'If you’re testing on web, use a fixed port (e.g. 8080) and add '
+              'that URL under Supabase → Authentication → URL Configuration. '
+              'See WEB_AUTH.md for steps.\n\n'
+              '(Technical: $msg)'
           : _isLogin
-              ? '❌ ${_friendlyLoginFailureMessage(e)}'
-              : '❌ Could not create account: $msg';
+              ? _loginFailureUserMessage(e)
+              : _signupFailureUserMessage(e);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: Duration(seconds: _isLogin ? 14 : 12),
+          duration: Duration(seconds: _isLogin ? 16 : 12),
           content: Text(snackText),
         ),
       );
@@ -382,7 +659,7 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(_isLogin ? 'Login' : 'Sign Up')),
+      appBar: AppBar(title: Text(_isLogin ? 'Log in' : 'Sign up')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
@@ -393,40 +670,78 @@ class _AuthPageState extends State<AuthPage> {
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: cs.primaryContainer.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: cs.primary.withOpacity(0.2),
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      'New here? Please sign up first, verify your email, '
-                      'then log in.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            height: 1.4,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'New to Smeet?',
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.onPrimaryContainer,
+                                  ),
+                        ),
+                        const SizedBox(height: 12),
+                        _authGuidanceLine(context, '1', 'Sign up for an account'),
+                        const SizedBox(height: 8),
+                        _authGuidanceLine(
+                          context,
+                          '2',
+                          '(If required) verify your email',
+                        ),
+                        const SizedBox(height: 8),
+                        _authGuidanceLine(
+                          context,
+                          '3',
+                          'Log in to start matching 🎾',
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
               ] else ...[
-                Text(
-                  'How it works',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '1. Create your account below\n'
-                  '2. Open your email and verify your address\n'
-                  '3. Return here, switch to Login, and sign in',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        height: 1.45,
-                        color: cs.onSurface.withOpacity(0.85),
-                      ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: cs.outlineVariant.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Create your account',
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'You’ll use this email to log in and get match updates. '
+                          'If your organizer asks for email verification, check your inbox '
+                          'after signing up — then come back and use Login.',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    height: 1.45,
+                                    color: cs.onSurface.withOpacity(0.88),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -434,12 +749,30 @@ class _AuthPageState extends State<AuthPage> {
                 controller: _emailCtrl,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _pwCtrl,
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) {
+                  if (!_loading) _submit();
+                },
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -447,15 +780,33 @@ class _AuthPageState extends State<AuthPage> {
                 child: FilledButton(
                   onPressed: _loading ? null : _submit,
                   child: Text(
-                    _loading ? '...' : (_isLogin ? 'Login' : 'Create account'),
+                    _loading
+                        ? 'Please wait…'
+                        : (_isLogin ? 'Log in' : 'Create account'),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              if (_isLogin) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: _loading ? null : _showForgotPassword,
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
               TextButton(
-                onPressed: () => setState(() => _isLogin = !_isLogin),
+                onPressed: _loading
+                    ? null
+                    : () => setState(() {
+                          _isLogin = !_isLogin;
+                        }),
                 child: Text(
-                  _isLogin ? 'No account? Sign up' : 'Have an account? Login',
+                  _isLogin
+                      ? 'New here? Sign up'
+                      : 'Already have an account? Log in',
                 ),
               ),
             ],
@@ -476,12 +827,26 @@ Future<bool> _ensureLoginAndPrompt(BuildContext context) async {
     MaterialPageRoute(builder: (_) => const AuthPage()),
   );
 
-  return auth.currentUser != null;
+  final ok = auth.currentUser != null;
+  if (ok) {
+    // Auth route may pop before onAuthStateChange reaches the shell; force check.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SmeetShell.requestPostLoginProfileCheck();
+    });
+  }
+  return ok;
 }
 
 /// Smeet 主框架：底部 5 个 Tab
 class SmeetShell extends StatefulWidget {
   const SmeetShell({super.key});
+
+  /// Run profile onboarding (Profile tab + welcome) if `public.profiles` has no row.
+  /// Call after login / sign-up; [onAuthStateChange] alone can race or be skipped when
+  /// [AuthPage] is popped.
+  static void requestPostLoginProfileCheck() {
+    _SmeetShellState.requestPostLoginProfileCheck();
+  }
 
   @override
   State<SmeetShell> createState() => _SmeetShellState();
@@ -489,6 +854,8 @@ class SmeetShell extends StatefulWidget {
 
 class _SmeetShellState extends State<SmeetShell> {
   static const int _kProfileTabIndex = 4;
+
+  static _SmeetShellState? _instance;
 
   int _index = 0;
   final Set<String> _joinedLocal = {};
@@ -501,9 +868,17 @@ class _SmeetShellState extends State<SmeetShell> {
   /// Avoid duplicate welcome SnackBars for the same signed-in user this session.
   String? _profileWelcomeSnackUserId;
 
+  static void requestPostLoginProfileCheck() {
+    // Yield so Supabase session + navigator settle after AuthPage.pop().
+    Future<void>.delayed(Duration.zero, () {
+      _instance?._scheduleProfileOnboardingIfNeeded();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _instance = this;
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final ev = data.event;
       if (ev == AuthChangeEvent.signedIn ||
@@ -521,6 +896,9 @@ class _SmeetShellState extends State<SmeetShell> {
 
   @override
   void dispose() {
+    if (identical(_instance, this)) {
+      _instance = null;
+    }
     _authSub?.cancel();
     super.dispose();
   }
@@ -536,6 +914,8 @@ class _SmeetShellState extends State<SmeetShell> {
   }
 
   Future<void> _runProfileOnboardingCheck() async {
+    // Let auth session propagate after sign-in / route pop.
+    await Future<void>.delayed(Duration.zero);
     final client = Supabase.instance.client;
     final u = client.auth.currentUser;
     if (u == null) {
@@ -3684,6 +4064,9 @@ class _ProfilePageState extends State<ProfilePage> {
   final _cityCtrl = TextEditingController();
   final _introCtrl = TextEditingController();
 
+  /// Tracks which user we last loaded into the form (guest → login needs reload).
+  String? _lastLoadedProfileUserId;
+
   String? _avatarUrl;
   bool _loading = false;
   bool _loaded = false;
@@ -3726,7 +4109,11 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    final u = _user;
+    if (u != null) {
+      _lastLoadedProfileUserId = u.id;
+      _loadProfile();
+    }
   }
 
   @override
@@ -4038,6 +4425,21 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final u = _user;
+
+    // Logged in after starting as guest: reload profile once session exists.
+    if (u != null && _lastLoadedProfileUserId != u.id) {
+      final id = u.id;
+      _lastLoadedProfileUserId = id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _user?.id == id) {
+          _loadProfile();
+        }
+      });
+    }
+    if (u == null) {
+      _lastLoadedProfileUserId = null;
+    }
 
     // 允许游客打开 profile：提示登录
     if (_user == null) {
