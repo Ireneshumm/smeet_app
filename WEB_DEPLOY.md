@@ -61,3 +61,37 @@ Download `https://www.smeet.com.au/main.dart.js` (or the hashed main file from N
 ## 5. Hosting must build from this repo
 
 If production is **not** built from the same machine/repo (e.g. old manual upload, wrong branch, second copy of the project), fix the pipeline so **only** the linked repo + branch runs `flutter build web --release`.
+
+---
+
+## 6. Vercel + `www.smeet.com.au` (404 / `NOT_FOUND`)
+
+**What serves the domain:** Response headers show `Server: Vercel` and `X-Vercel-Error: NOT_FOUND` when the deployment has **no usable output** (or the wrong output path).
+
+**Why it broke after git cleanup:** `build/` is correctly **gitignored**, so nothing under `build/web` is in the repo. If the Vercel project had **no `buildCommand`** and **no `outputDirectory`**, each deploy ships **no static files** → Vercel returns 404 for `/`.
+
+**What this repo does now:**
+
+- `vercel.json` sets:
+  - `buildCommand`: `bash scripts/vercel_flutter_build.sh` (installs Flutter stable shallow clone, then `flutter build web --release`)
+  - `outputDirectory`: `build/web`
+  - `rewrites`: SPA fallback to `/index.html` (static files still win when present)
+- `scripts/vercel_flutter_build.sh` — run on Vercel’s Linux builders
+
+**Dashboard checks (Vercel → Project → Settings → General / Build & Development):**
+
+| Setting | Expected |
+|--------|-----------|
+| **Root Directory** | `.` (repository root, where `pubspec.yaml` lives) |
+| **Framework Preset** | Other (or leave default; `vercel.json` drives build) |
+| **Build Command** | *(inherit from `vercel.json`)* |
+| **Output Directory** | *(inherit: `build/web`)* |
+| **Install Command** | *(inherit; no-op echo — no npm)* |
+
+**After pushing:** Trigger a **Redeploy** (use **Clear build cache** if a previous failed state is cached).
+
+**Optional:** Mark the script executable in git (Linux):
+
+```bash
+git update-index --chmod=+x scripts/vercel_flutter_build.sh
+```

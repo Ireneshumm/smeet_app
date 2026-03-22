@@ -1,0 +1,2 @@
+# Vercel runs Linux; keep shell scripts LF so bash can execute them.
+scripts/*.sh text eol=lf
