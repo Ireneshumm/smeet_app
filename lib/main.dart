@@ -182,8 +182,8 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Guest mode: never block app access behind login.
-    // Individual pages/actions will call `_ensureLoginAndPrompt` when needed.
+    // Auth + profile onboarding live in [SmeetShell] ([ShellAuthPhase]).
+    // Guests browse until an action calls `_ensureLoginAndPrompt`.
     return const SmeetShell();
   }
 }
@@ -524,7 +524,7 @@ class _AuthPageState extends State<AuthPage> {
         if (mounted) Navigator.of(context).pop();
         // Shell may miss auth stream timing when this route pops; ensure onboarding runs.
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          SmeetShell.requestPostLoginProfileCheck();
+          SmeetShell.refreshAuthState();
         });
       } else {
         // On web, Supabase may require the redirect URL to be on the allow list
@@ -596,7 +596,7 @@ class _AuthPageState extends State<AuthPage> {
                   if (hasSession) {
                     Navigator.of(context).pop();
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      SmeetShell.requestPostLoginProfileCheck();
+                      SmeetShell.refreshAuthState();
                     });
                   } else {
                     setState(() {
@@ -829,23 +829,32 @@ Future<bool> _ensureLoginAndPrompt(BuildContext context) async {
 
   final ok = auth.currentUser != null;
   if (ok) {
-    // Auth route may pop before onAuthStateChange reaches the shell; force check.
+    // Auth route may pop before onAuthStateChange reaches the shell.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      SmeetShell.requestPostLoginProfileCheck();
+      SmeetShell.refreshAuthState();
     });
   }
   return ok;
+}
+
+/// Central auth + profile row state for [SmeetShell] (guest vs needs profile vs ready).
+enum ShellAuthPhase {
+  /// Resolving Supabase session and `public.profiles` (avoid wrong first tab).
+  authResolving,
+  signedOut,
+  signedInProfileMissing,
+  signedInProfileReady,
 }
 
 /// Smeet 主框架：底部 5 个 Tab
 class SmeetShell extends StatefulWidget {
   const SmeetShell({super.key});
 
-  /// Run profile onboarding (Profile tab + welcome) if `public.profiles` has no row.
-  /// Call after login / sign-up; [onAuthStateChange] alone can race or be skipped when
-  /// [AuthPage] is popped.
-  static void requestPostLoginProfileCheck() {
-    _SmeetShellState.requestPostLoginProfileCheck();
+  /// Re-run session + profile row resolution (after login, sign-up, profile save, etc.).
+  static void refreshAuthState() {
+    Future<void>.delayed(Duration.zero, () {
+      _SmeetShellState.requestRefreshAuthState();
+    });
   }
 
   @override
@@ -857,23 +866,25 @@ class _SmeetShellState extends State<SmeetShell> {
 
   static _SmeetShellState? _instance;
 
+  static void requestRefreshAuthState() {
+    _instance?._scheduleAuthAndProfileResolution();
+  }
+
+  ShellAuthPhase _phase = ShellAuthPhase.authResolving;
+  int _authResolveEpoch = 0;
+  bool _authResolveQueued = false;
+  Future<void>? _authResolveInFlight;
+
   int _index = 0;
   final Set<String> _joinedLocal = {};
   /// Bumps when joins / DB sync changes so My Game & related lists refetch.
   int _gamesListRevision = 0;
+  /// Bumped on sign-out so [ProfilePage] resets cleanly on next login.
+  int _profileSessionKey = 0;
 
   StreamSubscription<AuthState>? _authSub;
-  /// Dedupes concurrent profile-row checks (e.g. `initialSession` + post-frame).
-  Future<void>? _profileOnboardingCheck;
   /// Avoid duplicate welcome SnackBars for the same signed-in user this session.
   String? _profileWelcomeSnackUserId;
-
-  static void requestPostLoginProfileCheck() {
-    // Yield so Supabase session + navigator settle after AuthPage.pop().
-    Future<void>.delayed(Duration.zero, () {
-      _instance?._scheduleProfileOnboardingIfNeeded();
-    });
-  }
 
   @override
   void initState() {
@@ -881,16 +892,29 @@ class _SmeetShellState extends State<SmeetShell> {
     _instance = this;
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final ev = data.event;
+      if (ev == AuthChangeEvent.signedOut) {
+        _authResolveEpoch++;
+        _authResolveQueued = false;
+        if (mounted) {
+          setState(() {
+            _phase = ShellAuthPhase.signedOut;
+            _index = 0;
+            _profileWelcomeSnackUserId = null;
+            _profileSessionKey++;
+          });
+        }
+        _syncJoinedFromDb();
+        return;
+      }
       if (ev == AuthChangeEvent.signedIn ||
           ev == AuthChangeEvent.initialSession) {
-        _scheduleProfileOnboardingIfNeeded();
+        _scheduleAuthAndProfileResolution();
       }
       _syncJoinedFromDb();
     });
     _syncJoinedFromDb();
-    // Cold start / edge cases: ensure check runs once the shell is mounted.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleProfileOnboardingIfNeeded();
+      _scheduleAuthAndProfileResolution();
     });
   }
 
@@ -903,36 +927,68 @@ class _SmeetShellState extends State<SmeetShell> {
     super.dispose();
   }
 
-  /// After login or restore, if `public.profiles` has no row for this user,
-  /// switch to Profile and show a one-time welcome message. On query errors,
-  /// fail closed (do not change tab).
-  void _scheduleProfileOnboardingIfNeeded() {
-    _profileOnboardingCheck ??=
-        _runProfileOnboardingCheck().whenComplete(() {
-      _profileOnboardingCheck = null;
+  void _scheduleAuthAndProfileResolution() {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u != null &&
+        (_phase == ShellAuthPhase.signedOut ||
+            _phase == ShellAuthPhase.authResolving)) {
+      setState(() => _phase = ShellAuthPhase.authResolving);
+    }
+    if (_authResolveInFlight != null) {
+      _authResolveQueued = true;
+      return;
+    }
+    _authResolveInFlight = _runAuthAndProfileResolution().whenComplete(() {
+      _authResolveInFlight = null;
+      if (!mounted) return;
+      if (_authResolveQueued) {
+        _authResolveQueued = false;
+        _scheduleAuthAndProfileResolution();
+      }
     });
   }
 
-  Future<void> _runProfileOnboardingCheck() async {
-    // Let auth session propagate after sign-in / route pop.
+  Future<void> _runAuthAndProfileResolution() async {
+    final startEpoch = _authResolveEpoch;
     await Future<void>.delayed(Duration.zero);
+    if (!mounted || startEpoch != _authResolveEpoch) return;
+
     final client = Supabase.instance.client;
     final u = client.auth.currentUser;
+
     if (u == null) {
-      _profileWelcomeSnackUserId = null;
+      if (!mounted || startEpoch != _authResolveEpoch) return;
+      setState(() {
+        _phase = ShellAuthPhase.signedOut;
+        _profileWelcomeSnackUserId = null;
+        _index = 0;
+      });
       return;
     }
+
+    Map<String, dynamic>? row;
     try {
-      final row = await client
+      row = await client
           .from('profiles')
           .select('id')
           .eq('id', u.id)
           .maybeSingle();
-      if (!mounted) return;
-      if (row != null) return;
+    } catch (e, st) {
+      debugPrint('[shell_auth] profiles check failed: $e');
+      debugPrint('$st');
+      if (!mounted || startEpoch != _authResolveEpoch) return;
+      // Fail open: keep app usable if RLS/network breaks profile read.
+      setState(() => _phase = ShellAuthPhase.signedInProfileReady);
+      return;
+    }
 
-      setState(() => _index = _kProfileTabIndex);
+    if (!mounted || startEpoch != _authResolveEpoch) return;
 
+    if (row == null) {
+      setState(() {
+        _phase = ShellAuthPhase.signedInProfileMissing;
+        _index = _kProfileTabIndex;
+      });
       final showWelcome = _profileWelcomeSnackUserId != u.id;
       if (showWelcome) {
         _profileWelcomeSnackUserId = u.id;
@@ -946,9 +1002,8 @@ class _SmeetShellState extends State<SmeetShell> {
           );
         });
       }
-    } catch (e, st) {
-      debugPrint('[profile_onboarding] profiles check failed (skip nav): $e');
-      debugPrint('$st');
+    } else {
+      setState(() => _phase = ShellAuthPhase.signedInProfileReady);
     }
   }
 
@@ -1001,7 +1056,7 @@ class _SmeetShellState extends State<SmeetShell> {
           onGamesMutated: _onGamesMutated,
         ),
         ChatPage(key: ValueKey(_gamesListRevision)),
-        const ProfilePage(),
+        ProfilePage(key: ValueKey(_profileSessionKey)),
       ];
 
   String get _title {
@@ -1023,6 +1078,23 @@ class _SmeetShellState extends State<SmeetShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_phase == ShellAuthPhase.authResolving) {
+      return const Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading…'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: _index == 0
@@ -4222,6 +4294,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('✅ Profile saved')));
+      SmeetShell.refreshAuthState();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
