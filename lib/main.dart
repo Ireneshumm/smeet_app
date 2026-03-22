@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:postgrest/postgrest.dart' show PostgrestException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -55,22 +56,10 @@ List<Map<String, dynamic>> sortedChatMessages(
   return copy;
 }
 
-/// e.g. "Saturday · 03/21/2026"
+/// e.g. "Saturday · 03/21/2026" (weekday uses device locale)
 String formatGameDateHeading(DateTime? start) {
   if (start == null) return 'Date —';
-  const weekdays = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-  final w = weekdays[start.weekday - 1];
-  final mon = start.month.toString().padLeft(2, '0');
-  final d = start.day.toString().padLeft(2, '0');
-  return '$w · $mon/$d/${start.year}';
+  return DateFormat('EEEE · MM/dd/yyyy').format(start);
 }
 
 Future<int> countUnreadForChat({
@@ -772,23 +761,31 @@ class _HomePageState extends State<HomePage> {
       String? setupNote;
       String? joinGameError;
       var chatSetupErrorShown = false;
-      final shortLoc = loc.split(',').first.trim();
 
       try {
+        // Match working manual inserts: only chat_kind, game_id, title.
+        // DB defaults fill id, created_at, last_message, last_message_at.
+        final chatTitle = '$_sport game';
+        final chatPayload = <String, dynamic>{
+          'chat_kind': 'game',
+          'game_id': gameId,
+          'title': chatTitle,
+        };
         debugPrint(
-          '[CreateGameChat] Step A: INSERT chats (game_id=$gameId, kind=game) ...',
+          '[CreateGameChat] BEFORE chats.insert → public.chats payload: '
+          '${jsonEncode(chatPayload)}',
         );
+
+        // Prefer returning only id — broad .select() can fail under RLS even when INSERT succeeded.
         final chatRow = await supabase
             .from('chats')
-            .insert({
-              'chat_kind': 'game',
-              'game_id': gameId,
-              'title': '$_sport @ $shortLoc',
-            })
+            .insert(chatPayload)
             .select('id')
             .single();
 
-        debugPrint('[CreateGameChat] Step A OK: chats insert result = $chatRow');
+        debugPrint(
+          '[CreateGameChat] AFTER chats.insert returned row: $chatRow',
+        );
         final chatId = chatRow['id']?.toString();
         if (chatId == null || chatId.isEmpty) {
           throw StateError('chats.insert returned no id (row=$chatRow)');
@@ -845,7 +842,12 @@ class _HomePageState extends State<HomePage> {
         debugPrint('[CreateGameChat] stackTrace: $st');
         if (e is PostgrestException) {
           debugPrint(
-            '[CreateGameChat] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+            '[CreateGameChat] PostgrestException (chats insert / select): '
+            'toString() => ${e.toString()}',
+          );
+          debugPrint(
+            '[CreateGameChat] PostgrestException fields: '
+            'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
           );
         }
         setupNote = 'Group chat setup failed: $e';
@@ -1479,6 +1481,7 @@ class _HomePageState extends State<HomePage> {
                       endsAt = DateTime.tryParse(g['ends_at'])?.toLocal();
                     }
 
+                    final dateLine = formatGameDateHeading(startsAt);
                     final timeRange = formatGameTimeRange(startsAt, endsAt);
 
                     final suburb = loc.split(',').first.trim();
@@ -1520,6 +1523,16 @@ class _HomePageState extends State<HomePage> {
                                       ?.copyWith(fontWeight: FontWeight.w800),
                                 ),
                                 const SizedBox(height: 4),
+                                Text(
+                                  dateLine,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
                                 Text(
                                   timeRange,
                                   style: Theme.of(context).textTheme.bodyMedium
