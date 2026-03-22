@@ -521,6 +521,12 @@ class _AuthPageState extends State<AuthPage> {
           })}',
         );
         // #endregion
+        debugPrint(
+          '[Auth] after login currentUser=${Supabase.instance.client.auth.currentUser?.id}',
+        );
+        debugPrint(
+          '[Auth] session=${Supabase.instance.client.auth.currentSession}',
+        );
         if (mounted) Navigator.of(context).pop();
         // Shell may miss auth stream timing when this route pops; ensure onboarding runs.
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -891,6 +897,9 @@ class _SmeetShellState extends State<SmeetShell> {
     super.initState();
     _instance = this;
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      debugPrint(
+        '[Shell] auth change currentUser=${Supabase.instance.client.auth.currentUser?.id}',
+      );
       final ev = data.event;
       if (ev == AuthChangeEvent.signedOut) {
         _authResolveEpoch++;
@@ -958,6 +967,9 @@ class _SmeetShellState extends State<SmeetShell> {
 
     if (u == null) {
       if (!mounted || startEpoch != _authResolveEpoch) return;
+      debugPrint(
+        '[shell_auth] no session → signedOut, reset tab to Home (was index=$_index)',
+      );
       setState(() {
         _phase = ShellAuthPhase.signedOut;
         _profileWelcomeSnackUserId = null;
@@ -985,12 +997,10 @@ class _SmeetShellState extends State<SmeetShell> {
     if (!mounted || startEpoch != _authResolveEpoch) return;
 
     if (row == null) {
-      if (kDebugMode) {
-        debugPrint(
-          '[shell_auth] profile row missing → Profile tab '
-          'user=${u.id} (was index=$_index)',
-        );
-      }
+      debugPrint(
+        '[shell_auth] profile row missing → force Profile tab '
+        'user=${u.id} (was index=$_index)',
+      );
       setState(() {
         _phase = ShellAuthPhase.signedInProfileMissing;
         _index = _kProfileTabIndex;
@@ -1136,6 +1146,9 @@ class _SmeetShellState extends State<SmeetShell> {
         onDestinationSelected: (i) {
           setState(() => _index = i);
           debugPrint('[Nav] switch tab -> $_index');
+          if (i == _kProfileTabIndex) {
+            debugPrint('[Nav] Profile tab selected (index $_kProfileTabIndex)');
+          }
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
@@ -4130,6 +4143,25 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
 /// --- 页面 5：Profile（个人信息） ---
 
+/// Tab content height when [LayoutBuilder] gives unbounded or tiny maxHeight
+/// (IndexedStack / offstage quirks on some mobile embedders). Uses screen minus
+/// approximate app bar + bottom nav — avoids `0.72 * screen` exceeding [Scaffold] body.
+double _profileTabSafeHeight(BoxConstraints constraints, BuildContext context) {
+  final mh = constraints.maxHeight;
+  if (mh.isFinite && mh > 8) {
+    return mh;
+  }
+  final mq = MediaQuery.sizeOf(context);
+  final pad = MediaQuery.paddingOf(context);
+  const chrome = 56.0 + 80.0 + 24.0; // app bar + nav bar + margin
+  final h = mq.height - pad.vertical - chrome;
+  final out = h.clamp(240.0, 680.0);
+  debugPrint(
+    '[ProfilePage] layout fallback (maxH=$mh not usable) → height=$out',
+  );
+  return out;
+}
+
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -4510,7 +4542,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final cs = Theme.of(context).colorScheme;
     final u = _user;
 
-    debugPrint('[ProfilePage] build');
+    debugPrint(
+      '[Profile] build currentUser=${Supabase.instance.client.auth.currentUser?.id}',
+    );
 
     // Logged in after starting as guest: reload profile once session exists.
     if (u != null && _lastLoadedProfileUserId != u.id) {
@@ -4526,41 +4560,40 @@ class _ProfilePageState extends State<ProfilePage> {
       _lastLoadedProfileUserId = null;
     }
 
-    // 允许游客打开 profile：提示登录
+    // 允许游客打开 profile：提示登录（scrollable：小屏避免 Column 溢出）
     if (_user == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.person_outline, size: 72, color: cs.primary),
-              const SizedBox(height: 14),
-              Text(
-                'Guest mode',
-                style: Theme.of(
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: MediaQuery.sizeOf(context).height * 0.06),
+            Icon(Icons.person_outline, size: 72, color: cs.primary),
+            const SizedBox(height: 14),
+            Text(
+              'Guest mode',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Login to upload avatar, set your sports profile, and post photos/videos.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withOpacity(0.7),
+                  ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(
                   context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Login to upload avatar, set your sports profile, and post photos/videos.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const AuthPage()));
-                },
-                child: const Text('Login / Sign up'),
-              ),
-            ],
-          ),
+                ).push(MaterialPageRoute(builder: (_) => const AuthPage()));
+              },
+              child: const Text('Login / Sign up'),
+            ),
+          ],
         ),
       );
     }
@@ -4571,16 +4604,32 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final slots = const ['Morning', 'Afternoon', 'Night'];
 
-    // No nested Scaffold (parent [SmeetShell] already has one) — avoids mobile
-    // primary-scroll / inset bugs. [Expanded] + [TabBarView] uses remaining height
-    // instead of a fixed 900px box (broken on short viewports / some devices).
-    return DefaultTabController(
-      length: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    // No nested Scaffold. [LayoutBuilder] logs constraints; if height is unbounded
+    // (some parent combinations on mobile), [SizedBox] gives TabBarView a finite height.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mh = constraints.maxHeight;
+        debugPrint(
+          '[ProfilePage] layout maxW=${constraints.maxWidth.toStringAsFixed(0)} '
+          'maxH=${mh.isFinite ? mh.toStringAsFixed(0) : "∞"} finiteH=${mh.isFinite}',
+        );
+        if (mh.isFinite && mh <= 8) {
+          debugPrint(
+            '[ProfilePage] WARNING: tiny maxHeight=$mh (IndexedStack/offstage?)',
+          );
+        }
+        final safeH = _profileTabSafeHeight(constraints, context);
+
+        return SizedBox(
+          height: safeH,
+          width: double.infinity,
+          child: DefaultTabController(
+            length: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               // Top header
               Container(
                 width: double.infinity,
@@ -4615,6 +4664,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             _nameCtrl.text.trim().isEmpty
                                 ? 'Tap to build your profile'
                                 : _nameCtrl.text.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w900),
                           ),
@@ -4623,6 +4674,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             _cityCtrl.text.trim().isEmpty
                                 ? 'City not set'
                                 : _cityCtrl.text.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: cs.onSurface.withOpacity(0.7),
@@ -5008,8 +5061,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ],
-        ),
-      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
