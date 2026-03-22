@@ -15,9 +15,9 @@
 1. **`game_participants`** — persistent joins (`joined` / `left`).
 2. **`join_game(uuid)` / `leave_game(uuid)`** — SECURITY DEFINER RPCs: enforce capacity, maintain `joined_count`, update participant rows.
 3. **`chats`** — `chat_kind` (`direct` \| `game`), optional `game_id`, `title` for list labels.
-4. **`games.game_chat_id`** — FK to the group chat for that game (created with the game).
+4. **`games.game_chat_id`** — FK to the group chat for that game (created with the game). **Required** for the updated `join_game` that adds `chat_members`.
 
-See `supabase/migrations/20260321120000_smeet_mvp_phases.sql`.
+See **`docs/MIGRATION_PLAN.md`** for apply order. Schema SQL: `supabase/migrations/20260321120000_smeet_mvp_phases.sql` (§3) and repair file `20260321135000_ensure_games_game_chat_id.sql`.
 
 ## RLS (you must align with your project)
 

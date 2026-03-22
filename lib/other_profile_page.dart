@@ -2,6 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 
+Widget _availabilityWidget(dynamic availability) {
+  if (availability is Map) {
+    final keys = availability.keys.map((k) => k.toString()).toList()..sort();
+    if (keys.isEmpty) {
+      return const Text('Not set');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: keys.map((day) {
+        final slots = availability[day];
+        final slotStr = slots is List
+            ? slots.map((e) => e.toString()).join(', ')
+            : slots?.toString() ?? '';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            '$day: $slotStr',
+            style: const TextStyle(height: 1.35),
+          ),
+        );
+      }).toList(),
+    );
+  }
+  return Text(availability.toString());
+}
+
 /// Read-only profile for another user: basics + recent posts / media (Phase 4).
 class OtherProfilePage extends StatelessWidget {
   final String userId;
@@ -119,7 +145,7 @@ class OtherProfilePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(availability.toString()),
+                  _availabilityWidget(availability),
                 ],
                 const SizedBox(height: 24),
                 Align(

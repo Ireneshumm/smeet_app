@@ -46,6 +46,8 @@ ALTER TABLE public.chats
 -- ---------------------------------------------------------------------------
 -- 3) games: link to group chat
 -- ---------------------------------------------------------------------------
+-- Required for app create-game (UPDATE games.game_chat_id) and for
+-- join_game variants that add users to the group chat (see 20260321140000).
 ALTER TABLE public.games
   ADD COLUMN IF NOT EXISTS game_chat_id uuid REFERENCES public.chats(id) ON DELETE SET NULL;
 

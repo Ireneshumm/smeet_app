@@ -1,15 +1,115 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:postgrest/postgrest.dart' show PostgrestException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:smeet_app/game_balance.dart';
 import 'package:smeet_app/geo_utils.dart';
 import 'package:smeet_app/other_profile_page.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
+
+/// 12h time like "2:00 PM"
+String formatTime12h(DateTime dt) {
+  final h = dt.hour;
+  final m = dt.minute;
+  final ap = h >= 12 ? 'PM' : 'AM';
+  final h12 = h % 12 == 0 ? 12 : h % 12;
+  final mm = m.toString().padLeft(2, '0');
+  return '$h12:$mm $ap';
+}
+
+String formatGameTimeRange(DateTime? start, DateTime? end) {
+  if (start == null) return '—';
+  final a = formatTime12h(start);
+  if (end == null) return a;
+  return '$a – ${formatTime12h(end)}';
+}
+
+String sportLevelForSport(Map<String, dynamic>? profile, String sport) {
+  if (profile == null) return '—';
+  final sl = profile['sport_levels'];
+  if (sl is! Map) return '—';
+  for (final e in sl.entries) {
+    if (e.key.toString().toLowerCase() == sport.toLowerCase()) {
+      return e.value?.toString() ?? '—';
+    }
+  }
+  return '—';
+}
+
+List<Map<String, dynamic>> sortedChatMessages(
+  List<Map<String, dynamic>> msgs,
+) {
+  final copy = List<Map<String, dynamic>>.from(msgs);
+  copy.sort((a, b) {
+    final ca = DateTime.tryParse(a['created_at']?.toString() ?? '');
+    final cb = DateTime.tryParse(b['created_at']?.toString() ?? '');
+    if (ca != null && cb != null) return ca.compareTo(cb);
+    return (a['id']?.toString() ?? '').compareTo(b['id']?.toString() ?? '');
+  });
+  return copy;
+}
+
+/// e.g. "Saturday · 03/21/2026"
+String formatGameDateHeading(DateTime? start) {
+  if (start == null) return 'Date —';
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  final w = weekdays[start.weekday - 1];
+  final mon = start.month.toString().padLeft(2, '0');
+  final d = start.day.toString().padLeft(2, '0');
+  return '$w · $mon/$d/${start.year}';
+}
+
+Future<int> countUnreadForChat({
+  required SupabaseClient supabase,
+  required String chatId,
+  required String me,
+  String? lastReadIso,
+}) async {
+  try {
+    var q = supabase
+        .from('messages')
+        .select('id')
+        .eq('chat_id', chatId)
+        .neq('user_id', me);
+    if (lastReadIso != null && lastReadIso.isNotEmpty) {
+      q = q.gt('created_at', lastReadIso);
+    }
+    final rows =
+        await q.order('created_at', ascending: false).limit(50);
+    return (rows as List).length;
+  } catch (_) {
+    return 0;
+  }
+}
+
+Future<void> markChatRead(
+  SupabaseClient supabase, {
+  required String chatId,
+  required String userId,
+}) async {
+  try {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await supabase
+        .from('chat_members')
+        .update({'last_read_at': now})
+        .eq('chat_id', chatId)
+        .eq('user_id', userId);
+  } catch (_) {}
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -458,7 +558,18 @@ class _HomePageState extends State<HomePage> {
 
   // Form state
   String _sport = 'Tennis';
-  DateTime? _dateTime;
+  /// Target level for this game (not the creator’s profile level).
+  String _gameLevel = 'Beginner';
+  static const _gameLevels = [
+    'Beginner',
+    'Intermediate',
+    'Advanced',
+    'Competitive',
+    'Pro',
+  ];
+  DateTime? _gameDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
   int _players = 4;
   LocationResult? _selectedLocation;
   final _courtFeeCtrl = TextEditingController(text: '20');
@@ -543,45 +654,73 @@ class _HomePageState extends State<HomePage> {
     return _courtFee / _players;
   }
 
-  Future<void> _pickDateTime() async {
+  Future<void> _pickGameDate() async {
     final now = DateTime.now();
-
     final date = await showDatePicker(
       context: context,
-      initialDate: _dateTime ?? now,
+      initialDate: _gameDate ?? now,
       firstDate: now.subtract(const Duration(days: 0)),
       lastDate: now.add(const Duration(days: 365)),
     );
     if (date == null) return;
+    setState(() => _gameDate = date);
+  }
 
+  Future<void> _pickStartTime() async {
+    final now = DateTime.now();
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_dateTime ?? now),
+      initialTime: _startTime ?? TimeOfDay.fromDateTime(now),
     );
     if (time == null) return;
+    setState(() => _startTime = time);
+  }
 
-    setState(() {
-      _dateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
+  TimeOfDay _defaultEndFromStart() {
+    if (_startTime == null) {
+      return TimeOfDay.fromDateTime(DateTime.now());
+    }
+    final base = DateTime(
+      2020,
+      1,
+      1,
+      _startTime!.hour,
+      _startTime!.minute,
+    );
+    final end = base.add(const Duration(hours: 2));
+    return TimeOfDay(hour: end.hour, minute: end.minute);
+  }
+
+  Future<void> _pickEndTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _endTime ?? _defaultEndFromStart(),
+    );
+    if (time == null) return;
+    setState(() => _endTime = time);
   }
 
   Future<void> _createGame() async {
     if (!await _ensureLogin()) return;
     if (!_formKey.currentState!.validate()) return;
-    if (_dateTime == null) {
+    if (_gameDate == null || _startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date & time')),
+        const SnackBar(
+          content: Text('Please select game date, start time, and end time'),
+        ),
       );
       return;
     }
 
-    final dt = _dateTime!;
+    DateTime combine(DateTime d, TimeOfDay t) =>
+        DateTime(d.year, d.month, d.day, t.hour, t.minute);
+
+    var startsAt = combine(_gameDate!, _startTime!);
+    var endsAt = combine(_gameDate!, _endTime!);
+    if (!endsAt.isAfter(startsAt)) {
+      endsAt = endsAt.add(const Duration(days: 1));
+    }
+
     if (_selectedLocation == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -612,7 +751,9 @@ class _HomePageState extends State<HomePage> {
           .from('games')
           .insert({
             'sport': _sport,
-            'starts_at': dt.toUtc().toIso8601String(),
+            'game_level': _gameLevel,
+            'starts_at': startsAt.toUtc().toIso8601String(),
+            'ends_at': endsAt.toUtc().toIso8601String(),
             'location_text': loc,
             'location_lat': locLat,
             'location_lng': locLng,
@@ -625,39 +766,174 @@ class _HomePageState extends State<HomePage> {
           .single();
 
       final gameId = result['id'].toString();
+      debugPrint('[CreateGameChat] Game inserted OK id=$gameId');
 
-      // Phase 3: group chat for this game (ignored if DB columns not migrated yet).
+      // Group chat: insert chats → update games.game_chat_id → join_game (RPC).
+      String? setupNote;
+      String? joinGameError;
+      var chatSetupErrorShown = false;
+      final shortLoc = loc.split(',').first.trim();
+
       try {
-        final shortLoc = loc.split(',').first.trim();
+        debugPrint(
+          '[CreateGameChat] Step A: INSERT chats (game_id=$gameId, kind=game) ...',
+        );
         final chatRow = await supabase
             .from('chats')
             .insert({
               'chat_kind': 'game',
               'game_id': gameId,
-              'title': 'Game — $_sport @ $shortLoc',
+              'title': '$_sport @ $shortLoc',
             })
             .select('id')
             .single();
-        final chatId = chatRow['id'].toString();
-        await supabase
+
+        debugPrint('[CreateGameChat] Step A OK: chats insert result = $chatRow');
+        final chatId = chatRow['id']?.toString();
+        if (chatId == null || chatId.isEmpty) {
+          throw StateError('chats.insert returned no id (row=$chatRow)');
+        }
+        debugPrint('[CreateGameChat] Step A: resolved chat_id=$chatId');
+
+        debugPrint(
+          '[CreateGameChat] Step B: UPDATE games SET game_chat_id=$chatId WHERE id=$gameId ...',
+        );
+        final afterUpdate = await supabase
             .from('games')
             .update({'game_chat_id': chatId})
-            .eq('id', gameId);
-        await supabase.from('chat_members').insert({
-          'chat_id': chatId,
-          'user_id': user.id,
-        });
-      } catch (_) {
-        // Migration not applied or RLS — game still created.
+            .eq('id', gameId)
+            .select('id, game_chat_id')
+            .maybeSingle();
+
+        debugPrint('[CreateGameChat] Step B: games update select result = $afterUpdate');
+
+        if (afterUpdate == null) {
+          const msg =
+              'UPDATE games returned no row — often RLS blocks UPDATE on games, or game id mismatch.';
+          debugPrint('[CreateGameChat] Step B FAILED: $msg');
+          setupNote = msg;
+          if (mounted) {
+            chatSetupErrorShown = true;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                content: Text(
+                  'Game created, but linking chat failed:\n$msg',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+                duration: const Duration(seconds: 8),
+              ),
+            );
+          }
+        } else {
+          final linked = afterUpdate['game_chat_id']?.toString();
+          if (linked != chatId) {
+            debugPrint(
+              '[CreateGameChat] Step B WARNING: DB game_chat_id=$linked expected $chatId',
+            );
+            setupNote = 'game_chat_id mismatch after update (got $linked)';
+          } else {
+            debugPrint(
+              '[CreateGameChat] Step B OK: games.game_chat_id is set to $linked',
+            );
+          }
+        }
+      } catch (e, st) {
+        debugPrint('[CreateGameChat] EXCEPTION during chat setup: $e');
+        debugPrint('[CreateGameChat] stackTrace: $st');
+        if (e is PostgrestException) {
+          debugPrint(
+            '[CreateGameChat] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+          );
+        }
+        setupNote = 'Group chat setup failed: $e';
+        if (mounted) {
+          chatSetupErrorShown = true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              content: Text(
+                'Chat creation failed (game still saved):\n$e',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
+              duration: const Duration(seconds: 10),
+            ),
+          );
+        }
+      }
+
+      try {
+        debugPrint('[CreateGameChat] Step C: RPC join_game(p_game_id=$gameId) ...');
+        await supabase.rpc('join_game', params: {'p_game_id': gameId});
+        debugPrint('[CreateGameChat] Step C OK: join_game finished');
+      } catch (e, st) {
+        debugPrint('[CreateGameChat] Step C FAILED join_game: $e');
+        debugPrint('[CreateGameChat] stackTrace: $st');
+        if (e is PostgrestException) {
+          debugPrint(
+            '[CreateGameChat] PostgrestException: code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+          );
+        }
+        joinGameError = '$e';
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Saved to Supabase! ID: $gameId')),
-      );
+      if (!chatSetupErrorShown) {
+        if (joinGameError == null && setupNote == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('✅ Game & group chat ready!')),
+          );
+        } else if (joinGameError == null && setupNote != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('✅ Game saved. Note: $setupNote')),
+          );
+        } else if (joinGameError != null && setupNote == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 8),
+              content: Text(
+                '✅ Game & chat linked. join_game failed:\n$joinGameError',
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 8),
+              content: Text(
+                '✅ Game saved. $setupNote · join_game: $joinGameError',
+              ),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 6),
+            content: Text(
+              '✅ Game was saved. Chat linking failed — see previous message and console [CreateGameChat].',
+            ),
+          ),
+        );
+        if (joinGameError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 8),
+              content: Text('join_game also failed:\n$joinGameError'),
+            ),
+          );
+        }
+      }
       setState(() {
         _sport = 'Tennis';
-        _dateTime = null;
+        _gameLevel = 'Beginner';
+        _gameDate = null;
+        _startTime = null;
+        _endTime = null;
         _players = 4;
         _selectedLocation = null;
         _courtFeeCtrl.text = '20';
@@ -673,6 +949,7 @@ class _HomePageState extends State<HomePage> {
           alignment: 0.1,
         );
       });
+      widget.onGamesMutated?.call();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -735,21 +1012,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      // Add to game group chat when present (Phase 3).
-      try {
-        final g = await supabase
-            .from('games')
-            .select('game_chat_id')
-            .eq('id', gameId)
-            .maybeSingle();
-        final cid = g?['game_chat_id']?.toString();
-        if (cid != null) {
-          await supabase.from('chat_members').insert({
-            'chat_id': cid,
-            'user_id': user.id,
-          });
-        }
-      } catch (_) {}
+      // join_game RPC (updated migration) also adds this user to game_chat_id group chat.
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -772,18 +1035,21 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    String dateTimeLabel;
-    if (_dateTime == null) {
-      dateTimeLabel = 'Select date & time';
+    String dateLabel;
+    if (_gameDate == null) {
+      dateLabel = 'Select date';
     } else {
-      final dt = _dateTime!;
+      final dt = _gameDate!;
       final y = dt.year.toString().padLeft(4, '0');
       final m = dt.month.toString().padLeft(2, '0');
       final d = dt.day.toString().padLeft(2, '0');
-      final hh = dt.hour.toString().padLeft(2, '0');
-      final mm = dt.minute.toString().padLeft(2, '0');
-      dateTimeLabel = '$y-$m-$d  $hh:$mm';
+      dateLabel = '$y-$m-$d';
     }
+
+    String startLabel =
+        _startTime == null ? 'Select start time' : _startTime!.format(context);
+    String endLabel =
+        _endTime == null ? 'Select end time' : _endTime!.format(context);
 
     return SingleChildScrollView(
       controller: _scrollCtrl,
@@ -813,7 +1079,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Pick sport • time • location • players • split costs',
+                    'Sport • game level • start/end • location • players • cost split',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurface.withOpacity(0.7),
                     ),
@@ -853,25 +1119,91 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // Date time
+            // Game level (target level for this game)
+            _SectionCard(
+              child: DropdownButtonFormField<String>(
+                value: _gameLevel,
+                decoration: const InputDecoration(
+                  labelText: 'Game level (target for this game)',
+                  border: OutlineInputBorder(),
+                  helperText:
+                      'Suitable skill level for this session — not your profile level',
+                ),
+                items: _gameLevels
+                    .map(
+                      (lv) => DropdownMenuItem(value: lv, child: Text(lv)),
+                    )
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _gameLevel = v ?? _gameLevels.first),
+              ),
+            ),
+
+            // Game date
             _SectionCard(
               child: InkWell(
-                onTap: _pickDateTime,
+                onTap: _pickGameDate,
                 borderRadius: BorderRadius.circular(14),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: 'Date & Time',
+                    labelText: 'Game date',
                     border: OutlineInputBorder(),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.calendar_today_outlined),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(dateTimeLabel)),
+                      Expanded(child: Text(dateLabel)),
                       const Icon(Icons.chevron_right),
                     ],
                   ),
                 ),
+              ),
+            ),
+
+            // Start / end time
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkWell(
+                    onTap: _pickStartTime,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Start time',
+                        border: OutlineInputBorder(),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(startLabel)),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: _pickEndTime,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'End time',
+                        border: OutlineInputBorder(),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule_outlined),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(endLabel)),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -958,7 +1290,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Each pays: \$${_perPerson.toStringAsFixed(2)}',
+                            'Per person: \$${_perPerson.toStringAsFixed(2)}/pp',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
@@ -1125,6 +1457,8 @@ class _HomePageState extends State<HomePage> {
                 return Column(
                   children: visible.map((g) {
                     final sport = g['sport'] ?? '';
+                    final gameLevel =
+                        (g['game_level'] ?? '').toString().trim();
                     final loc = g['location_text'] ?? '';
                     final players = (g['players'] as num?)?.toInt() ?? 0;
                     final joined = (g['joined_count'] as num?)?.toInt() ?? 0;
@@ -1140,13 +1474,17 @@ class _HomePageState extends State<HomePage> {
                     if (g['starts_at'] != null) {
                       startsAt = DateTime.tryParse(g['starts_at'])?.toLocal();
                     }
+                    DateTime? endsAt;
+                    if (g['ends_at'] != null) {
+                      endsAt = DateTime.tryParse(g['ends_at'])?.toLocal();
+                    }
 
-                    final when = startsAt == null
-                        ? '-'
-                        : '${startsAt.year}-${startsAt.month.toString().padLeft(2, '0')}-${startsAt.day.toString().padLeft(2, '0')} '
-                            '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+                    final timeRange = formatGameTimeRange(startsAt, endsAt);
 
                     final suburb = loc.split(',').first.trim();
+                    final sportLevelLine = gameLevel.isEmpty
+                        ? sport.toString()
+                        : '$sport • $gameLevel';
 
                     return Container(
                       width: double.infinity,
@@ -1175,7 +1513,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  sport.toString(),
+                                  sportLevelLine,
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleSmall
@@ -1183,32 +1521,22 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  when,
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  timeRange,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  suburb,
+                                  suburb.isEmpty
+                                      ? formatDistanceKm(distKm)
+                                      : '$suburb • ${formatDistanceKm(distKm)}',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  formatDistanceKm(distKm),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .secondary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$remaining spots left · \$${perPerson.toStringAsFixed(2)} each',
+                                  '$remaining spots left • \$${perPerson.toStringAsFixed(2)}/pp',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -1382,25 +1710,6 @@ class _SwipePageState extends State<SwipePage> {
     return mySports.intersection(otSports).isNotEmpty;
   }
 
-  // 判断：是否有可约时间重叠（同一天同slot）
-  bool _hasAvailabilityOverlap(Map<String, dynamic> other) {
-    final myAv = _myProfile?['availability'];
-    final otAv = other['availability'];
-
-    if (myAv is! Map || otAv is! Map) return false;
-
-    for (final day in myAv.keys) {
-      final mySlots = myAv[day];
-      final otSlots = otAv[day];
-      if (mySlots is List && otSlots is List) {
-        final s1 = mySlots.map((e) => e.toString()).toSet();
-        final s2 = otSlots.map((e) => e.toString()).toSet();
-        if (s1.intersection(s2).isNotEmpty) return true;
-      }
-    }
-    return false;
-  }
-
   Future<void> _loadCandidates() async {
     final supabase = Supabase.instance.client;
     final u = _user!;
@@ -1427,13 +1736,12 @@ class _SwipePageState extends State<SwipePage> {
 
     final list = (raw as List).cast<Map<String, dynamic>>();
 
-    // 3) 本地过滤：没 swipe 过 + 有共同运动 + 可约时间有重叠
+    // 3) 本地过滤：没 swipe 过 + 有共同运动（不限定等级或 availability）
     final filtered = list.where((p) {
       final id = p['id']?.toString();
       if (id == null) return false;
       if (swipedIds.contains(id)) return false;
       if (!_hasCommonSport(p)) return false;
-      if (!_hasAvailabilityOverlap(p)) return false;
       return true;
     }).toList();
 
@@ -1513,8 +1821,12 @@ class _SwipePageState extends State<SwipePage> {
 
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) =>
-                  ChatRoomPage(chatId: chatId.toString(), title: otherName),
+              builder: (_) => ChatRoomPage(
+                chatId: chatId.toString(),
+                title: otherName,
+                chatKind: 'direct',
+                directPeerUserId: toUser,
+              ),
             ),
           );
         }
@@ -1613,7 +1925,7 @@ class _SwipePageState extends State<SwipePage> {
               const Text('No more matches right now.'),
               const SizedBox(height: 6),
               Text(
-                'Tip: add more Sports & Availability in Profile.',
+                'Tip: add more sports in Profile so others can find you.',
                 style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
                 textAlign: TextAlign.center,
               ),
@@ -1693,8 +2005,17 @@ class _SwipePageState extends State<SwipePage> {
                         ),
                         const SizedBox(height: 10),
 
-                        // sports
+                        // sports & levels (all levels shown — swipe is not level-gated)
+                        Text(
+                          'Sports & levels',
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: cs.onSurface.withOpacity(0.75),
+                              ),
+                        ),
+                        const SizedBox(height: 6),
                         Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: cs.primary.withOpacity(0.06),
@@ -1706,7 +2027,7 @@ class _SwipePageState extends State<SwipePage> {
                           child: Text(
                             _sportsText(cur),
                             style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                                ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ),
 
@@ -1878,6 +2199,10 @@ class _MyGamePageState extends State<MyGamePage> {
           .eq('game_id', gid)
           .eq('status', 'joined');
       final ids = (parts as List).map((e) => e['user_id'].toString()).toList();
+      final host = (g['created_by'] ?? '').toString();
+      if (host.isNotEmpty && !ids.contains(host)) {
+        ids.add(host);
+      }
       if (ids.isEmpty) {
         g['_profiles'] = <Map<String, dynamic>>[];
         return;
@@ -1886,7 +2211,22 @@ class _MyGamePageState extends State<MyGamePage> {
           .from('profiles')
           .select('id, display_name, avatar_url, city, sport_levels')
           .inFilter('id', ids);
-      g['_profiles'] = (profs as List).cast<Map<String, dynamic>>();
+      final list = (profs as List).cast<Map<String, dynamic>>();
+      final hostId = (g['created_by'] ?? '').toString();
+      list.sort((a, b) {
+        final aid = a['id']?.toString() ?? '';
+        final bid = b['id']?.toString() ?? '';
+        final aHost = aid.isNotEmpty && aid == hostId;
+        final bHost = bid.isNotEmpty && bid == hostId;
+        if (aHost != bHost) {
+          return aHost ? -1 : 1;
+        }
+        return (a['display_name'] ?? '')
+            .toString()
+            .toLowerCase()
+            .compareTo((b['display_name'] ?? '').toString().toLowerCase());
+      });
+      g['_profiles'] = list;
     } catch (_) {
       g['_profiles'] = <Map<String, dynamic>>[];
     }
@@ -1903,7 +2243,7 @@ class _MyGamePageState extends State<MyGamePage> {
         final rows = await supabase
             .from('game_participants')
             .select(
-              'game_id, games(id, sport, starts_at, location_text, players, joined_count, per_person, created_by)',
+              'game_id, games(id, sport, game_level, starts_at, ends_at, location_text, players, joined_count, per_person, created_by, game_chat_id)',
             )
             .eq('user_id', u.id)
             .eq('status', 'joined');
@@ -1936,7 +2276,7 @@ class _MyGamePageState extends State<MyGamePage> {
       final data = await supabase
           .from('games')
           .select(
-            'id, sport, starts_at, location_text, players, joined_count, per_person, created_by, created_at',
+            'id, sport, game_level, starts_at, ends_at, location_text, players, joined_count, per_person, created_by, created_at, game_chat_id',
           )
           .inFilter('id', widget.joinedLocal.toList())
           .order('starts_at', ascending: true);
@@ -1974,6 +2314,8 @@ class _MyGamePageState extends State<MyGamePage> {
           itemBuilder: (context, i) {
             final g = games[i];
             final sport = (g['sport'] ?? '').toString();
+            final gameLevel =
+                (g['game_level'] ?? '').toString().trim();
             final loc = (g['location_text'] ?? '').toString();
             final perPerson = (g['per_person'] ?? 0) as num;
             final createdBy = (g['created_by'] ?? '').toString();
@@ -1986,11 +2328,25 @@ class _MyGamePageState extends State<MyGamePage> {
             if (g['starts_at'] != null) {
               startsAt = DateTime.tryParse(g['starts_at'])?.toLocal();
             }
+            DateTime? endsAt;
+            if (g['ends_at'] != null) {
+              endsAt = DateTime.tryParse(g['ends_at'])?.toLocal();
+            }
 
-            final when = startsAt == null
-                ? '-'
-                : '${startsAt.year}-${startsAt.month.toString().padLeft(2, '0')}-${startsAt.day.toString().padLeft(2, '0')} '
-                    '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+            final dateLine = formatGameDateHeading(startsAt);
+            final startLine = startsAt == null
+                ? 'Start —'
+                : 'Start: ${formatTime12h(startsAt)}';
+            final endLine = endsAt == null
+                ? 'End —'
+                : 'End: ${formatTime12h(endsAt)}';
+            final sportHeadline = gameLevel.isEmpty ? sport : '$sport • $gameLevel';
+            final gameChatId = g['game_chat_id']?.toString();
+            final chatTitle =
+                (sport.isNotEmpty ? '$sport · ' : '') +
+                    (loc.split(',').first.trim().isEmpty
+                        ? 'Game chat'
+                        : loc.split(',').first.trim());
 
             final balance = balanceLabelForGroup(
               sportKey: sport,
@@ -2014,7 +2370,7 @@ class _MyGamePageState extends State<MyGamePage> {
                     children: [
                       Expanded(
                         child: Text(
-                          sport,
+                          sportHeadline,
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
@@ -2029,8 +2385,22 @@ class _MyGamePageState extends State<MyGamePage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    dateLine,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(when, style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    startLine,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  Text(
+                    endLine,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     loc,
@@ -2045,48 +2415,79 @@ class _MyGamePageState extends State<MyGamePage> {
                         ),
                   ),
                   const SizedBox(height: 10),
+                  if (gameChatId != null && gameChatId.isNotEmpty)
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ChatRoomPage(
+                                chatId: gameChatId,
+                                title: chatTitle,
+                                chatKind: 'game',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text('Open group chat'),
+                      ),
+                    )
+                  else
+                    Text(
+                      'Group chat unavailable for this game (run latest DB migration / check game_chat_id).',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.error,
+                          ),
+                    ),
+                  const SizedBox(height: 12),
                   Text(
-                    'Who\'s in',
+                    'Participants (${profiles.length})',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: profiles.map((p) {
-                      final id = p['id']?.toString() ?? '';
-                      final name =
-                          (p['display_name'] ?? 'Player').toString().trim();
-                      final avatar = (p['avatar_url'] ?? '').toString();
-                      final host = id.isNotEmpty && id == createdBy;
-                      return InputChip(
-                        avatar: CircleAvatar(
-                          radius: 14,
-                          backgroundImage:
-                              avatar.isEmpty ? null : NetworkImage(avatar),
-                          child: avatar.isEmpty
-                              ? const Icon(Icons.person, size: 16)
-                              : null,
-                        ),
-                        label: Text(
-                          host ? '$name (host)' : name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onPressed: id.isEmpty
-                            ? null
-                            : () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        OtherProfilePage(userId: id),
-                                  ),
-                                );
-                              },
-                      );
-                    }).toList(),
-                  ),
+                  const SizedBox(height: 4),
+                  ...profiles.map((p) {
+                    final id = p['id']?.toString() ?? '';
+                    final name =
+                        (p['display_name'] ?? 'Player').toString().trim();
+                    final avatar = (p['avatar_url'] ?? '').toString();
+                    final city = (p['city'] ?? '').toString().trim();
+                    final host = id.isNotEmpty && id == createdBy;
+                    final lvl = sportLevelForSport(p, sport);
+                    final subtitle = [
+                      if (city.isNotEmpty) city,
+                      '$sport: $lvl',
+                    ].join(' · ');
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundImage:
+                            avatar.isEmpty ? null : NetworkImage(avatar),
+                        child: avatar.isEmpty
+                            ? const Icon(Icons.person, size: 20)
+                            : null,
+                      ),
+                      title: Text(
+                        host ? '$name (host)' : name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(subtitle),
+                      trailing: const Icon(Icons.chevron_right, size: 20),
+                      onTap: id.isEmpty
+                          ? null
+                          : () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      OtherProfilePage(userId: id),
+                                ),
+                              );
+                            },
+                    );
+                  }),
                   if (profiles.isEmpty)
                     Text(
                       'Roster loads after migration (game_participants).',
@@ -2141,7 +2542,7 @@ class _ChatPageState extends State<ChatPage> {
       final data = await supabase
           .from('chat_members')
           .select(
-            'chat_id, chats(id, last_message, last_message_at, created_at, chat_kind, game_id, title)',
+            'chat_id, last_read_at, chats(id, last_message, last_message_at, created_at, chat_kind, game_id, title)',
           )
           .eq('user_id', u.id);
       list = (data as List).cast<Map<String, dynamic>>();
@@ -2149,7 +2550,7 @@ class _ChatPageState extends State<ChatPage> {
       final data = await supabase
           .from('chat_members')
           .select(
-            'chat_id, chats(id, last_message, last_message_at, created_at)',
+            'chat_id, last_read_at, chats(id, last_message, last_message_at, created_at)',
           )
           .eq('user_id', u.id);
       list = (data as List).cast<Map<String, dynamic>>();
@@ -2159,6 +2560,7 @@ class _ChatPageState extends State<ChatPage> {
       final chat = (row['chats'] ?? {}) as Map;
       return {
         'chat_id': row['chat_id'],
+        'last_read_at': row['last_read_at'],
         'last_message': chat['last_message'],
         'last_message_at': chat['last_message_at'],
         'created_at': chat['created_at'],
@@ -2181,35 +2583,9 @@ class _ChatPageState extends State<ChatPage> {
       return tb.compareTo(ta);
     });
 
-    return chats;
-  }
-
-  Future<String> _otherUserLabel(String chatId) async {
-    final u = _user!;
-    final supabase = Supabase.instance.client;
-
-    // 找到另一个成员
-    final other = await supabase
-        .from('chat_members')
-        .select('user_id')
-        .eq('chat_id', chatId)
-        .neq('user_id', u.id)
-        .limit(1)
-        .maybeSingle();
-    final otherId = other?['user_id']?.toString();
-    if (otherId == null) return 'Chat';
-
-    // 从 profiles 拿名字（没有就显示短ID）
-    final p = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', otherId)
-        .maybeSingle();
-
-    final name = (p?['display_name'] ?? '').toString().trim();
-    if (name.isNotEmpty) return name;
-
-    return 'User ${otherId.substring(0, 6)}';
+    final enriched =
+        await Future.wait(chats.map((c) => _enrichChatRow(c, u.id)));
+    return enriched;
   }
 
   Future<int> _gameMemberCount(String chatId) async {
@@ -2222,6 +2598,88 @@ class _ChatPageState extends State<ChatPage> {
     } catch (_) {
       return 0;
     }
+  }
+
+  Future<Map<String, dynamic>> _enrichChatRow(
+    Map<String, dynamic> c,
+    String myId,
+  ) async {
+    final supabase = Supabase.instance.client;
+    final chatId = c['chat_id'].toString();
+    final lastRead = c['last_read_at']?.toString();
+    final kind = (c['chat_kind'] ?? 'direct').toString();
+
+    final unread = await countUnreadForChat(
+      supabase: supabase,
+      chatId: chatId,
+      me: myId,
+      lastReadIso: lastRead,
+    );
+
+    if (kind == 'game') {
+      final n = await _gameMemberCount(chatId);
+      return {
+        ...c,
+        'member_count': n,
+        'ui_title': (c['title'] ?? 'Game chat').toString(),
+        'ui_avatar': null,
+        'unread': unread,
+        'direct_peer_id': null,
+      };
+    }
+
+    final other = await supabase
+        .from('chat_members')
+        .select('user_id')
+        .eq('chat_id', chatId)
+        .neq('user_id', myId)
+        .limit(1)
+        .maybeSingle();
+    final oid = other?['user_id']?.toString();
+
+    var name = 'Chat';
+    String? av;
+    if (oid != null) {
+      final p = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', oid)
+          .maybeSingle();
+      final dn = (p?['display_name'] ?? '').toString().trim();
+      name = dn.isNotEmpty
+          ? dn
+          : 'User ${oid.length >= 6 ? oid.substring(0, 6) : oid}';
+      av = p?['avatar_url']?.toString();
+    }
+
+    return {
+      ...c,
+      'member_count': 0,
+      'ui_title': name,
+      'ui_avatar': av,
+      'unread': unread,
+      'direct_peer_id': oid,
+    };
+  }
+
+  Widget _unreadTrailing(int n) {
+    if (n <= 0) return const SizedBox.shrink();
+    final label = n >= 50 ? '50+' : '$n';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
   }
 
   @override
@@ -2262,102 +2720,126 @@ class _ChatPageState extends State<ChatPage> {
               final chatId = c['chat_id'].toString();
               final last = (c['last_message'] ?? '').toString();
               final isGame = (c['chat_kind'] ?? 'direct') == 'game';
-              final gameTitle = (c['title'] ?? 'Game chat').toString();
+              final uiTitle = (c['ui_title'] ?? c['title'] ?? 'Chat').toString();
+              final uiAvatar = c['ui_avatar']?.toString();
+              final unread = (c['unread'] as num?)?.toInt() ?? 0;
+              final n = (c['member_count'] as num?)?.toInt() ?? 0;
+              final peerId = c['direct_peer_id']?.toString();
 
               if (isGame) {
-                return FutureBuilder<int>(
-                  future: _gameMemberCount(chatId),
-                  builder: (context, cntSnap) {
-                    final n = cntSnap.data ?? 0;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: cs.primary.withOpacity(0.10),
-                        ),
-                      ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: cs.primary.withOpacity(0.12),
-                          child: Icon(Icons.groups, color: cs.primary),
-                        ),
-                        title: Text(
-                          'Game — $gameTitle',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        subtitle: Text(
-                          last.isEmpty
-                              ? 'Group chat · $n people'
-                              : last,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () async {
-                          final ok = await _ensureLoginAndPrompt(context);
-                          if (!ok) return;
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ChatRoomPage(
-                                chatId: chatId,
-                                title: gameTitle,
-                                chatKind: 'game',
-                              ),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: cs.primary.withOpacity(0.10),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primary.withOpacity(0.12),
+                      child: Icon(Icons.groups, color: cs.primary),
+                    ),
+                    title: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: cs.secondary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'GROUP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: cs.secondary,
                             ),
-                          );
-                          setState(() => _chatsFuture = _fetchMyChats());
-                        },
-                      ),
-                    );
-                  },
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            uiTitle,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      last.isEmpty
+                          ? 'Group chat · $n people'
+                          : last,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: _unreadTrailing(unread),
+                    onTap: () async {
+                      final ok = await _ensureLoginAndPrompt(context);
+                      if (!ok) return;
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatRoomPage(
+                            chatId: chatId,
+                            title: uiTitle,
+                            chatKind: 'game',
+                          ),
+                        ),
+                      );
+                      setState(() => _chatsFuture = _fetchMyChats());
+                    },
+                  ),
                 );
               }
 
-              return FutureBuilder<String>(
-                future: _otherUserLabel(chatId),
-                builder: (context, nameSnap) {
-                  final title = nameSnap.data ?? 'Chat';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: cs.primary.withOpacity(0.10)),
-                    ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: cs.primary.withOpacity(0.12),
-                        child: Icon(Icons.person, color: cs.primary),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: cs.primary.withOpacity(0.10)),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: cs.primary.withOpacity(0.12),
+                    backgroundImage: uiAvatar != null && uiAvatar.isNotEmpty
+                        ? NetworkImage(uiAvatar)
+                        : null,
+                    child: uiAvatar == null || uiAvatar.isEmpty
+                        ? Icon(Icons.person, color: cs.primary)
+                        : null,
+                  ),
+                  title: Text(
+                    uiTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    last.isEmpty ? 'Say hi 👋' : last,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: _unreadTrailing(unread),
+                  onTap: () async {
+                    final ok = await _ensureLoginAndPrompt(context);
+                    if (!ok) return;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ChatRoomPage(
+                          chatId: chatId,
+                          title: uiTitle,
+                          chatKind: 'direct',
+                          directPeerUserId: peerId,
+                        ),
                       ),
-                      title: Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: Text(
-                        last.isEmpty ? 'Say hi 👋' : last,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () async {
-                        final ok = await _ensureLoginAndPrompt(context);
-                        if (!ok) return;
-                        final t = nameSnap.data ?? 'Chat';
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ChatRoomPage(
-                              chatId: chatId,
-                              title: t,
-                              chatKind: 'direct',
-                            ),
-                          ),
-                        );
-                        setState(() => _chatsFuture = _fetchMyChats());
-                      },
-                    ),
-                  );
-                },
+                    );
+                    setState(() => _chatsFuture = _fetchMyChats());
+                  },
+                ),
               );
             },
           ),
@@ -2372,12 +2854,15 @@ class ChatRoomPage extends StatefulWidget {
   final String title;
   /// `direct` (1:1 match) or `game` (group).
   final String chatKind;
+  /// When known (e.g. from a new match), avoids an extra lookup.
+  final String? directPeerUserId;
 
   const ChatRoomPage({
     super.key,
     required this.chatId,
     required this.title,
     this.chatKind = 'direct',
+    this.directPeerUserId,
   });
 
   @override
@@ -2391,13 +2876,54 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final ScrollController _listCtrl = ScrollController();
 
   String _appTitle = 'Chat';
-  int _lastMsgCount = 0;
+  String _gameSubtitle = '';
+  String? _directPeerId;
+  String? _directPeerAvatar;
+  int _prevMsgLen = -1;
+  Timer? _readDebounce;
 
   @override
   void dispose() {
+    _readDebounce?.cancel();
+    final u = _user;
+    if (u != null) {
+      markChatRead(
+        Supabase.instance.client,
+        chatId: widget.chatId,
+        userId: u.id,
+      );
+    }
     _ctrl.dispose();
     _listCtrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleMarkRead() {
+    final u = _user;
+    if (u == null) return;
+    _readDebounce?.cancel();
+    _readDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      markChatRead(
+        Supabase.instance.client,
+        chatId: widget.chatId,
+        userId: u.id,
+      );
+    });
+  }
+
+  void _scrollChatToBottom({bool animate = false}) {
+    if (!_listCtrl.hasClients) return;
+    final t = _listCtrl.position.minScrollExtent;
+    if (animate) {
+      _listCtrl.animateTo(
+        t,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _listCtrl.jumpTo(t);
+    }
   }
 
   Future<void> _send() async {
@@ -2420,6 +2946,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         'content': text,
       });
       _ctrl.clear();
+      if (!mounted) return;
+      _scheduleMarkRead();
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollChatToBottom(animate: true));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -2433,47 +2963,70 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     super.initState();
     _appTitle = widget.title.isNotEmpty ? widget.title : 'Chat';
     if (widget.chatKind == 'direct') {
-      _loadOtherName().then((name) {
-        if (mounted) {
-          setState(() => _appTitle = name);
-        }
-      });
+      _loadDirectHeader();
+    } else {
+      _loadGameHeaderMeta();
     }
   }
 
-  Future<String> _loadOtherName() async {
+  Future<void> _loadGameHeaderMeta() async {
     try {
-      final u = _user;
-      if (u == null) return 'Unknown';
-
-      final supabase = Supabase.instance.client;
-
-      final other = await supabase
+      final rows = await Supabase.instance.client
           .from('chat_members')
           .select('user_id')
-          .eq('chat_id', widget.chatId)
-          .neq('user_id', u.id)
-          .limit(1)
-          .maybeSingle();
+          .eq('chat_id', widget.chatId);
+      final n = (rows as List).length;
+      if (mounted) {
+        setState(() {
+          _gameSubtitle = n <= 0 ? 'Group chat' : '$n people · tap for roster';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _gameSubtitle = 'Group chat · tap for roster');
+      }
+    }
+  }
 
-      final otherId = other?['user_id']?.toString();
-      if (otherId == null) return 'Unknown';
+  Future<void> _loadDirectHeader() async {
+    try {
+      final u = _user;
+      if (u == null) return;
+
+      final supabase = Supabase.instance.client;
+      var oid = widget.directPeerUserId;
+      if (oid == null) {
+        final other = await supabase
+            .from('chat_members')
+            .select('user_id')
+            .eq('chat_id', widget.chatId)
+            .neq('user_id', u.id)
+            .limit(1)
+            .maybeSingle();
+        oid = other?['user_id']?.toString();
+      }
+      if (oid == null || !mounted) return;
+      final peerId = oid;
 
       final p = await supabase
           .from('profiles')
-          .select('display_name')
-          .eq('id', otherId)
+          .select('display_name, avatar_url')
+          .eq('id', peerId)
           .maybeSingle();
 
-      final name = (p?['display_name'] ?? '').toString().trim();
-      if (name.isNotEmpty) {
-        return name;
-      }
-
-      return 'User ${otherId.substring(0, 6)}';
-    } catch (_) {
-      return 'Chat';
-    }
+      if (!mounted) return;
+      setState(() {
+        _directPeerId = peerId;
+        _directPeerAvatar = p?['avatar_url']?.toString();
+        final name = (p?['display_name'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          _appTitle = name;
+        } else {
+          _appTitle =
+              'User ${peerId.length >= 6 ? peerId.substring(0, 6) : peerId}';
+        }
+      });
+    } catch (_) {}
   }
 
   Future<void> _showGameMembers(BuildContext context) async {
@@ -2564,7 +3117,94 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_appTitle),
+        centerTitle: false,
+        titleSpacing: 8,
+        title: widget.chatKind == 'game'
+            ? InkWell(
+                onTap: () => _showGameMembers(context),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: cs.primary.withOpacity(0.15),
+                        child: Icon(Icons.groups, color: cs.primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _appTitle,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 17,
+                              ),
+                            ),
+                            Text(
+                              _gameSubtitle,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface.withOpacity(0.65),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : InkWell(
+                onTap: _directPeerId == null
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                OtherProfilePage(userId: _directPeerId!),
+                          ),
+                        );
+                      },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: cs.primary.withOpacity(0.15),
+                        backgroundImage: _directPeerAvatar != null &&
+                                _directPeerAvatar!.isNotEmpty
+                            ? NetworkImage(_directPeerAvatar!)
+                            : null,
+                        child: _directPeerAvatar == null ||
+                                _directPeerAvatar!.isEmpty
+                            ? Icon(Icons.person, color: cs.primary)
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _appTitle,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
         actions: [
           if (widget.chatKind == 'game')
             IconButton(
@@ -2584,28 +3224,30 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final msgs = snapshot.data!;
+                final msgs = sortedChatMessages(snapshot.data!);
                 if (msgs.isEmpty) {
                   return const Center(child: Text('Say hi 👋'));
                 }
 
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  final newCount = msgs.length;
-                  final hasNewMessage = newCount > _lastMsgCount;
+                final newestFirst = msgs.reversed.toList();
 
-                  _lastMsgCount = newCount;
-
-                  if (hasNewMessage && _listCtrl.hasClients) {
-                    _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
-                  }
-                });
+                final len = msgs.length;
+                if (len != _prevMsgLen) {
+                  _prevMsgLen = len;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _scrollChatToBottom(animate: false);
+                    _scheduleMarkRead();
+                  });
+                }
 
                 return ListView.builder(
+                  reverse: true,
                   controller: _listCtrl,
                   padding: const EdgeInsets.all(12),
-                  itemCount: msgs.length,
+                  itemCount: newestFirst.length,
                   itemBuilder: (context, i) {
-                    final m = msgs[i];
+                    final m = newestFirst[i];
                     final isMe =
                         u != null && m['user_id']?.toString() == u.id;
                     final text = (m['content'] ?? '').toString();
