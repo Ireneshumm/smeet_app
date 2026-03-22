@@ -1,8 +1,10 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Matches `SmeetTheme.smeetMint` in `main.dart` (avoid importing `main.dart`).
+const Color kSmeetMint = Color(0xFF56CDBE);
 
 class LocationResult {
   final String address;
@@ -16,26 +18,48 @@ class LocationResult {
   });
 }
 
+/// Google Places autocomplete row; [==] / [hashCode] use [placeId] for [RawAutocomplete].
+@immutable
+class PlacePrediction {
+  const PlacePrediction(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get placeId => (raw['place_id'] ?? '').toString().trim();
+
+  String get description => (raw['description'] ?? '').toString();
+
+  Map<String, dynamic>? get structuredFormatting =>
+      raw['structured_formatting'] as Map<String, dynamic>?;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlacePrediction && other.placeId == placeId;
+
+  @override
+  int get hashCode => placeId.hashCode;
+}
+
 /// Location search via Supabase Edge Function `google-places`.
-/// Suggestions render in an [Overlay] + [CompositedTransformFollower] so Web taps are not swallowed.
+/// Uses [RawAutocomplete] so the framework owns overlay / hit-testing (reliable on Web).
 class LocationSearchField extends StatefulWidget {
   final SupabaseClient supabase;
   final String labelText;
   final String hintText;
   final bool enabled;
   final ValueChanged<LocationResult?> onChanged;
-  final void Function(String address, double lat, double lng) onLocationSelected;
+  final void Function(String address, double lat, double lng)? onLocationSelected;
   final LocationResult? initialValue;
 
   const LocationSearchField({
     super.key,
     required this.supabase,
     required this.onChanged,
-    required this.onLocationSelected,
     this.labelText = 'Location',
     this.hintText = 'Search address',
     this.enabled = true,
     this.initialValue,
+    this.onLocationSelected,
   });
 
   @override
@@ -45,163 +69,77 @@ class LocationSearchField extends StatefulWidget {
 class _LocationSearchFieldState extends State<LocationSearchField> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  final LayerLink _layerLink = LayerLink();
-  final GlobalKey _targetKey = GlobalKey();
 
-  Timer? _debounce;
-  Timer? _blurHideTimer;
-
-  OverlayEntry? _overlayEntry;
+  int _fetchGeneration = 0;
 
   bool _loading = false;
   String? _error;
-  List<Map<String, dynamic>> _predictions = const [];
   String _sessionToken = '';
   LocationResult? _selected;
 
+  /// True while resolving place details after user picks an option (skips duplicate searches).
+  bool _resolvingPick = false;
+
+  /// When we call [onChanged](null) because the user edited text after a pick, the parent
+  /// sets [initialValue] to null; we must not treat that as "reset form" and clear the field.
+  bool _suppressNextInitialNullSync = false;
+
+  /// Web / platform may emit multiple [TextEditingController] notifications per assignment.
   bool _ignoreNextControllerChange = false;
+  int _extraControllerChangeSkips = 0;
+
+  static bool _sameLocation(LocationResult? a, LocationResult? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    return a.address == b.address && a.lat == b.lat && a.lng == b.lng;
+  }
+
+  void _armControllerChangeIgnore({int extraSkips = 2}) {
+    _ignoreNextControllerChange = true;
+    _extraControllerChangeSkips = extraSkips;
+  }
+
+  bool _consumeControllerChangeIgnore() {
+    if (_ignoreNextControllerChange) {
+      _ignoreNextControllerChange = false;
+      return true;
+    }
+    if (_extraControllerChangeSkips > 0) {
+      _extraControllerChangeSkips--;
+      return true;
+    }
+    return false;
+  }
 
   @override
   void initState() {
     super.initState();
     _sessionToken = _newSessionToken();
     _selected = widget.initialValue;
-    if (_selected != null) {
-      _controller.text = _selected!.address;
-    }
+    _controller.text = widget.initialValue?.address ?? '';
     _controller.addListener(_onControllerChanged);
-    _focusNode.addListener(_onFocusChanged);
   }
 
-  void _onFocusChanged() {
-    _blurHideTimer?.cancel();
-    _blurHideTimer = null;
-
-    if (_focusNode.hasFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showOrUpdateOverlay();
-      });
-      return;
+  @override
+  void didUpdateWidget(LocationSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_sameLocation(oldWidget.initialValue, widget.initialValue)) {
+      _selected = widget.initialValue;
+      if (widget.initialValue != null) {
+        _armControllerChangeIgnore(extraSkips: 3);
+        _controller.text = widget.initialValue!.address;
+      } else if (_suppressNextInitialNullSync) {
+        _suppressNextInitialNullSync = false;
+      } else {
+        _armControllerChangeIgnore(extraSkips: 3);
+        _controller.clear();
+      }
     }
-
-    _blurHideTimer = Timer(const Duration(milliseconds: 220), () {
-      _blurHideTimer = null;
-      if (!mounted || _focusNode.hasFocus) return;
-      setState(() => _predictions = const []);
-      _hideOverlay();
-    });
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
-  void _showOrUpdateOverlay() {
-    if (!mounted) return;
-    if (_predictions.isEmpty || !_focusNode.hasFocus) {
-      _hideOverlay();
-      return;
-    }
-
-    final ctx = _targetKey.currentContext;
-    if (ctx == null) return;
-    final box = ctx.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showOrUpdateOverlay();
-      });
-      return;
-    }
-
-    final width = box.size.width;
-    final predictions = List<Map<String, dynamic>>.from(_predictions);
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    _hideOverlay();
-
-    _overlayEntry = OverlayEntry(
-      builder: (overlayContext) {
-        return CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          followerAnchor: Alignment.topLeft,
-          targetAnchor: Alignment.bottomLeft,
-          offset: const Offset(0, 6),
-          child: Material(
-            elevation: 8,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            color: theme.colorScheme.surface,
-            child: SizedBox(
-              width: width,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 280),
-                child: ListView.separated(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  physics: const ClampingScrollPhysics(),
-                  itemCount: predictions.length,
-                  separatorBuilder: (_, _) => Divider(
-                    height: 1,
-                    color: cs.outlineVariant.withOpacity(0.35),
-                  ),
-                  itemBuilder: (_, i) {
-                    final prediction = predictions[i];
-                    final main =
-                        (prediction['structured_formatting']?['main_text'] ??
-                                '')
-                            .toString();
-                    final secondary =
-                        (prediction['structured_formatting']?['secondary_text'] ??
-                                '')
-                            .toString();
-                    final description =
-                        (prediction['description'] ?? '').toString();
-
-                    return Listener(
-                      behavior: HitTestBehavior.opaque,
-                      onPointerDown: (PointerDownEvent event) {
-                        if (!mounted) return;
-                        // Raw pointer: bypass gesture arena / blur race on Web.
-                        _focusNode.unfocus();
-                        _ignoreNextControllerChange = true;
-                        _controller.text =
-                            (prediction['description'] ?? '').toString();
-                        _selectPrediction(prediction);
-                      },
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(
-                          Icons.place_outlined,
-                          color: cs.primary,
-                        ),
-                        title: Text(main.isEmpty ? description : main),
-                        subtitle: secondary.isEmpty
-                            ? null
-                            : Text(secondary),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    Overlay.of(context).insert(_overlayEntry!);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _blurHideTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
-    _focusNode.removeListener(_onFocusChanged);
-    _hideOverlay();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -259,51 +197,78 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     return null;
   }
 
-  /// Drives search from [TextEditingController] so programmatic updates can be ignored.
-  void _onControllerChanged() {
-    // Skips search when we inject description (pointer down) or full address (after details).
-    if (_ignoreNextControllerChange) {
-      _ignoreNextControllerChange = false;
-      return;
-    }
+  void _applyResolvedPlace(LocationResult item) {
+    _resolvingPick = false;
 
-    if (!mounted) return;
+    _selected = item;
+    _sessionToken = _newSessionToken();
 
-    _debounce?.cancel();
-    _selected = null;
-    widget.onChanged(null);
+    _armControllerChangeIgnore(extraSkips: 3);
+    _controller.text = item.address;
 
-    final value = _controller.text;
-    final q = value.trim();
-    if (q.isEmpty) {
+    if (mounted) {
       setState(() {
-        _predictions = const [];
-        _error = null;
         _loading = false;
+        _error = null;
       });
-      _hideOverlay();
-      return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _fetchPredictions(q);
-    });
+    debugPrint(
+      'LocationSearchField: selection resolved → ${item.address} (${item.lat},${item.lng})',
+    );
+    widget.onLocationSelected?.call(item.address, item.lat, item.lng);
+    widget.onChanged(item);
+
+    _focusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  Future<void> _fetchPredictions(String query) async {
-    if (!widget.enabled) return;
+  void _onControllerChanged() {
+    if (_consumeControllerChangeIgnore()) {
+      return;
+    }
+    if (_resolvingPick) {
+      return;
+    }
+    if (!mounted) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_selected != null) {
+      _selected = null;
+      _suppressNextInitialNullSync = true;
+      widget.onChanged(null);
+    }
+  }
+
+  Future<Iterable<PlacePrediction>> _optionsBuilder(TextEditingValue value) async {
+    if (!widget.enabled || _resolvingPick) {
+      return const [];
+    }
+
+    final q = value.text.trim();
+    if (q.isEmpty) {
+      if (mounted) setState(() => _error = null);
+      return const [];
+    }
+
+    final gen = ++_fetchGeneration;
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted || gen != _fetchGeneration) {
+      return const [];
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final res = await widget.supabase.functions.invoke(
         'google-places',
         body: {
           'action': 'autocomplete',
-          'input': query,
+          'input': q,
           'sessionToken': _sessionToken,
         },
       );
@@ -319,65 +284,67 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
 
       final status = (body['status'] ?? '').toString();
 
+      if (!mounted || gen != _fetchGeneration) {
+        return const [];
+      }
+
       if (status == 'OK') {
         final raw = (body['predictions'] as List?) ?? const [];
-        if (!mounted) return;
-        setState(() {
-          _predictions =
-              raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-          _loading = false;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _showOrUpdateOverlay();
-        });
-        return;
+        final list = raw
+            .map((e) => PlacePrediction(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        debugPrint('LocationSearchField: autocomplete OK, ${list.length} options for "$q"');
+        if (mounted) setState(() => _loading = false);
+        return list;
       }
 
       if (status == 'ZERO_RESULTS') {
-        if (!mounted) return;
-        setState(() {
-          _predictions = const [];
-          _loading = false;
-        });
-        _hideOverlay();
-        return;
+        debugPrint('LocationSearchField: autocomplete ZERO_RESULTS for "$q"');
+        if (mounted) setState(() => _loading = false);
+        return const [];
       }
 
       throw Exception(
         'Autocomplete status=$status ${body['error_message'] ?? ''}',
       );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _predictions = const [];
-        _loading = false;
-      });
-      _hideOverlay();
+    } catch (e, st) {
+      debugPrint('LocationSearchField: autocomplete error: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return const [];
     }
   }
 
-  Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
-    _blurHideTimer?.cancel();
-    _blurHideTimer = null;
-    _hideOverlay();
+  Future<void> _onPredictionSelected(PlacePrediction prediction) async {
+    debugPrint(
+      'LocationSearchField: option tapped placeId=${prediction.placeId} desc=${prediction.description}',
+    );
 
-    final placeId = (prediction['place_id'] ?? '').toString().trim();
-    if (placeId.isEmpty) return;
+    if (prediction.placeId.isEmpty) {
+      debugPrint('LocationSearchField: abort — empty placeId');
+      return;
+    }
 
-    if (!mounted) return;
-    setState(() {
-      _predictions = const [];
-      _loading = true;
-      _error = null;
-    });
+    _resolvingPick = true;
+    _armControllerChangeIgnore(extraSkips: 5);
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final res = await widget.supabase.functions.invoke(
         'google-places',
         body: {
           'action': 'details',
-          'placeId': placeId,
+          'placeId': prediction.placeId,
         },
       );
 
@@ -395,36 +362,18 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         throw Exception('Invalid place details payload');
       }
 
-      final address = selected.address;
-      final lat = selected.lat;
-      final lng = selected.lng;
-
-      _selected = selected;
-      _sessionToken = _newSessionToken();
-
       if (!mounted) return;
-
-      // Must be true before assigning text so [_onControllerChanged] skips search / clearing selection.
-      _ignoreNextControllerChange = true;
-      setState(() {
-        _controller.text = address;
-        _loading = false;
-      });
-
-      widget.onLocationSelected(address, lat, lng);
-      widget.onChanged(selected);
-
-      _hideOverlay();
-
-      _focusNode.unfocus();
-      FocusManager.instance.primaryFocus?.unfocus();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-      _hideOverlay();
+      debugPrint('LocationSearchField: details OK → notifying parent');
+      _applyResolvedPlace(selected);
+    } catch (e, st) {
+      debugPrint('LocationSearchField: details error: $e\n$st');
+      _resolvingPick = false;
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -436,49 +385,109 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CompositedTransformTarget(
-          link: _layerLink,
-          child: SizedBox(
-            key: _targetKey,
-            width: double.infinity,
-            child: TextField(
+        RawAutocomplete<PlacePrediction>(
+          focusNode: _focusNode,
+          textEditingController: _controller,
+          displayStringForOption: (PlacePrediction p) => p.description,
+          optionsBuilder: _optionsBuilder,
+          onSelected: _onPredictionSelected,
+          fieldViewBuilder:
+              (context, controller, focusNode, onFieldSubmitted) {
+            return TextField(
               enabled: widget.enabled,
-              focusNode: _focusNode,
-              controller: _controller,
+              focusNode: focusNode,
+              controller: controller,
+              onSubmitted: (_) => onFieldSubmitted(),
               decoration: InputDecoration(
                 labelText: widget.labelText,
                 hintText: widget.hintText,
                 border: const OutlineInputBorder(),
+                focusedBorder: const OutlineInputBorder(
+                  borderSide: BorderSide(color: kSmeetMint, width: 2),
+                ),
                 filled: true,
                 fillColor: Colors.white,
-                prefixIcon: const Icon(Icons.location_on_outlined),
+                prefixIcon: const Icon(
+                  Icons.location_on_outlined,
+                  color: kSmeetMint,
+                ),
                 suffixIcon: _loading
                     ? const Padding(
                         padding: EdgeInsets.all(12),
                         child: SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: kSmeetMint,
+                          ),
                         ),
                       )
-                    : (_controller.text.isEmpty
+                    : (controller.text.isEmpty
                         ? null
                         : IconButton(
                             onPressed: () {
+                              _fetchGeneration++;
                               _controller.clear();
                               _selected = null;
                               widget.onChanged(null);
-                              setState(() {
-                                _predictions = const [];
-                                _error = null;
-                              });
-                              _hideOverlay();
+                              setState(() => _error = null);
                             },
                             icon: const Icon(Icons.close),
                           )),
               ),
-            ),
-          ),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            final opts = options.toList();
+            if (opts.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 8,
+                clipBehavior: Clip.antiAlias,
+                color: Theme.of(context).colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: kSmeetMint, width: 1),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < opts.length; i++) ...[
+                          if (i > 0)
+                            Divider(
+                              height: 1,
+                              color: kSmeetMint.withValues(alpha: 0.25),
+                            ),
+                          _SuggestionRow(
+                            prediction: opts[i],
+                            onPick: (PlacePrediction p) {
+                              debugPrint(
+                                'LocationSearchField: row pointer/tap → onSelected(${p.placeId})',
+                              );
+                              _resolvingPick = true;
+                              _armControllerChangeIgnore(extraSkips: 5);
+                              // RawAutocomplete sets field text to [displayStringForOption] then calls
+                              // [onSelected] → [_onPredictionSelected] (details + parent notify).
+                              onSelected(p);
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         if (_error != null && _error!.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -489,16 +498,52 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         ],
         if (!_loading &&
             _controller.text.trim().isNotEmpty &&
-            _predictions.isEmpty &&
             _error == null &&
             hasFocus) ...[
           const SizedBox(height: 8),
           Text(
-            'No results found.',
+            'Type to search, then pick an address from the list.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Row hit target: [Listener.onPointerDown] fires on Web before blur; no [InkWell.onTap]
+/// (would double-fire with the same pointer gesture).
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({
+    required this.prediction,
+    required this.onPick,
+  });
+
+  final PlacePrediction prediction;
+  final void Function(PlacePrediction) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final sf = prediction.structuredFormatting;
+    final main = (sf?['main_text'] ?? '').toString();
+    final secondary = (sf?['secondary_text'] ?? '').toString();
+    final description = prediction.description;
+
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => onPick(prediction),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Material(
+          color: kSmeetMint.withValues(alpha: 0.06),
+          child: ListTile(
+            dense: true,
+            leading: const Icon(Icons.place_outlined, color: kSmeetMint),
+            title: Text(main.isEmpty ? description : main),
+            subtitle: secondary.isEmpty ? null : Text(secondary),
+          ),
+        ),
+      ),
     );
   }
 }
