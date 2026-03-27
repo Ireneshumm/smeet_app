@@ -64,11 +64,21 @@ class SupabaseProfilePostsRepository {
       final typeLabel = mediaType.isEmpty ? 'post' : mediaType;
       final subtitle = '$when · $typeLabel';
 
+      final rawUrls = row['media_urls'];
+      String? firstUrl;
+      if (rawUrls is List && rawUrls.isNotEmpty) {
+        final s = rawUrls.first?.toString().trim() ?? '';
+        firstUrl = s.isEmpty ? null : s;
+      }
+
       return ProfileTabItem(
         id: id,
         tab: ProfileContentTab.posts,
         title: title,
         subtitle: subtitle,
+        previewMediaUrl: firstUrl,
+        previewMediaType:
+            mediaType.isEmpty ? null : mediaType.toLowerCase().trim(),
       );
     } catch (e) {
       debugPrint('[SupabaseProfilePostsRepository] skip row: $e');

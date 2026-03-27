@@ -15,6 +15,7 @@ class ChatListItem {
     required this.updatedAt,
     required this.unreadCount,
     this.directPeerUserId,
+    this.avatarUrl,
   });
 
   /// Chat id (`chats.id` / `chat_members.chat_id`).
@@ -29,4 +30,7 @@ class ChatListItem {
 
   /// Other user in a direct chat; null for game chats and mock rows.
   final String? directPeerUserId;
+
+  /// Direct chat peer avatar URL from [ChatConversationListService] (`ui_avatar`).
+  final String? avatarUrl;
 }

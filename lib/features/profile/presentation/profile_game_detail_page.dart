@@ -124,9 +124,38 @@ class _GameDetailBody extends StatelessWidget {
     final createdBy = (row['created_by'] ?? '').toString().trim();
     final createdAt = _mvpParseDt(row['created_at']);
 
+    Widget sectionCard({required String title, required List<Widget> children}) {
+      return Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.55)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...children,
+            ],
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         children: [
           if (sourceLabel.isNotEmpty)
             Padding(
@@ -135,57 +164,60 @@ class _GameDetailBody extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Chip(
                   visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: cs.outlineVariant),
                   label: Text(sourceLabel),
                 ),
               ),
             ),
           Text(
             headline,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
             ),
           ),
-          const SizedBox(height: 16),
-          _line(theme, 'Starts', _mvpFormatWhen(starts)),
-          _line(theme, 'Ends', _mvpFormatWhen(ends)),
-          const SizedBox(height: 8),
-          _line(
-            theme,
-            'Location',
-            loc.isEmpty ? '—' : loc,
-          ),
-          const SizedBox(height: 8),
-          _line(theme, 'Players', '$jStr / $pStr joined'),
-          if (perPerson != null) ...[
-            const SizedBox(height: 8),
-            _line(
-              theme,
-              'Price',
-              '\$${perPerson.toStringAsFixed(2)} each',
-            ),
-          ],
-          const SizedBox(height: 20),
-          Text(
-            'Details',
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (createdBy.isNotEmpty)
-            SelectableText(
-              'created_by: $createdBy',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
+          const SizedBox(height: 18),
+          sectionCard(
+            title: 'When & where',
+            children: [
+              _line(theme, 'Starts', _mvpFormatWhen(starts)),
+              const SizedBox(height: 10),
+              _line(theme, 'Ends', _mvpFormatWhen(ends)),
+              const SizedBox(height: 10),
+              _line(
+                theme,
+                'Location',
+                loc.isEmpty ? '—' : loc,
               ),
-            ),
-          if (createdAt != null) ...[
-            if (createdBy.isNotEmpty) const SizedBox(height: 6),
-            Text(
-              'created_at: ${_mvpFormatWhen(createdAt)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          sectionCard(
+            title: 'Players & fee',
+            children: [
+              _line(theme, 'Spots', '$jStr / $pStr joined'),
+              if (perPerson != null) ...[
+                const SizedBox(height: 10),
+                _line(
+                  theme,
+                  'Per person',
+                  '\$${perPerson.toStringAsFixed(2)}',
+                ),
+              ],
+            ],
+          ),
+          if (createdBy.isNotEmpty || createdAt != null) ...[
+            const SizedBox(height: 12),
+            sectionCard(
+              title: 'Listing',
+              children: [
+                if (createdBy.isNotEmpty)
+                  _line(theme, 'Host ID', createdBy),
+                if (createdAt != null) ...[
+                  if (createdBy.isNotEmpty) const SizedBox(height: 10),
+                  _line(theme, 'Listed', _mvpFormatWhen(createdAt)),
+                ],
+              ],
             ),
           ],
         ],

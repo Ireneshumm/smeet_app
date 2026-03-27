@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart'; // kIsWeb
-import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +22,7 @@ import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
 import 'package:smeet_app/widgets/legal_section_card.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
+import 'package:smeet_app/widgets/post_media_display.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 import 'package:smeet_app/widgets/signup_legal_agreement.dart';
 import 'package:smeet_app/features/feed/feed.dart';
@@ -81,6 +81,45 @@ List<Map<String, dynamic>> sortedChatMessages(
 String formatGameDateHeading(DateTime? start) {
   if (start == null) return 'Date —';
   return DateFormat('EEEE · MM/dd/yyyy').format(start);
+}
+
+String _userFacingJoinGameError(Object e) {
+  debugPrint('[JoinGame] failed: $e');
+  final s = e.toString().toLowerCase();
+  if (s.contains('full')) {
+    return 'This game is full.';
+  }
+  return 'Couldn’t join this game. Please try again.';
+}
+
+String _userFacingSwipeError(Object e) {
+  debugPrint('[Swipe] failed: $e');
+  return 'That didn’t work. Please try again.';
+}
+
+String _userFacingChatSendError(Object e) {
+  debugPrint('[ChatSend] failed: $e');
+  return 'Couldn’t send. Check your connection and try again.';
+}
+
+String _userFacingMembersLoadError(Object e) {
+  debugPrint('[ChatRoom] members load failed: $e');
+  return 'Couldn’t load the player list. Try again in a moment.';
+}
+
+String _userFacingProfileLoadError(Object e) {
+  debugPrint('[Profile] load failed: $e');
+  return 'Couldn’t load your profile. Please try again.';
+}
+
+String _userFacingAvatarUploadError(Object e) {
+  debugPrint('[Profile] avatar upload failed: $e');
+  return 'Couldn’t update your profile photo. Please try again.';
+}
+
+String _userFacingPostPublishError(Object e) {
+  debugPrint('[Profile] post publish failed: $e');
+  return 'Couldn’t publish your post. Please try again.';
 }
 
 Future<void> markChatRead(
@@ -768,7 +807,7 @@ class _AuthPageState extends State<AuthPage> {
                         _authGuidanceLine(
                           context,
                           '3',
-                          'Log in to start matching 🎾',
+                          'Sign in to start matching with people near you.',
                         ),
                       ],
                     ),
@@ -1329,8 +1368,8 @@ class _HomePageState extends State<HomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Game created, but group chat setup is incomplete. '
-              'Your game still appears in the list below.',
+              'Your game is live, but the group chat isn’t ready yet. '
+              'You can still see it in the list below.',
             ),
             duration: Duration(seconds: 6),
           ),
@@ -1338,14 +1377,14 @@ class _HomePageState extends State<HomePage> {
       } else if (!joinOk) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Game created successfully.'),
+            content: Text('Your game is live.'),
             duration: Duration(seconds: 4),
           ),
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'We couldn’t add you to the roster automatically. '
+              'We couldn’t add you to the player list automatically. '
               'Open My Game to join this session.',
             ),
             duration: Duration(seconds: 8),
@@ -1354,7 +1393,7 @@ class _HomePageState extends State<HomePage> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Game created successfully.'),
+            content: Text('Your game is live.'),
             duration: Duration(seconds: 4),
           ),
         );
@@ -1402,14 +1441,16 @@ class _HomePageState extends State<HomePage> {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Please login first')));
+        ).showSnackBar(
+          const SnackBar(content: Text('Please sign in to join a game.')),
+        );
         return;
       }
 
       if (widget.joinedLocal.contains(gameId)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Already joined')),
+          const SnackBar(content: Text('You’re already in this game.')),
         );
         return;
       }
@@ -1432,7 +1473,7 @@ class _HomePageState extends State<HomePage> {
         if (joined >= players) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Full already')),
+            const SnackBar(content: Text('This game is full.')),
           );
           return;
         }
@@ -1450,9 +1491,11 @@ class _HomePageState extends State<HomePage> {
       // join_game RPC (updated migration) also adds this user to game_chat_id group chat.
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('✅ Joined!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You’re in! Find this game under My Game.'),
+        ),
+      );
 
       setState(() {
         widget.joinedLocal.add(gameId);
@@ -1460,9 +1503,9 @@ class _HomePageState extends State<HomePage> {
       widget.onGamesMutated?.call();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Join failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_userFacingJoinGameError(e))),
+      );
     }
   }
 
@@ -1514,9 +1557,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Sport • game level • start/end • location • players • cost split',
+                    'Set sport, level, time, place, headcount, and cost — '
+                    'it appears below for others to join.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurface.withOpacity(0.7),
+                      height: 1.35,
                     ),
                   ),
                 ],
@@ -1763,8 +1808,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 10),
 
             Text(
-              'Games you create appear in the list below.',
-
+              'Games you host show up in this list right away.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: cs.onSurface.withOpacity(0.55),
               ),
@@ -1879,8 +1923,7 @@ class _HomePageState extends State<HomePage> {
 
                 if (snapshot.hasError) {
                   return AppErrorState(
-                    message:
-                        'Something went wrong while loading games. Please try again.',
+                    message: 'We couldn’t load games. Tap Retry.',
                     onRetry: _retryGamesStream,
                   );
                 }
@@ -1892,9 +1935,9 @@ class _HomePageState extends State<HomePage> {
                 if (sortedGames.isEmpty) {
                   return const AppEmptyState(
                     icon: Icons.sports_tennis,
-                    title: 'No games yet.',
+                    title: 'No games yet',
                     subtitle:
-                        'Be the first — create a game above, or check back soon.',
+                        'Create one with the form above, or check back later.',
                   );
                 }
 
@@ -2063,6 +2106,47 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+const List<String> _kSwipeMatchOpeners = [
+  'Ask what they’re playing this week.',
+  'Comment on a sport you have in common.',
+  'Suggest a casual hit or practice session.',
+];
+
+class _SwipeMatchAvatar extends StatelessWidget {
+  const _SwipeMatchAvatar({
+    required this.url,
+    required this.fallbackLabel,
+  });
+
+  final String? url;
+  final String fallbackLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hasUrl = url != null && url!.isNotEmpty;
+    final t = fallbackLabel.trim();
+    final initial =
+        t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
+    return CircleAvatar(
+      radius: 44,
+      backgroundColor: cs.primaryContainer,
+      backgroundImage: hasUrl ? NetworkImage(url!) : null,
+      onBackgroundImageError: (_, __) {},
+      child: hasUrl
+          ? null
+          : Text(
+              initial,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cs.onPrimaryContainer,
+              ),
+            ),
+    );
+  }
+}
+
 /// --- 页面 2：Swipe（找搭子） ---
 class SwipePage extends StatefulWidget {
   const SwipePage({super.key});
@@ -2226,6 +2310,165 @@ class _SwipePageState extends State<SwipePage> {
     return _candidates[_index];
   }
 
+  /// Brief full-screen stamp; does not await network.
+  void _flashDecisionStamp(String action) {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return;
+    final isLike = action == 'like';
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => IgnorePointer(
+        child: Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.92, end: 1.0),
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) {
+              return Transform.scale(
+                scale: scale,
+                child: child,
+              );
+            },
+            child: Text(
+              isLike ? 'LIKE' : 'PASS',
+              style: TextStyle(
+                fontSize: 52,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: isLike
+                    ? const Color(0xFF4ADE80).withValues(alpha: 0.92)
+                    : Colors.white.withValues(alpha: 0.92),
+                shadows: const [
+                  Shadow(blurRadius: 16, color: Colors.black54),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    Future<void>.delayed(const Duration(milliseconds: 240), () {
+      entry.remove();
+    });
+  }
+
+  Future<void> _showMatchCelebration({
+    required String peerName,
+    required String peerAvatarUrl,
+    required String? selfAvatarUrl,
+    required VoidCallback onSayHi,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'It’s a match!',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'You and $peerName both liked each other.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _SwipeMatchAvatar(
+                      url: selfAvatarUrl,
+                      fallbackLabel: 'You',
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        color: cs.primary,
+                        size: 32,
+                      ),
+                    ),
+                    _SwipeMatchAvatar(
+                      url: peerAvatarUrl.isEmpty ? null : peerAvatarUrl,
+                      fallbackLabel: peerName,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Icebreakers',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ..._kSwipeMatchOpeners.map(
+                  (line) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• ', style: TextStyle(color: cs.primary)),
+                        Expanded(
+                          child: Text(
+                            line,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              height: 1.35,
+                              color: cs.onSurface.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      onSayHi();
+                    },
+                    child: const Text('Say hi'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Keep swiping'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _swipe(String action) async {
     final cur = _current;
     if (cur == null) return;
@@ -2239,6 +2482,7 @@ class _SwipePageState extends State<SwipePage> {
     }
     if (u == null) return;
 
+    _flashDecisionStamp(action);
     setState(() => _loading = true);
 
     try {
@@ -2285,22 +2529,27 @@ class _SwipePageState extends State<SwipePage> {
 
           if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🎉 Matched! Chat created')),
-          );
-
-          // ✅ 直接进入聊天室
           final otherName = (cur['display_name'] ?? 'Chat').toString();
+          final peerAv = (cur['avatar_url'] ?? '').toString();
+          final selfAv = _myProfile?['avatar_url']?.toString();
 
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ChatRoomPage(
-                chatId: chatId.toString(),
-                title: otherName,
-                chatKind: 'direct',
-                directPeerUserId: toUser,
-              ),
-            ),
+          await _showMatchCelebration(
+            peerName: otherName,
+            peerAvatarUrl: peerAv,
+            selfAvatarUrl: selfAv,
+            onSayHi: () {
+              if (!mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ChatRoomPage(
+                    chatId: chatId.toString(),
+                    title: otherName,
+                    chatKind: 'direct',
+                    directPeerUserId: toUser,
+                  ),
+                ),
+              );
+            },
           );
         }
       }
@@ -2311,9 +2560,9 @@ class _SwipePageState extends State<SwipePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Swipe failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_userFacingSwipeError(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -2330,6 +2579,38 @@ class _SwipePageState extends State<SwipePage> {
     return items.isEmpty ? '-' : items.join('  •  ');
   }
 
+  /// Compact sport tags for the full-bleed card overlay (Tinder-style).
+  List<Widget> _sportOverlayChips(Map<String, dynamic> p) {
+    final sl = p['sport_levels'];
+    if (sl is! Map) return const [];
+    return sl.entries.take(8).map((e) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 6, bottom: 6),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.32),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              '${e.key} · ${e.value}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   String _overlapHint(Map<String, dynamic> other) {
     final myAv = _myProfile?['availability'];
     final otAv = other['availability'];
@@ -2344,7 +2625,7 @@ class _SwipePageState extends State<SwipePage> {
         final s2 = otSlots.map((e) => e.toString()).toSet();
         final inter = s1.intersection(s2);
         if (inter.isNotEmpty) {
-          return 'Overlap: $day ${inter.first}';
+          return 'Same slot: $day ${inter.first}';
         }
       }
     }
@@ -2356,13 +2637,13 @@ class _SwipePageState extends State<SwipePage> {
     final cs = Theme.of(context).colorScheme;
 
     if (_loading && _candidates.isEmpty) {
-      return const AppLoadingState(message: 'Loading matches…');
+      return const AppLoadingState(message: 'Finding people near you…');
     }
 
     if (_error != null) {
       return AppErrorState(
         message:
-            'Something went wrong while loading this page. Please try again.',
+            'We couldn’t load people to show. Please try again.',
         onRetry: _user == null
             ? () async {
                 final ok = await _ensureLoginAndPrompt(context);
@@ -2370,7 +2651,7 @@ class _SwipePageState extends State<SwipePage> {
                 await _bootstrap();
               }
             : _bootstrap,
-        retryLabel: _user == null ? 'Log in / Retry' : 'Retry',
+        retryLabel: _user == null ? 'Sign in / Retry' : 'Retry',
       );
     }
 
@@ -2378,10 +2659,10 @@ class _SwipePageState extends State<SwipePage> {
     if (cur == null) {
       return AppEmptyState(
         icon: Icons.people_outline,
-        title: 'No matches available right now.',
-            subtitle: _user == null
-                ? 'Sign in and complete your profile to get tailored matches.'
-                : 'Add more sports in Profile so others can find you, then tap Refresh.',
+        title: 'No one new to show right now',
+        subtitle: _user == null
+            ? 'Sign in and finish your profile to see people you can connect with.'
+            : 'Add a sport in Profile or pull to refresh — new people may appear later.',
         actionLabel: 'Refresh',
         onAction: _bootstrap,
       );
@@ -2392,6 +2673,10 @@ class _SwipePageState extends State<SwipePage> {
     final intro = (cur['intro'] ?? '').toString();
     final avatar = (cur['avatar_url'] ?? '').toString();
     final overlap = _overlapHint(cur);
+
+    final theme = Theme.of(context);
+    final gradientHeight =
+        (MediaQuery.sizeOf(context).height * 0.22).clamp(200.0, 320.0);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -2415,10 +2700,10 @@ class _SwipePageState extends State<SwipePage> {
                       Expanded(
                         child: Text(
                           'Browsing as a guest — sign in to like or pass.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: cs.onSurface.withValues(alpha: 0.85),
-                              ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.85),
+                          ),
                         ),
                       ),
                     ],
@@ -2426,142 +2711,219 @@ class _SwipePageState extends State<SwipePage> {
                 ),
               ),
             ),
-          // 卡片
           Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: cs.primary.withOpacity(0.12)),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                    color: Colors.black.withOpacity(0.05),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 头像/封面
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(22),
-                    ),
-                    child: Container(
-                      height: 260,
-                      width: double.infinity,
-                      color: cs.primary.withOpacity(0.08),
-                      child: avatar.isEmpty
-                          ? Center(
-                              child: Icon(
-                                Icons.person,
-                                size: 72,
-                                color: cs.primary,
-                              ),
-                            )
-                          : Image.network(avatar, fit: BoxFit.cover),
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          city.isEmpty ? 'City not set' : city,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: cs.onSurface.withOpacity(0.7)),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // sports & levels (all levels shown — swipe is not level-gated)
-                        Text(
-                          'Sports & levels',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: cs.onSurface.withOpacity(0.75),
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: cs.primary.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: cs.primary.withOpacity(0.12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ColoredBox(
+                        color: cs.surfaceContainerHighest,
+                      ),
+                      if (avatar.isEmpty)
+                        Center(
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 96,
+                            color: cs.primary.withValues(alpha: 0.35),
+                          ),
+                        )
+                      else
+                        Image.network(
+                          avatar,
+                          fit: BoxFit.cover,
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 64,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
-                          child: Text(
-                            _sportsText(cur),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: gradientHeight,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.78),
+                              ],
+                            ),
                           ),
                         ),
-
-                        if (overlap.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            overlap,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: cs.secondary,
-                                  fontWeight: FontWeight.w700,
+                      ),
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 20,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                height: 1.05,
+                                shadows: const [
+                                  Shadow(
+                                    blurRadius: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  size: 18,
+                                  color: Colors.white.withValues(alpha: 0.92),
                                 ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    city.isEmpty ? 'City not set' : city,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.92,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                      shadows: const [
+                                        Shadow(
+                                          blurRadius: 8,
+                                          color: Colors.black45,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_sportOverlayChips(cur).isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'Sports',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(children: _sportOverlayChips(cur)),
+                            ],
+                            if (overlap.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                overlap,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.secondaryContainer
+                                      .withValues(alpha: 0.95),
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                            if (intro.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                intro,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.88),
+                                  height: 1.35,
+                                  shadows: const [
+                                    Shadow(
+                                      blurRadius: 10,
+                                      color: Colors.black45,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (_loading)
+                        Positioned.fill(
+                          child: ColoredBox(
+                            color: Colors.black.withValues(alpha: 0.12),
                           ),
-                        ],
-
-                        if (intro.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(intro),
-                        ],
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
-
-          const SizedBox(height: 14),
-
-          // 操作按钮
+          const SizedBox(height: 16),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: _loading ? null : () => _swipe('pass'),
-                  icon: const Icon(Icons.close),
-                  label: const Text('Pass'),
+              Material(
+                color: Colors.white,
+                elevation: 3,
+                shadowColor: Colors.black26,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _loading ? null : () => _swipe('pass'),
+                  child: SizedBox(
+                    width: 72,
+                    height: 72,
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 36,
+                      color: cs.error,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _loading ? null : () => _swipe('like'),
-                  icon: const Icon(Icons.favorite),
-                  label: const Text('Like'),
+              const SizedBox(width: 40),
+              Material(
+                color: cs.primary,
+                elevation: 4,
+                shadowColor: Colors.black26,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _loading ? null : () => _swipe('like'),
+                  child: SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: Icon(
+                      Icons.favorite_rounded,
+                      size: 38,
+                      color: cs.onPrimary,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 10),
-
+          const SizedBox(height: 12),
           Text(
             'Showing ${_index + 1} / ${_candidates.length}',
-            style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+            style: TextStyle(
+              color: cs.onSurface.withValues(alpha: 0.55),
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -2649,9 +3011,9 @@ class _MyGamePageState extends State<MyGamePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('✅ Left game')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You’ve left this game.')),
+      );
 
       setState(() {
         _myGamesFuture = _fetchMyGames();
@@ -2661,8 +3023,8 @@ class _MyGamePageState extends State<MyGamePage> {
       if (!mounted) return;
 
       final msg = e.toString().contains('NOT_JOINED_OR_EMPTY')
-          ? '❌ Cannot leave'
-          : '❌ Leave failed: $e';
+          ? 'You’re not in this game (or it’s already empty).'
+          : 'Couldn’t leave. Please try again.';
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
@@ -2753,8 +3115,7 @@ class _MyGamePageState extends State<MyGamePage> {
         }
         if (snapshot.hasError) {
           return AppErrorState(
-            message:
-                'Something went wrong while loading your games. Please try again.',
+            message: 'We couldn’t load your games. Tap Retry.',
             onRetry: () {
               setState(() => _myGamesFuture = _fetchMyGames());
             },
@@ -2767,12 +3128,12 @@ class _MyGamePageState extends State<MyGamePage> {
           return AppEmptyState(
             icon: Icons.sports_outlined,
             title: loggedIn
-                ? 'No joined games yet.'
-                : 'No games to show yet.',
+                ? 'No joined games yet'
+                : 'No games to show yet',
             subtitle: loggedIn
-                ? 'Join a game from the Home tab or create your own.'
+                ? 'Join a game from Home, or host your own.'
                 : 'Sign in to see games you’ve joined. You can still browse Home as a guest.',
-            actionLabel: loggedIn ? null : 'Log in',
+            actionLabel: loggedIn ? null : 'Sign in',
             onAction: loggedIn
                 ? null
                 : () async {
@@ -2911,9 +3272,9 @@ class _MyGamePageState extends State<MyGamePage> {
                     )
                   else
                     Text(
-                      'Group chat unavailable for this game (run latest DB migration / check game_chat_id).',
+                      'Group chat isn’t available for this game yet.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.error,
+                            color: cs.onSurfaceVariant,
                           ),
                     ),
                   const SizedBox(height: 12),
@@ -2965,8 +3326,10 @@ class _MyGamePageState extends State<MyGamePage> {
                   }),
                   if (profiles.isEmpty)
                     Text(
-                      'Roster loads after migration (game_participants).',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      'Player list will fill in as people join.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                     ),
                   const SizedBox(height: 12),
                   Align(
@@ -3182,8 +3545,7 @@ class _ChatPageState extends State<ChatPage> {
         }
         if (snapshot.hasError) {
           return AppErrorState(
-            message:
-                'Something went wrong while loading chats. Please try again.',
+            message: 'We couldn’t load your chats. Tap Retry.',
             onRetry: () {
               setState(() => _chatsFuture = _fetchMyChats());
             },
@@ -3196,11 +3558,11 @@ class _ChatPageState extends State<ChatPage> {
             icon: _user == null ? Icons.login : Icons.chat_bubble_outline,
             title: _user == null
                 ? 'Sign in to chat'
-                : 'No chats yet.',
+                : 'No chats yet',
             subtitle: _user == null
-                ? 'Log in to message people you meet on Smeet.'
-                : 'Match with someone from Swipe to start a conversation.',
-            actionLabel: _user == null ? 'Log in' : null,
+                ? 'Sign in to message people you meet on Smeet.'
+                : 'Match with someone on Swipe to start a conversation.',
+            actionLabel: _user == null ? 'Sign in' : null,
             onAction: _user == null
                 ? () {
                     Navigator.of(context).push(
@@ -3594,9 +3956,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           (m) => m['_client_id']?.toString() == clientId,
         );
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Send failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_userFacingChatSendError(e))),
+      );
     }
   }
 
@@ -3716,7 +4078,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       if (ids.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No members found')),
+            const SnackBar(
+              content: Text('No players in this chat yet.'),
+            ),
           );
         }
         return;
@@ -3772,7 +4136,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not load members: $e')),
+          SnackBar(content: Text(_userFacingMembersLoadError(e))),
         );
       }
     }
@@ -3996,10 +4360,30 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   if (snapshot.hasError) {
                     return Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Messages stream error:\n${snapshot.error}',
-                          textAlign: TextAlign.center,
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_off_outlined,
+                              size: 48,
+                              color: cs.outline,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Couldn’t load messages',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Go back and open this chat again, or check your connection.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -4017,8 +4401,40 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           child: _directChatBlockBanner(context, cs),
                         ),
                       ],
-                      const Expanded(
-                        child: Center(child: Text('Say hi 👋')),
+                      Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 44,
+                                  color: cs.outline,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No messages yet',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Say hi to start the conversation.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   );
@@ -4186,9 +4602,15 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         Expanded(
                           child: TextField(
                             controller: _ctrl,
+                            textCapitalization: TextCapitalization.sentences,
                             decoration: const InputDecoration(
-                              hintText: 'Message...',
+                              hintText: 'Write a message…',
                               border: OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                             ),
                             onSubmitted: (_) => _send(),
                           ),
@@ -4318,7 +4740,9 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _loaded = true);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('❌ Load profile failed: $e')));
+      ).showSnackBar(
+        SnackBar(content: Text(_userFacingProfileLoadError(e))),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -4364,7 +4788,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('❌ Avatar upload failed: $e')));
+      ).showSnackBar(
+        SnackBar(content: Text(_userFacingAvatarUploadError(e))),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -4411,7 +4837,9 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Please login to post')));
+        ).showSnackBar(
+          const SnackBar(content: Text('Please sign in to post.')),
+        );
         return;
       }
       final payload = PostsService.buildMediaPostPayload(
@@ -4423,12 +4851,16 @@ class _ProfilePageState extends State<ProfilePage> {
       final inserted =
           await _postsService.insertPostReturningSummary(payload);
 
-      debugPrint('✅ INSERT OK => $inserted');
+      if (kDebugMode) {
+        debugPrint('[Profile] post insert OK => $inserted');
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('✅ Posted')));
+      ).showSnackBar(
+        const SnackBar(content: Text('Post published.')),
+      );
 
       setState(() {
         _myPostsFuture = _fetchMyPosts();
@@ -4437,7 +4869,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('❌ Post failed: $e')));
+      ).showSnackBar(
+        SnackBar(content: Text(_userFacingPostPublishError(e))),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -4479,7 +4913,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Signed out')));
+    ).showSnackBar(
+      const SnackBar(content: Text('You’re signed out.')),
+    );
     // 你现在是游客也能看主页，所以不用强制跳走
     setState(() {
       _myPostsFuture = _fetchMyPosts();
@@ -4521,14 +4957,14 @@ class _ProfilePageState extends State<ProfilePage> {
             Icon(Icons.person_outline, size: 72, color: cs.primary),
             const SizedBox(height: 14),
             Text(
-              'Guest mode',
+              'Sign in for your profile',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
-              'Login to upload avatar, set your sports profile, and post photos/videos.',
+              'Sign in to add a photo, set your sports profile, and post photos or videos.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withOpacity(0.7),
@@ -4541,7 +4977,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   context,
                 ).push(MaterialPageRoute(builder: (_) => const AuthPage()));
               },
-              child: const Text('Login / Sign up'),
+              child: const Text('Sign in or create account'),
             ),
             const SizedBox(height: 24),
             const LegalSectionCard(guestMode: true),
@@ -4749,8 +5185,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                               if (snapshot.hasError) {
                                 return AppErrorState(
-                                  message:
-                                      'Something went wrong while loading posts. Please try again.',
+                                  message: 'We couldn’t load your posts. Tap Retry.',
                                   onRetry: () {
                                     setState(() {
                                       _myPostsFuture = _fetchMyPosts();
@@ -4763,9 +5198,9 @@ class _ProfilePageState extends State<ProfilePage> {
                               if (posts.isEmpty) {
                                 return const AppEmptyState(
                                   icon: Icons.photo_library_outlined,
-                                  title: 'No posts yet.',
+                                  title: 'No posts yet',
                                   subtitle:
-                                      'Share a photo or video from a session — your grid will show up here.',
+                                      'Share a photo or video from a session. It will show up here.',
                                 );
                               }
 
@@ -4774,22 +5209,17 @@ class _ProfilePageState extends State<ProfilePage> {
                                 itemBuilder: (context, i) {
                                   final p = posts[i];
 
-                                  // 1) 读字段
                                   final caption = (p['caption'] ?? '')
                                       .toString();
                                   final type = (p['media_type'] ?? 'image')
                                       .toString()
                                       .toLowerCase();
 
-                                  // ✅ 正确：从 media_urls 数组里取
                                   final List mediaUrls =
                                       (p['media_urls'] ?? []) as List;
                                   final String url = mediaUrls.isNotEmpty
                                       ? mediaUrls.first.toString()
                                       : '';
-
-                                  // 2) ✅ Debug：看类型和URL到底是什么
-                                  debugPrint('POST[$i] type=$type url=$url');
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
@@ -4807,8 +5237,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        // 3) ✅ 用 _PostMedia 统一渲染 image / video（视频可直接点播）
-                                        _PostMedia(type: type, url: url),
+                                        PostProfileListMedia(type: type, url: url),
 
                                         const SizedBox(height: 10),
                                         Text(caption),
@@ -4834,199 +5263,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-}
-
-/// 一个统一的占位页（后面再替换成真实页面）
-class _PostMedia extends StatefulWidget {
-  final String type; // 'image' | 'video'
-  final String url;
-
-  const _PostMedia({required this.type, required this.url});
-
-  @override
-  State<_PostMedia> createState() => _PostMediaState();
-}
-
-class _PostMediaState extends State<_PostMedia> {
-  VideoPlayerController? _vc;
-  Future<void>? _initFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _setup();
-  }
-
-  @override
-  void didUpdateWidget(covariant _PostMedia oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 如果类型或URL变了，重新初始化 controller
-    if (oldWidget.url != widget.url || oldWidget.type != widget.type) {
-      _disposeVc();
-      _setup();
-    }
-  }
-
-  void _setup() {
-    if (widget.type != 'video' || widget.url.isEmpty) return;
-
-    final uri = Uri.parse(widget.url);
-    _vc = VideoPlayerController.networkUrl(uri);
-    _initFuture = _vc!.initialize().then((_) {
-      // 可选：默认静音，避免刷屏有声音
-      _vc!.setVolume(0);
-      if (mounted) setState(() {});
-    }).catchError((Object e, StackTrace st) {
-      if (kDebugMode) {
-        debugPrint('[PostMedia] VideoPlayer.initialize failed: $e');
-        debugPrint('$st');
-      }
-      if (mounted) setState(() {});
-    });
-  }
-
-  void _disposeVc() {
-    _vc?.dispose();
-    _vc = null;
-    _initFuture = null;
-  }
-
-  @override
-  void dispose() {
-    _disposeVc();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    // IMAGE
-    if (widget.type == 'image') {
-      if (widget.url.isEmpty) {
-        return _emptyBox(context, icon: Icons.image_not_supported);
-      }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Image.network(
-            widget.url,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return _emptyBox(context, label: 'Image failed');
-            },
-          ),
-        ),
-      );
-    }
-
-    // VIDEO
-    if (widget.type == 'video') {
-      if (widget.url.isEmpty) {
-        return _emptyBox(context, icon: Icons.play_disabled, label: 'No video');
-      }
-
-      if (_vc == null || _initFuture == null) {
-        return _emptyBox(
-          context,
-          icon: Icons.play_circle_outline,
-          label: 'Init',
-        );
-      }
-
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          color: Colors.black,
-          child: FutureBuilder<void>(
-            future: _initFuture,
-            builder: (context, snap) {
-              if (snap.hasError) {
-                return AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: _emptyBox(
-                    context,
-                    icon: Icons.error_outline,
-                    label: 'Video failed to load',
-                  ),
-                );
-              }
-              if (snap.connectionState != ConnectionState.done) {
-                return AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation(cs.primary),
-                    ),
-                  ),
-                );
-              }
-
-              final ar =
-                  (_vc!.value.isInitialized && _vc!.value.aspectRatio > 0)
-                  ? _vc!.value.aspectRatio
-                  : (4 / 3);
-
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  AspectRatio(aspectRatio: ar, child: VideoPlayer(_vc!)),
-                  // 播放/暂停按钮
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (_vc!.value.isPlaying) {
-                          _vc!.pause();
-                        } else {
-                          _vc!.play();
-                        }
-                      });
-                    },
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _vc!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                        size: 36,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      );
-    }
-
-    // unknown type fallback
-    return _emptyBox(context, icon: Icons.help_outline);
-  }
-
-  Widget _emptyBox(BuildContext context, {IconData? icon, String? label}) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 220,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: cs.primary.withOpacity(0.08),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon ?? Icons.broken_image, size: 56),
-          if (label != null) ...[const SizedBox(height: 6), Text(label)],
-        ],
-      ),
-    );
-  }
 }
 
 /// Mutual likes from [matches] + [profiles]; tap opens the existing direct
@@ -5103,9 +5339,12 @@ class _MatchesPageState extends State<MatchesPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'No direct chat is linked yet. New mutual likes from Swipe '
-                  'open a chat automatically; otherwise check the Chat tab.',
-                  style: Theme.of(ctx).textTheme.bodySmall,
+                  'There isn’t a chat linked to this person yet. '
+                  'New mutual likes on Swipe open a chat automatically; '
+                  'you can also check the Chat tab.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        height: 1.35,
+                      ),
                 ),
               ],
             ),
@@ -5120,8 +5359,11 @@ class _MatchesPageState extends State<MatchesPage> {
       );
     } catch (e) {
       if (!context.mounted) return;
+      debugPrint('[MatchesPage] open chat failed: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open chat: $e')),
+        const SnackBar(
+          content: Text('Couldn’t open chat. Try again from the Chat tab.'),
+        ),
       );
     }
   }
@@ -5136,11 +5378,17 @@ class _MatchesPageState extends State<MatchesPage> {
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingState(message: 'Loading matches…');
           }
           final items = snap.data ?? [];
           if (items.isEmpty) {
-            return const Center(child: Text('No matches yet.'));
+            return AppEmptyState(
+              icon: Icons.favorite_border,
+              title: 'No matches yet',
+              subtitle:
+                  'When you and someone both like each other on Swipe, they’ll show up here. '
+                  'Existing chats stay in the Chat tab.',
+            );
           }
 
           return ListView.builder(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_player/video_player.dart';
 
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/block_user_confirm_dialog.dart';
+import 'package:smeet_app/widgets/post_media_display.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 
 Widget _availabilityWidget(dynamic availability) {
@@ -402,7 +402,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 8,
                           crossAxisSpacing: 8,
-                          childAspectRatio: 0.85,
+                          childAspectRatio: 4 / 5,
                         ),
                         itemCount: posts.length,
                         itemBuilder: (context, i) {
@@ -460,7 +460,7 @@ class _ReportUserActionButton extends StatelessWidget {
   }
 }
 
-class _PostPreviewTile extends StatefulWidget {
+class _PostPreviewTile extends StatelessWidget {
   const _PostPreviewTile({
     required this.imageUrl,
     required this.mediaType,
@@ -472,34 +472,13 @@ class _PostPreviewTile extends StatefulWidget {
   final String caption;
 
   @override
-  State<_PostPreviewTile> createState() => _PostPreviewTileState();
-}
-
-class _PostPreviewTileState extends State<_PostPreviewTile> {
-  VideoPlayerController? _vc;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.mediaType == 'video' && widget.imageUrl.isNotEmpty) {
-      _vc = VideoPlayerController.networkUrl(Uri.parse(widget.imageUrl))
-        ..initialize().then((_) {
-          if (mounted) setState(() {});
-        });
-    }
-  }
-
-  @override
-  void dispose() {
-    _vc?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final isVideo = mediaType.toLowerCase() == 'video';
+    final cs = Theme.of(context).colorScheme;
+
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: cs.surface,
+      borderRadius: BorderRadius.circular(kPostMediaThumbRadius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
@@ -510,19 +489,27 @@ class _PostPreviewTileState extends State<_PostPreviewTile> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (widget.caption.isNotEmpty) Text(widget.caption),
-                    if (widget.caption.isNotEmpty) const SizedBox(height: 12),
-                    if (widget.mediaType == 'video' &&
-                        _vc != null &&
-                        _vc!.value.isInitialized)
-                      AspectRatio(
-                        aspectRatio: _vc!.value.aspectRatio,
-                        child: VideoPlayer(_vc!),
-                      )
-                    else if (widget.imageUrl.isNotEmpty)
-                      Image.network(widget.imageUrl),
+                    if (isVideo && imageUrl.isNotEmpty)
+                      PostMediaDetailVideo(url: imageUrl)
+                    else if (imageUrl.isNotEmpty)
+                      PostMediaDetailImages(urls: [imageUrl])
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Text(
+                          'No media',
+                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    if (caption.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(caption),
+                    ],
                   ],
                 ),
               ),
@@ -539,32 +526,16 @@ class _PostPreviewTileState extends State<_PostPreviewTile> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: widget.mediaType == 'video' &&
-                      _vc != null &&
-                      _vc!.value.isInitialized
-                  ? FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: _vc!.value.size.width,
-                        height: _vc!.value.size.height,
-                        child: VideoPlayer(_vc!),
-                      ),
-                    )
-                  : widget.imageUrl.isEmpty
-                      ? Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.image_not_supported),
-                        )
-                      : Image.network(
-                          widget.imageUrl,
-                          fit: BoxFit.cover,
-                        ),
+              child: PostMediaGridCell(
+                imageUrl: isVideo ? '' : imageUrl,
+                isVideo: isVideo,
+              ),
             ),
-            if (widget.caption.isNotEmpty)
+            if (caption.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                 child: Text(
-                  widget.caption,
+                  caption,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,

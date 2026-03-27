@@ -12,6 +12,7 @@ import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
 import 'package:smeet_app/features/profile/presentation/profile_game_detail_page.dart';
 import 'package:smeet_app/features/profile/presentation/profile_post_detail_page.dart';
 import 'package:smeet_app/features/profile/profile_routes.dart';
+import 'package:smeet_app/widgets/post_media_display.dart';
 
 /// Live vs mock source for the **header** only (Posts / Hosted / Joined tabs are live).
 enum ProfileMvpSummarySource {
@@ -26,6 +27,7 @@ class ProfileMvpPage extends StatefulWidget {
     this.summaryRepository,
     this.initialSummarySource = ProfileMvpSummarySource.supabase,
     this.initialTabIndex = 0,
+    this.snackMessageOnOpen,
   });
 
   /// Optional override for tests (summary only; list tabs use live Supabase repos).
@@ -35,6 +37,9 @@ class ProfileMvpPage extends StatefulWidget {
 
   /// Bottom tab: 0 = Posts, 1 = Hosted, 2 = Joined (see [ProfileMvpInitialTabIndex]).
   final int initialTabIndex;
+
+  /// Shown once on this route after the first frame (e.g. after create flows navigate here).
+  final String? snackMessageOnOpen;
 
   @override
   State<ProfileMvpPage> createState() => _ProfileMvpPageState();
@@ -80,6 +85,16 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
     _listFutures[ProfileContentTab.posts] = _postsRepo.fetchMyPostsTabItems();
     _listFutures[ProfileContentTab.hosted] = _hostedRepo.fetchHostedTabItems();
     _listFutures[ProfileContentTab.joined] = _joinedRepo.fetchJoinedTabItems();
+
+    final snack = widget.snackMessageOnOpen;
+    if (snack != null && snack.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(snack)),
+        );
+      });
+    }
   }
 
   @override
@@ -156,61 +171,89 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final child = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    final inner = Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 36,
-            backgroundColor: cs.primaryContainer,
-            backgroundImage: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
-                ? NetworkImage(s.avatarUrl!)
-                : null,
-            onBackgroundImageError: (Object? error, StackTrace? stackTrace) {},
-            child: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
-                ? null
-                : Icon(
-                    s.isGuest ? Icons.person_off_outlined : Icons.person,
-                    size: 40,
-                    color: cs.onPrimaryContainer,
-                  ),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.22),
+                width: 2,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: cs.primaryContainer,
+              backgroundImage: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
+                  ? NetworkImage(s.avatarUrl!)
+                  : null,
+              onBackgroundImageError: (Object? error, StackTrace? stackTrace) {},
+              child: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
+                  ? null
+                  : Icon(
+                      s.isGuest ? Icons.person_off_outlined : Icons.person,
+                      size: 42,
+                      color: cs.onPrimaryContainer,
+                    ),
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 18),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   s.displayName,
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Icon(
                       Icons.place_outlined,
                       size: 18,
-                      color: cs.outline,
+                      color: cs.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        s.city,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        s.city.isEmpty ? 'Add your city' : s.city,
+                        style: theme.textTheme.bodyLarge?.copyWith(
                           color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  s.sportsSummary,
-                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
-                ),
+                if (s.sportsSummary.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      s.sportsSummary,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.4,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -218,13 +261,30 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
       ),
     );
 
+    final shell = DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.65)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: inner,
+    );
+
     if (!s.isGuest) {
-      return child;
+      return shell;
     }
 
     return Material(
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
-      child: child,
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: shell,
     );
   }
 
@@ -242,7 +302,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _postsTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.posts],
@@ -274,7 +334,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Couldn’t load posts. Pull to try again.',
+                      'We couldn’t load posts. Pull to refresh.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
@@ -363,7 +423,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _joinedTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.joined],
@@ -395,7 +455,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Couldn’t load joined games. Pull to try again.',
+                      'We couldn’t load joined games. Pull to refresh.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
@@ -484,7 +544,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _hostedTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.hosted],
@@ -516,7 +576,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Couldn’t load hosted games. Pull to try again.',
+                      'We couldn’t load hosted games. Pull to refresh.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
@@ -602,25 +662,79 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
     );
   }
 
+  IconData _leadingIconForTab(ProfileContentTab tab) {
+    switch (tab) {
+      case ProfileContentTab.posts:
+        return Icons.article_outlined;
+      case ProfileContentTab.hosted:
+        return Icons.event_available_outlined;
+      case ProfileContentTab.joined:
+        return Icons.sports_tennis;
+    }
+  }
+
   Widget _postCard(ProfileTabItem item) {
-    return Card(
-      child: ListTile(
-        title: Text(
-          item.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            item.subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+    final cs = Theme.of(context).colorScheme;
+    final isPost = item.tab == ProfileContentTab.posts;
+    final thumbUrl = item.previewMediaUrl;
+    final hasThumb = isPost &&
+        thumbUrl != null &&
+        thumbUrl.trim().isNotEmpty;
+    final isVideoThumb =
+        (item.previewMediaType ?? '').toLowerCase() == 'video';
+
+    final Widget leading = hasThumb
+        ? PostMediaMvpLeading(
+            url: thumbUrl.trim(),
+            isVideo: isVideoThumb,
+          )
+        : CircleAvatar(
+            backgroundColor: cs.primary.withValues(alpha: 0.12),
+            child: Icon(
+              _leadingIconForTab(item.tab),
+              color: cs.primary,
+            ),
+          );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _open(item),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.10)),
+          ),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            leading: leading,
+            title: Text(
+              item.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                item.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: cs.outline,
+            ),
           ),
         ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _open(item),
       ),
     );
   }
@@ -630,7 +744,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile (MVP)')),
+      appBar: AppBar(title: const Text('Profile')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -661,10 +775,10 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               !_usesSummaryToggle
-                  ? 'Custom summary repository (Posts / Hosted / Joined still live).'
+                  ? 'Using a custom summary source. Posts, hosted, and joined lists stay live.'
                   : _summarySource == ProfileMvpSummarySource.supabase
-                      ? 'Live: header from `profiles`. Posts from `posts`; Hosted from `games.created_by`; Joined from `game_participants`.'
-                      : 'Mock: sample header. Posts + Hosted + Joined still live.',
+                      ? 'Live: profile header from your account. Posts, hosted games, and joined games load from the server.'
+                      : 'Preview header only. Posts, hosted games, and joined games still load live.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -720,13 +834,23 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
               );
             },
           ),
-          TabBar(
-            controller: _tabs,
-            tabs: const [
-              Tab(text: 'Posts'),
-              Tab(text: 'Hosted'),
-              Tab(text: 'Joined'),
-            ],
+          Material(
+            color: theme.colorScheme.surface,
+            child: TabBar(
+              controller: _tabs,
+              dividerColor: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              labelStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+              unselectedLabelStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              tabs: const [
+                Tab(text: 'Posts'),
+                Tab(text: 'Hosted'),
+                Tab(text: 'Joined'),
+              ],
+            ),
           ),
           Expanded(
             child: TabBarView(

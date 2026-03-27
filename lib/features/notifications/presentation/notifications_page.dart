@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -47,9 +48,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   void _open(NotificationItem item) {
-    debugPrint(
-      '[Notifications MVP] open id=${item.id} kind=${item.kind.name} read=${item.isRead}',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[Notifications] open id=${item.id} kind=${item.kind.name} read=${item.isRead}',
+      );
+    }
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (context) => NotificationDetailPage(item: item),
@@ -62,7 +65,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications (MVP)')),
+      appBar: AppBar(title: const Text('Notifications')),
       body: FutureBuilder<List<NotificationItem>>(
         future: _future,
         builder: (context, snapshot) {
@@ -70,11 +73,32 @@ class _NotificationsPageState extends State<NotificationsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            if (kDebugMode) {
+              debugPrint('[Notifications] load failed: ${snapshot.error}');
+            }
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Couldn’t load notifications.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            );
           }
           final items = snapshot.data ?? const [];
           if (items.isEmpty) {
-            return const Center(child: Text('No notifications'));
+            return Center(
+              child: Text(
+                'No notifications yet',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            );
           }
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),

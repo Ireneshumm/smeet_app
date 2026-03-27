@@ -69,6 +69,7 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
         MaterialPageRoute<void>(
           builder: (_) => const ProfileMvpPage(
             initialTabIndex: ProfileMvpInitialTabIndex.posts,
+            snackMessageOnOpen: 'Your video is on your profile.',
           ),
         ),
       );
@@ -76,7 +77,11 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
     }
 
     messenger.showSnackBar(
-      SnackBar(content: Text(result.userMessage ?? 'Something went wrong.')),
+      SnackBar(
+        content: Text(
+          result.userMessage ?? 'That didn’t work. Please try again.',
+        ),
+      ),
     );
   }
 
@@ -85,7 +90,7 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Upload Video (MVP)')),
+      appBar: AppBar(title: const Text('New video')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -93,8 +98,8 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'One video from gallery (max 30s, same as main Profile). '
-                'Uploads to `media` then inserts a `posts` row.',
+                'Pick one clip from your gallery (up to 30 seconds). '
+                'It will appear on your profile like videos you post from Profile.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

@@ -19,16 +19,25 @@ class CreateHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create (MVP)')),
+      appBar: AppBar(title: const Text('Create')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              child: Text(
+                'Add something new to your profile, or start the same game flow as Home.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.sticky_note_2_outlined),
-                title: const Text('Post Note'),
-                subtitle: const Text('Text-only → saves to your posts'),
+                title: const Text('Text note'),
+                subtitle: const Text('A short written update on your profile'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push<void>(
@@ -42,8 +51,8 @@ class CreateHubPage extends StatelessWidget {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.video_library_outlined),
-                title: const Text('Upload Video'),
-                subtitle: const Text('Single gallery video → posts'),
+                title: const Text('Video'),
+                subtitle: const Text('One gallery clip on your profile (up to 30s)'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push<void>(
@@ -57,8 +66,8 @@ class CreateHubPage extends StatelessWidget {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.sports_tennis),
-                title: const Text('Create Game'),
-                subtitle: const Text('Legacy flow (same as Home tab)'),
+                title: const Text('Create game'),
+                subtitle: const Text('Same flow as creating a game from Home'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   final open = onOpenLegacyCreateGame;
@@ -67,7 +76,9 @@ class CreateHubPage extends StatelessWidget {
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Create Game bridge not wired for this route.'),
+                        content: Text(
+                          'Game creation isn’t available from this screen in this build.',
+                        ),
                       ),
                     );
                   }

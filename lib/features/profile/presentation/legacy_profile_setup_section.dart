@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -150,7 +151,7 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login first')),
+        const SnackBar(content: Text('Please sign in first.')),
       );
       return;
     }
@@ -172,13 +173,18 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Profile saved')),
+        const SnackBar(content: Text('Profile saved.')),
       );
       widget.onProfileSaved();
     } catch (e) {
       if (!mounted) return;
+      if (kDebugMode) {
+        debugPrint('[ProfileSetup] save failed: $e');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Save failed: $e')),
+        const SnackBar(
+          content: Text('Couldn’t save your profile. Please try again.'),
+        ),
       );
     } finally {
       if (mounted) {

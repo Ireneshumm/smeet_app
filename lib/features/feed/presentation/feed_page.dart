@@ -208,7 +208,7 @@ class _FeedPageState extends State<FeedPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Feed (MVP)'),
+        title: const Text('Feed'),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -240,10 +240,10 @@ class _FeedPageState extends State<FeedPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               !_usesToggle
-                  ? 'Custom repository (tests).'
+                  ? 'Using a custom feed source for this screen.'
                   : _source == FeedListDataSource.supabase
-                      ? 'Live: upcoming games from Supabase (v1).'
-                      : 'Mock: sample post / video / game cards.',
+                      ? 'Showing upcoming games from your project.'
+                      : 'Preview mode: sample cards for layout only.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -271,18 +271,7 @@ class _FeedPageState extends State<FeedPage> {
                   slivers.add(
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Couldn’t load feed. Pull to try again.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: _FeedErrorState(onRetry: _reload),
                     ),
                   );
                 } else {
@@ -334,6 +323,64 @@ class _FeedPageState extends State<FeedPage> {
   }
 }
 
+class _FeedErrorState extends StatelessWidget {
+  const _FeedErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              size: 56,
+              color: cs.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'We couldn’t load the feed',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection, then pull down to refresh or tap Retry.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Pull down to refresh.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyFeedState extends StatelessWidget {
   const _EmptyFeedState({
     required this.isMock,
@@ -361,7 +408,7 @@ class _EmptyFeedState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              isMock ? 'No mock items' : 'No upcoming games',
+              isMock ? 'Nothing to preview yet' : 'Nothing to show yet',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -370,8 +417,8 @@ class _EmptyFeedState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               isMock
-                  ? 'Mock data should always show rows — try again.'
-                  : 'No rows returned (empty DB, filters, or access). Switch to Mock to preview UI.',
+                  ? 'Sample cards will appear here when preview data is available. You can pull to refresh or retry.'
+                  : 'There aren’t any upcoming games to list right now. Check back later, or use Preview to see sample cards.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,
               ),

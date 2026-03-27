@@ -2,6 +2,10 @@
 
 面向：**工程收口、发布前烟测、环境侧人工项**。不替代法务 / 商店审核要求。
 
+**入口与对外承诺边界**（Release / 灰度 / Debug、商店可说与不可说）：见 [`RELEASE_AND_GREY_SCOPE.md`](./RELEASE_AND_GREY_SCOPE.md)。
+
+**灰度验收记录模板**（轮次勾选、Blocker 分级、是否发测试用户、执行顺序）：见 [`GREY_ACCEPTANCE_RECORD.md`](./GREY_ACCEPTANCE_RECORD.md)。
+
 ## 1. 构建与 Supabase 配置
 
 ### 1.1 Release 构建（必须带 dart-define）
@@ -43,6 +47,8 @@ flutter build ios --release \
 ---
 
 ## 2. Release 与 Debug 行为收口（代码层）
+
+产品视角的入口清单与商店口径见 [`RELEASE_AND_GREY_SCOPE.md`](./RELEASE_AND_GREY_SCOPE.md)。
 
 | 行为 | Debug / Profile | Release |
 |------|-----------------|---------|
@@ -120,4 +126,4 @@ dart analyze
 2. 烟测清单在目标 Supabase 环境通过。
 3. 产品侧已接受：Release 包**不**含 Feed / Inbox / Notifications / Create hub / Profile MVP 的**命名路由入口**（主路径为 Shell 五 Tab + Profile 内功能）。
 
-若不满足 3，需增加内测 flavor 或 define 开关后再灰度。
+若不满足 3，需增加内测 flavor 或 define 开关后再灰度。与「灰度包是否额外开放路由」的对照说明见 [`RELEASE_AND_GREY_SCOPE.md` §2](./RELEASE_AND_GREY_SCOPE.md)。

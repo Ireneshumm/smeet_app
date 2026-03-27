@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -91,8 +92,13 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loaded = true);
+      if (kDebugMode) {
+        debugPrint('[ProfileSetupDemo] load failed: $e');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Load failed: $e')),
+        const SnackBar(
+          content: Text('Couldn’t load profile setup. Please try again.'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -110,7 +116,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Setup (debug)'),
+        title: const Text('Profile setup (demo)'),
       ),
       body: u == null
           ? Center(

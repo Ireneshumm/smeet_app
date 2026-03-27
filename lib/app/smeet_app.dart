@@ -64,6 +64,9 @@ class SmeetApp extends StatelessWidget {
     this.mvpDebugLauncherItems = const [],
   });
 
+  /// [MaterialApp.builder] sits above [Navigator]; use this for modal route ops.
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   /// First screen after launch (currently [SmeetShell] from `main.dart`).
   final Widget home;
 
@@ -135,6 +138,7 @@ class SmeetApp extends StatelessWidget {
         showMvpDebugLauncher && launcherItems.isNotEmpty;
 
     return MaterialApp(
+      navigatorKey: SmeetApp.navigatorKey,
       title: 'Smeet',
       debugShowCheckedModeBanner: false,
       theme: theme,
@@ -154,9 +158,13 @@ class SmeetApp extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(0, 0, 12, 88),
                         child: FloatingActionButton.small(
                           heroTag: 'smeet_mvp_debug_launcher',
-                          tooltip: 'MVP debug',
-                          onPressed: () =>
-                              _openMvpDebugLauncher(context, launcherItems),
+                          // Omit tooltip: FAB Tooltip needs Overlay; builder Stack is not under it.
+                          onPressed: () {
+                            final navCtx = SmeetApp.navigatorKey.currentContext;
+                            if (navCtx != null) {
+                              _openMvpDebugLauncher(navCtx, launcherItems);
+                            }
+                          },
                           child: const Icon(Icons.bug_report_outlined),
                         ),
                       ),

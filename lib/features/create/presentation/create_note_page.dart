@@ -42,6 +42,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
         MaterialPageRoute<void>(
           builder: (_) => const ProfileMvpPage(
             initialTabIndex: ProfileMvpInitialTabIndex.posts,
+            snackMessageOnOpen: 'Your note is on your profile.',
           ),
         ),
       );
@@ -49,14 +50,18 @@ class _CreateNotePageState extends State<CreateNotePage> {
     }
 
     messenger.showSnackBar(
-      SnackBar(content: Text(result.userMessage ?? 'Something went wrong.')),
+      SnackBar(
+        content: Text(
+          result.userMessage ?? 'That didn’t work. Please try again.',
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Post Note (MVP)')),
+      appBar: AppBar(title: const Text('New note')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -64,7 +69,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Text-only note — same `posts` row as Profile uploads (no image/video here).',
+                'Write a short text update. It appears on your profile with your other posts.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),

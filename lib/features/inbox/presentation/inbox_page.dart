@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -314,85 +315,167 @@ class _InboxPageState extends State<InboxPage>
     );
   }
 
+  /// Same pill as legacy [ChatPage] `_compactUnreadBadge` (list visual parity).
+  Widget _inboxCompactUnreadBadge(BuildContext context, int unreadShown) {
+    final label = unreadLabelForChatRow(unreadShown);
+    if (label.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.error.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: cs.onErrorContainer,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
   Widget _buildConversationList(
     List<ChatListItem> items, {
     ScrollPhysics? physics,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return ValueListenableBuilder<String?>(
       valueListenable: smeetOpenChatRoomId,
       builder: (context, openChatId, _) {
-        return ListView.separated(
+        return ListView.builder(
           physics: physics,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          padding: const EdgeInsets.all(16),
           itemCount: items.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
           itemBuilder: (context, i) {
             final item = items[i];
-            final timeStr =
-                DateFormat.MMMd().add_jm().format(item.updatedAt.toLocal());
             final rawUnread = item.unreadCount;
             final unreadShown = (openChatId != null && openChatId == item.id)
                 ? 0
                 : rawUnread;
-            final badge = unreadLabelForChatRow(unreadShown);
 
-            return ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              title: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  item.lastMessage,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            if (item.kind == InboxTabKind.gameChats) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.10),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: cs.primary.withValues(alpha: 0.12),
+                        child: Icon(Icons.groups, color: cs.primary),
+                      ),
+                      title: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: cs.secondary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'GROUP',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: cs.secondary,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (unreadShown > 0) ...[
+                            const SizedBox(width: 8),
+                            _inboxCompactUnreadBadge(context, unreadShown),
+                          ],
+                        ],
+                      ),
+                      subtitle: Text(
+                        item.lastMessage,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () async {
+                        await _openItem(item);
+                      },
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // DMs — mirror ChatPage direct row
+            final av = item.avatarUrl?.trim() ?? '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.10),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cs.primary.withValues(alpha: 0.12),
+                      backgroundImage:
+                          av.isNotEmpty ? NetworkImage(av) : null,
+                      child: av.isEmpty
+                          ? Icon(Icons.person, color: cs.primary)
+                          : null,
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (unreadShown > 0) ...[
+                          const SizedBox(width: 8),
+                          _inboxCompactUnreadBadge(context, unreadShown),
+                        ],
+                      ],
+                    ),
+                    subtitle: Text(
+                      item.lastMessage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () async {
+                      await _openItem(item);
+                    },
                   ),
                 ),
               ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    timeStr,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                  ),
-                  if (badge.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        badge,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onErrorContainer,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              onTap: () async {
-                await _openItem(item);
-              },
             );
           },
         );
@@ -406,8 +489,8 @@ class _InboxPageState extends State<InboxPage>
     return AppEmptyState(
       icon: Icons.login,
       title: 'Sign in to chat',
-      subtitle: 'Log in to message people you meet on Smeet.',
-      actionLabel: gate != null ? 'Log in' : null,
+      subtitle: 'Sign in to message people you meet on Smeet.',
+      actionLabel: gate != null ? 'Sign in' : null,
       onAction: gate == null
           ? null
           : () async {
@@ -485,7 +568,11 @@ class _InboxPageState extends State<InboxPage>
           widget.onAfterLiveChatClosed?.call();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chat opener not configured')),
+            const SnackBar(
+              content: Text(
+                'Chat can’t be opened from here in this build. Use the Chat tab.',
+              ),
+            ),
           );
         }
         return;
@@ -494,8 +581,13 @@ class _InboxPageState extends State<InboxPage>
       _showMatchNoDirectChatDialog(row);
     } catch (e) {
       if (!mounted) return;
+      if (kDebugMode) {
+        debugPrint('[Inbox] open chat from match failed: $e');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open chat: $e')),
+        const SnackBar(
+          content: Text('Couldn’t open chat. Try again from the Chat tab.'),
+        ),
       );
     }
   }
@@ -536,11 +628,10 @@ class _InboxPageState extends State<InboxPage>
     ScrollPhysics? physics,
   }) {
     final cs = Theme.of(context).colorScheme;
-    return ListView.separated(
+    return ListView.builder(
       physics: physics,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final row = items[i];
         final cityLabel =
@@ -548,41 +639,74 @@ class _InboxPageState extends State<InboxPage>
         final timeStr =
             DateFormat.MMMd().add_jm().format(row.matchedAt.toLocal());
         final avatar = row.avatarUrl.trim();
-        return ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          leading: CircleAvatar(
-            backgroundColor: cs.primary.withOpacity(0.12),
-            backgroundImage:
-                avatar.isEmpty ? null : NetworkImage(row.avatarUrl),
-            child: avatar.isEmpty
-                ? Icon(Icons.person, color: cs.primary)
-                : null,
-          ),
-          title: Text(
-            row.displayName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              cityLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        // Relationship rows: not chat cards — tertiary accent + MATCH chip.
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: cs.tertiary.withValues(alpha: 0.35),
+                ),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: cs.tertiary.withValues(alpha: 0.18),
+                  backgroundImage:
+                      avatar.isEmpty ? null : NetworkImage(row.avatarUrl),
+                  child: avatar.isEmpty
+                      ? Icon(Icons.favorite_outline, color: cs.tertiary)
+                      : null,
+                ),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: cs.tertiary.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'MATCH',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: cs.tertiary,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        row.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Text(
+                  'Mutual match · $cityLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Text(
+                  timeStr,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.outline,
+                      ),
+                ),
+                onTap: () => unawaited(_onMatchRowTap(row)),
               ),
             ),
           ),
-          trailing: Text(
-            timeStr,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-          ),
-          onTap: () => unawaited(_onMatchRowTap(row)),
         );
       },
     );

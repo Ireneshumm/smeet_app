@@ -53,6 +53,7 @@ class SupabaseDmsInboxRepository {
       updatedAt: updated,
       unreadCount: unread,
       directPeerUserId: row['direct_peer_id']?.toString(),
+      avatarUrl: row['ui_avatar']?.toString(),
     );
   }
 }

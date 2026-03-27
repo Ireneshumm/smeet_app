@@ -314,6 +314,8 @@ class _SmeetShellState extends State<SmeetShell> {
       );
     }
 
+    final pages = _pages;
+
     return Scaffold(
       appBar: AppBar(
         title: _index == 0
@@ -337,11 +339,29 @@ class _SmeetShellState extends State<SmeetShell> {
             : Text(_title),
         centerTitle: true,
       ),
-      // Use IndexedStack to keep pages alive when switching tabs
+      // Use IndexedStack to keep pages alive when switching tabs.
+      // Web: offstage children skip layout; isolate focus, semantics, pointers,
+      // and tickers so traversal / bounds don't touch unfocused tabs.
       body: SafeArea(
         child: IndexedStack(
           index: _index,
-          children: _pages,
+          children: List<Widget>.generate(pages.length, (i) {
+            final page = pages[i];
+            if (i == _index) return page;
+            return TickerMode(
+              enabled: false,
+              child: IgnorePointer(
+                ignoring: true,
+                child: ExcludeSemantics(
+                  excluding: true,
+                  child: ExcludeFocus(
+                    excluding: true,
+                    child: page,
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
       bottomNavigationBar: NavigationBar(
