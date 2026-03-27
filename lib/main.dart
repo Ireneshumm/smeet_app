@@ -8,6 +8,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:smeet_app/core/config/supabase_env.dart';
+import 'package:smeet_app/core/formatting/chat_row_unread_label.dart';
+import 'package:smeet_app/core/notifiers/smeet_open_chat_room_notifier.dart';
+import 'package:smeet_app/core/services/chat_conversation_list_service.dart';
+import 'package:smeet_app/core/services/joined_games_service.dart';
+import 'package:smeet_app/core/services/media_upload_service.dart';
+import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/game_balance.dart';
 import 'package:smeet_app/geo_utils.dart';
 import 'package:smeet_app/other_profile_page.dart';
@@ -17,6 +25,15 @@ import 'package:smeet_app/widgets/legal_section_card.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 import 'package:smeet_app/widgets/signup_legal_agreement.dart';
+import 'package:smeet_app/features/feed/feed.dart';
+import 'package:smeet_app/features/inbox/inbox.dart';
+import 'package:smeet_app/features/create/create.dart';
+import 'package:smeet_app/features/notifications/notifications.dart';
+import 'package:smeet_app/features/profile/presentation/legacy_profile_setup_section.dart';
+import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
+import 'package:smeet_app/features/profile/profile.dart';
+
+part 'app/shell/smeet_shell.dart';
 
 /// 12h time like "2:00 PM"
 String formatTime12h(DateTime dt) {
@@ -66,29 +83,6 @@ String formatGameDateHeading(DateTime? start) {
   return DateFormat('EEEE · MM/dd/yyyy').format(start);
 }
 
-Future<int> countUnreadForChat({
-  required SupabaseClient supabase,
-  required String chatId,
-  required String me,
-  String? lastReadIso,
-}) async {
-  try {
-    var q = supabase
-        .from('messages')
-        .select('id')
-        .eq('chat_id', chatId)
-        .neq('user_id', me);
-    if (lastReadIso != null && lastReadIso.isNotEmpty) {
-      q = q.gt('created_at', lastReadIso);
-    }
-    final rows =
-        await q.order('created_at', ascending: false).limit(50);
-    return (rows as List).length;
-  } catch (_) {
-    return 0;
-  }
-}
-
 Future<void> markChatRead(
   SupabaseClient supabase, {
   required String chatId,
@@ -105,9 +99,6 @@ Future<void> markChatRead(
   } catch (_) {}
 }
 
-/// When a [ChatRoomPage] is on the stack, list + tab badge treat that thread as read.
-final ValueNotifier<String?> smeetOpenChatRoomId = ValueNotifier<String?>(null);
-
 /// Shell-level Chat tab unread indicator (implementation detail).
 ///
 /// Prefer [SmeetShell.reportChatTabUnread], [SmeetShell.clearChatTabUnreadBadge], and
@@ -119,13 +110,6 @@ final ValueNotifier<int> smeetChatTabUnreadTotal = ValueNotifier<int>(0);
 /// Used when `last_read_at` changes without a new message row (e.g. after leaving [ChatRoomPage]).
 final ValueNotifier<int> smeetChatInboxRefreshSignal = ValueNotifier<int>(0);
 
-/// Per-row unread pill (compact).
-String unreadLabelForChatRow(int n) {
-  if (n <= 0) return '';
-  if (n > 9) return '9+';
-  return '$n';
-}
-
 /// Bottom nav Chat tab (larger cap).
 String unreadLabelForChatTab(int n) {
   if (n <= 0) return '';
@@ -133,81 +117,112 @@ String unreadLabelForChatTab(int n) {
   return '$n';
 }
 
+Map<String, WidgetBuilder> _smeetNamedRoutesForNonRelease() {
+  return {
+    FeedRoutes.list: (_) => const FeedPage(),
+    InboxRoutes.list: (_) => InboxPage(
+          onEnsureLoggedIn: _ensureLoginAndPrompt,
+          onAfterLiveChatClosed: SmeetShell.requestChatInboxRefresh,
+          onAfterInboxRealtimeRefresh: SmeetShell.requestChatInboxRefresh,
+          onOpenChat: (context, item) async {
+            final chatKind =
+                item.kind == InboxTabKind.gameChats ? 'game' : 'direct';
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => ChatRoomPage(
+                  chatId: item.id,
+                  title: item.title,
+                  chatKind: chatKind,
+                  directPeerUserId: item.directPeerUserId,
+                ),
+              ),
+            );
+          },
+        ),
+    CreateRoutes.hub: (context) => CreateHubPage(
+          onOpenLegacyCreateGame: () {
+            Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (ctx) => HomePage(
+                  joinedLocal: <String>{},
+                  onGamesMutated: () {},
+                ),
+              ),
+            );
+          },
+        ),
+    NotificationsRoutes.list: (_) => const NotificationsPage(),
+    ProfileRoutes.list: (context) {
+      final raw = ModalRoute.of(context)?.settings.arguments;
+      var tab = ProfileMvpInitialTabIndex.posts;
+      if (raw is int &&
+          raw >= ProfileMvpInitialTabIndex.posts &&
+          raw <= ProfileMvpInitialTabIndex.joined) {
+        tab = raw;
+      }
+      return ProfileMvpPage(initialTabIndex: tab);
+    },
+    ProfileRoutes.setupDemo: (_) => ProfileSetupDemoPage(
+          onProfileSaved: SmeetShell.refreshAuthState,
+        ),
+  };
+}
+
+const List<MvpDebugLauncherItem> _kMvpDebugLauncherItems = [
+  MvpDebugLauncherItem(
+    label: 'Feed MVP',
+    route: FeedRoutes.list,
+    icon: Icons.dynamic_feed_outlined,
+  ),
+  MvpDebugLauncherItem(
+    label: 'Inbox MVP',
+    route: InboxRoutes.list,
+    icon: Icons.inbox_outlined,
+  ),
+  MvpDebugLauncherItem(
+    label: 'Create MVP',
+    route: CreateRoutes.hub,
+    icon: Icons.add_circle_outline,
+  ),
+  MvpDebugLauncherItem(
+    label: 'Notifications MVP',
+    route: NotificationsRoutes.list,
+    icon: Icons.notifications_outlined,
+  ),
+  MvpDebugLauncherItem(
+    label: 'Profile MVP',
+    route: ProfileRoutes.list,
+    icon: Icons.person_outline,
+  ),
+  MvpDebugLauncherItem(
+    label: 'Profile Setup (debug)',
+    route: ProfileRoutes.setupDemo,
+    icon: Icons.manage_accounts_outlined,
+  ),
+];
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final cfg = resolveSupabaseConfig();
   // supabase package defaults to AuthFlowType.pkce; no need to pass authOptions.
   await Supabase.initialize(
-    url: 'https://gjaljqqvtxfqddmtyxgt.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqYWxqcXF2dHhmcWRkbXR5eGd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxODAzNTYsImV4cCI6MjA4Mjc1NjM1Nn0.xBUQad28YDmWG7uTGopg7itEruXnCMdcU-EDwkZ3308',
+    url: cfg.url,
+    anonKey: cfg.anonKey,
   );
 
-  runApp(const SmeetApp());
-}
+  final namedRoutes =
+      kReleaseMode ? const <String, WidgetBuilder>{} : _smeetNamedRoutesForNonRelease();
 
-class SmeetApp extends StatelessWidget {
-  const SmeetApp({super.key});
-
-  // Brand colors (from your logo)
-  static const Color smeetMint = Color(0xFF56CDBE);
-  static const Color smeetDeep = Color(0xFF0B8F85);
-  static const Color smeetInk = Color(0xFF0F2D2A);
-  static const Color smeetBg = Color(0xFFF7FBFA);
-
-  @override
-  Widget build(BuildContext context) {
-    final baseScheme = ColorScheme.fromSeed(
-      seedColor: smeetMint,
-      brightness: Brightness.light,
-    );
-
-    return MaterialApp(
-      title: 'Smeet',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-
-        scaffoldBackgroundColor: smeetBg,
-
-        colorScheme: baseScheme.copyWith(
-          primary: smeetMint,
-          secondary: smeetDeep,
-          surface: Colors.white,
-          onPrimary: Colors.white,
-          onSurface: smeetInk,
-        ),
-
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: smeetInk,
-          centerTitle: true,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: Colors.white,
-          indicatorColor: smeetMint.withOpacity(0.18),
-          labelTextStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 12)),
-        ),
-
-        filledButtonTheme: FilledButtonThemeData(
-          style: ButtonStyle(
-            backgroundColor: const WidgetStatePropertyAll(smeetMint),
-            foregroundColor: const WidgetStatePropertyAll(Colors.white),
-            padding: const WidgetStatePropertyAll(
-              EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            ),
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ),
-      ),
+  runApp(
+    SmeetApp(
       home: const SmeetShell(),
-    );
-  }
+      routes: namedRoutes,
+      showMvpDebugLauncher: kDebugMode,
+      mvpDebugLauncherItems:
+          kReleaseMode ? const <MvpDebugLauncherItem>[] : _kMvpDebugLauncherItems,
+    ),
+  );
 }
 
 class AuthGate extends StatelessWidget {
@@ -900,390 +915,6 @@ Future<bool> _ensureLoginAndPrompt(BuildContext context) async {
     });
   }
   return ok;
-}
-
-/// Central auth + profile row state for [SmeetShell] (guest vs needs profile vs ready).
-enum ShellAuthPhase {
-  /// Resolving Supabase session and `public.profiles` (avoid wrong first tab).
-  authResolving,
-  signedOut,
-  signedInProfileMissing,
-  signedInProfileReady,
-}
-
-/// Smeet 主框架：底部 5 个 Tab
-class SmeetShell extends StatefulWidget {
-  const SmeetShell({super.key});
-
-  /// Re-run session + profile row resolution (after login, sign-up, profile save, etc.).
-  static void refreshAuthState() {
-    Future<void>.delayed(Duration.zero, () {
-      _SmeetShellState.requestRefreshAuthState();
-    });
-  }
-
-  // --- Chat tab unread (shell-level indicator; [ChatPage] aggregates, no messaging rewrite) ---
-
-  /// Updates the Chat tab badge total. Called from [ChatPage] when the aggregate unread changes.
-  static void reportChatTabUnread(int total) {
-    smeetChatTabUnreadTotal.value = total < 0 ? 0 : total;
-  }
-
-  /// Clears the Chat tab badge (signed out, no session, etc.).
-  static void clearChatTabUnreadBadge() {
-    smeetChatTabUnreadTotal.value = 0;
-  }
-
-  /// Nudges [ChatPage] to refetch (debounced there) after read state is persisted without a
-  /// new message — e.g. [markChatRead] when popping [ChatRoomPage].
-  static void requestChatInboxRefresh() {
-    smeetChatInboxRefreshSignal.value++;
-  }
-
-  @override
-  State<SmeetShell> createState() => _SmeetShellState();
-}
-
-class _SmeetShellState extends State<SmeetShell> {
-  static const int _kProfileTabIndex = 4;
-
-  static _SmeetShellState? _instance;
-
-  static void requestRefreshAuthState() {
-    _instance?._scheduleAuthAndProfileResolution();
-  }
-
-  ShellAuthPhase _phase = ShellAuthPhase.authResolving;
-  int _authResolveEpoch = 0;
-  bool _authResolveQueued = false;
-  Future<void>? _authResolveInFlight;
-
-  int _index = 0;
-  final Set<String> _joinedLocal = {};
-  /// Bumps when joins / DB sync changes so My Game & related lists refetch.
-  int _gamesListRevision = 0;
-  /// Bumped on sign-out so [ProfilePage] resets cleanly on next login.
-  int _profileSessionKey = 0;
-
-  StreamSubscription<AuthState>? _authSub;
-  /// Avoid duplicate welcome SnackBars for the same signed-in user this session.
-  String? _profileWelcomeSnackUserId;
-
-  @override
-  void initState() {
-    super.initState();
-    _instance = this;
-    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      debugPrint(
-        '[Shell] auth change currentUser=${Supabase.instance.client.auth.currentUser?.id}',
-      );
-      final ev = data.event;
-      if (ev == AuthChangeEvent.signedOut) {
-        _authResolveEpoch++;
-        _authResolveQueued = false;
-        if (mounted) {
-          setState(() {
-            _phase = ShellAuthPhase.signedOut;
-            _index = 0;
-            _profileWelcomeSnackUserId = null;
-            _profileSessionKey++;
-            SmeetShell.clearChatTabUnreadBadge();
-          });
-        }
-        _syncJoinedFromDb();
-        return;
-      }
-      if (ev == AuthChangeEvent.signedIn ||
-          ev == AuthChangeEvent.initialSession) {
-        _scheduleAuthAndProfileResolution();
-      }
-      _syncJoinedFromDb();
-    });
-    _syncJoinedFromDb();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleAuthAndProfileResolution();
-    });
-  }
-
-  @override
-  void dispose() {
-    if (identical(_instance, this)) {
-      _instance = null;
-    }
-    _authSub?.cancel();
-    super.dispose();
-  }
-
-  void _scheduleAuthAndProfileResolution() {
-    final u = Supabase.instance.client.auth.currentUser;
-    if (u != null &&
-        (_phase == ShellAuthPhase.signedOut ||
-            _phase == ShellAuthPhase.authResolving)) {
-      setState(() => _phase = ShellAuthPhase.authResolving);
-    }
-    if (_authResolveInFlight != null) {
-      _authResolveQueued = true;
-      return;
-    }
-    _authResolveInFlight = _runAuthAndProfileResolution().whenComplete(() {
-      _authResolveInFlight = null;
-      if (!mounted) return;
-      if (_authResolveQueued) {
-        _authResolveQueued = false;
-        _scheduleAuthAndProfileResolution();
-      }
-    });
-  }
-
-  Future<void> _runAuthAndProfileResolution() async {
-    final startEpoch = _authResolveEpoch;
-    await Future<void>.delayed(Duration.zero);
-    if (!mounted || startEpoch != _authResolveEpoch) return;
-
-    final client = Supabase.instance.client;
-    final u = client.auth.currentUser;
-
-    if (u == null) {
-      if (!mounted || startEpoch != _authResolveEpoch) return;
-      debugPrint(
-        '[shell_auth] no session → signedOut, reset tab to Home (was index=$_index)',
-      );
-      setState(() {
-        _phase = ShellAuthPhase.signedOut;
-        _profileWelcomeSnackUserId = null;
-        _index = 0;
-        SmeetShell.clearChatTabUnreadBadge();
-      });
-      return;
-    }
-
-    Map<String, dynamic>? row;
-    try {
-      row = await client
-          .from('profiles')
-          .select('id')
-          .eq('id', u.id)
-          .maybeSingle();
-    } catch (e, st) {
-      debugPrint('[shell_auth] profiles check failed: $e');
-      debugPrint('$st');
-      if (!mounted || startEpoch != _authResolveEpoch) return;
-      // Fail open: keep app usable if RLS/network breaks profile read.
-      setState(() => _phase = ShellAuthPhase.signedInProfileReady);
-      return;
-    }
-
-    if (!mounted || startEpoch != _authResolveEpoch) return;
-
-    if (row == null) {
-      debugPrint(
-        '[shell_auth] profile row missing → force Profile tab '
-        'user=${u.id} (was index=$_index)',
-      );
-      setState(() {
-        _phase = ShellAuthPhase.signedInProfileMissing;
-        _index = _kProfileTabIndex;
-      });
-      final showWelcome = _profileWelcomeSnackUserId != u.id;
-      if (showWelcome) {
-        _profileWelcomeSnackUserId = u.id;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            const SnackBar(
-              content: Text('Welcome! Please complete your profile first.'),
-              duration: Duration(seconds: 5),
-            ),
-          );
-        });
-      }
-    } else {
-      setState(() => _phase = ShellAuthPhase.signedInProfileReady);
-    }
-  }
-
-  Future<void> _syncJoinedFromDb() async {
-    final u = Supabase.instance.client.auth.currentUser;
-    if (u == null) {
-      if (mounted) {
-        setState(() {
-          _joinedLocal.clear();
-          _gamesListRevision++;
-        });
-      }
-      return;
-    }
-    try {
-      final rows = await Supabase.instance.client
-          .from('game_participants')
-          .select('game_id')
-          .eq('user_id', u.id)
-          .eq('status', 'joined');
-      final ids = (rows as List)
-          .map((e) => e['game_id'].toString())
-          .toSet();
-      if (!mounted) return;
-      setState(() {
-        _joinedLocal
-          ..clear()
-          ..addAll(ids);
-        _gamesListRevision++;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _gamesListRevision++);
-    }
-  }
-
-  void _onGamesMutated() {
-    _syncJoinedFromDb();
-  }
-
-  Widget _chatNavIcon({required bool selected, required int unread}) {
-    final icon = Icon(
-      selected ? Icons.chat_bubble : Icons.chat_bubble_outline,
-    );
-    if (unread <= 0) return icon;
-    final cs = Theme.of(context).colorScheme;
-    return Badge(
-      backgroundColor: cs.error,
-      textColor: cs.onError,
-      label: Text(
-        unreadLabelForChatTab(unread),
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      child: icon,
-    );
-  }
-
-  List<Widget> get _pages => [
-        HomePage(
-          joinedLocal: _joinedLocal,
-          onGamesMutated: _onGamesMutated,
-        ),
-        const SwipePage(),
-        MyGamePage(
-          key: ValueKey(_gamesListRevision),
-          joinedLocal: _joinedLocal,
-          listRevision: _gamesListRevision,
-          onGamesMutated: _onGamesMutated,
-        ),
-        ChatPage(
-          key: ValueKey(_gamesListRevision),
-        ),
-        ProfilePage(key: ValueKey(_profileSessionKey)),
-      ];
-
-  String get _title {
-    switch (_index) {
-      case 0:
-        return 'Smeet';
-      case 1:
-        return 'Swipe';
-      case 2:
-        return 'My Game';
-      case 3:
-        return 'Chat';
-      case 4:
-        return 'Profile';
-      default:
-        return 'Smeet';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_phase == ShellAuthPhase.authResolving) {
-      return const Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading…'),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: _index == 0
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/images/Smeet_logo_transparent.png',
-                    height: 26,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.sports, size: 22);
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _title,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ],
-              )
-            : Text(_title),
-        centerTitle: true,
-      ),
-      // Use IndexedStack to keep pages alive when switching tabs
-      body: SafeArea(
-        child: IndexedStack(
-          index: _index,
-          children: _pages,
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) {
-          setState(() => _index = i);
-          debugPrint('[Nav] switch tab -> $_index');
-          if (i == _kProfileTabIndex) {
-            debugPrint('[Nav] Profile tab selected (index $_kProfileTabIndex)');
-          }
-        },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          const NavigationDestination(icon: Icon(Icons.swipe), label: 'Swipe'),
-          const NavigationDestination(
-            icon: Icon(Icons.sports_tennis),
-            label: 'MyGame',
-          ),
-          NavigationDestination(
-            icon: ValueListenableBuilder<int>(
-              valueListenable: smeetChatTabUnreadTotal,
-              builder: (context, unread, _) {
-                return _chatNavIcon(selected: false, unread: unread);
-              },
-            ),
-            selectedIcon: ValueListenableBuilder<int>(
-              valueListenable: smeetChatTabUnreadTotal,
-              builder: (context, unread, _) {
-                return _chatNavIcon(selected: true, unread: unread);
-              },
-            ),
-            label: 'Chat',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// --- 页面 1：Home（Create Game） ---
@@ -3087,35 +2718,8 @@ class _MyGamePageState extends State<MyGamePage> {
     List<Map<String, dynamic>> games;
 
     if (u != null) {
-      try {
-        final rows = await supabase
-            .from('game_participants')
-            .select(
-              'game_id, games(id, sport, game_level, starts_at, ends_at, location_text, players, joined_count, per_person, created_by, game_chat_id)',
-            )
-            .eq('user_id', u.id)
-            .eq('status', 'joined');
-
-        games = [];
-        for (final r in rows as List) {
-          final nested = r['games'];
-          if (nested is Map) {
-            games.add(
-              Map<String, dynamic>.from(Map<Object?, Object?>.from(nested)),
-            );
-          }
-        }
-        games.sort((a, b) {
-          final ta = DateTime.tryParse(a['starts_at']?.toString() ?? '');
-          final tb = DateTime.tryParse(b['starts_at']?.toString() ?? '');
-          if (ta == null && tb == null) return 0;
-          if (ta == null) return 1;
-          if (tb == null) return -1;
-          return ta.compareTo(tb);
-        });
-      } catch (_) {
-        games = [];
-      }
+      games =
+          await JoinedGamesService(supabase).fetchJoinedGameRowsForCurrentUser();
     } else {
       games = [];
     }
@@ -3533,148 +3137,15 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     final supabase = Supabase.instance.client;
-
-    List<Map<String, dynamic>> list;
-    try {
-      final data = await supabase
-          .from('chat_members')
-          .select(
-            'chat_id, last_read_at, chats(id, last_message, last_message_at, created_at, chat_kind, game_id, title)',
-          )
-          .eq('user_id', u.id);
-      list = (data as List).cast<Map<String, dynamic>>();
-    } catch (_) {
-      final data = await supabase
-          .from('chat_members')
-          .select(
-            'chat_id, last_read_at, chats(id, last_message, last_message_at, created_at)',
-          )
-          .eq('user_id', u.id);
-      list = (data as List).cast<Map<String, dynamic>>();
-    }
-
-    final chats = list.map((row) {
-      final chat = (row['chats'] ?? {}) as Map;
-      return {
-        'chat_id': row['chat_id'],
-        'last_read_at': row['last_read_at'],
-        'last_message': chat['last_message'],
-        'last_message_at': chat['last_message_at'],
-        'created_at': chat['created_at'],
-        'chat_kind': (chat['chat_kind'] ?? 'direct').toString(),
-        'game_id': chat['game_id'],
-        'title': chat['title'],
-      };
-    }).toList();
-
-    chats.sort((a, b) {
-      final ta = DateTime.tryParse(
-        (a['last_message_at'] ?? '')?.toString() ?? '',
-      );
-      final tb = DateTime.tryParse(
-        (b['last_message_at'] ?? '')?.toString() ?? '',
-      );
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return tb.compareTo(ta);
-    });
-
-    final enriched =
-        await Future.wait(chats.map((c) => _enrichChatRow(c, u.id)));
-    if (!mounted) return enriched;
-
-    final blockSets = await BlockService.fetchMyBlockSets();
-    if (!mounted) return enriched;
-
-    final filtered = enriched.where((c) {
-      final kind = (c['chat_kind'] ?? 'direct').toString();
-      if (kind == 'game') return true;
-      final peer = c['direct_peer_id']?.toString();
-      if (peer == null || peer.isEmpty) return true;
-      return !blockSets.iBlocked.contains(peer) &&
-          !blockSets.blockedMe.contains(peer);
-    }).toList();
+    final filtered = await ChatConversationListService(supabase)
+        .fetchEnrichedListForUser(u.id);
+    if (!mounted) return filtered;
 
     final ids = filtered.map((e) => e['chat_id'].toString()).toList();
     _bindMessagesRealtime(ids);
     _pushUnreadToShell(filtered, smeetOpenChatRoomId.value);
 
     return filtered;
-  }
-
-  Future<int> _gameMemberCount(String chatId) async {
-    try {
-      final rows = await Supabase.instance.client
-          .from('chat_members')
-          .select('user_id')
-          .eq('chat_id', chatId);
-      return (rows as List).length;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  Future<Map<String, dynamic>> _enrichChatRow(
-    Map<String, dynamic> c,
-    String myId,
-  ) async {
-    final supabase = Supabase.instance.client;
-    final chatId = c['chat_id'].toString();
-    final lastRead = c['last_read_at']?.toString();
-    final kind = (c['chat_kind'] ?? 'direct').toString();
-
-    final unread = await countUnreadForChat(
-      supabase: supabase,
-      chatId: chatId,
-      me: myId,
-      lastReadIso: lastRead,
-    );
-
-    if (kind == 'game') {
-      final n = await _gameMemberCount(chatId);
-      return {
-        ...c,
-        'member_count': n,
-        'ui_title': (c['title'] ?? 'Game chat').toString(),
-        'ui_avatar': null,
-        'unread': unread,
-        'direct_peer_id': null,
-      };
-    }
-
-    final other = await supabase
-        .from('chat_members')
-        .select('user_id')
-        .eq('chat_id', chatId)
-        .neq('user_id', myId)
-        .limit(1)
-        .maybeSingle();
-    final oid = other?['user_id']?.toString();
-
-    var name = 'Chat';
-    String? av;
-    if (oid != null) {
-      final p = await supabase
-          .from('profiles')
-          .select('display_name, avatar_url')
-          .eq('id', oid)
-          .maybeSingle();
-      final dn = (p?['display_name'] ?? '').toString().trim();
-      name = dn.isNotEmpty
-          ? dn
-          : 'User ${oid.length >= 6 ? oid.substring(0, 6) : oid}';
-      av = p?['avatar_url']?.toString();
-    }
-
-    return {
-      ...c,
-      'member_count': 0,
-      'ui_title': name,
-      'ui_avatar': av,
-      'unread': unread,
-      'direct_peer_id': oid,
-    };
   }
 
   Widget _compactUnreadBadge(BuildContext context, int unreadShown) {
@@ -4768,6 +4239,8 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   User? get _user => Supabase.instance.client.auth.currentUser;
 
+  final PostsService _postsService = PostsService();
+
   final _nameCtrl = TextEditingController();
   final _birthYearCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
@@ -4780,38 +4253,12 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _loading = false;
   bool _loaded = false;
 
-  // dynamic: 先选运动，再选 level
-  final Map<String, String> _sportLevels = {};
-  String? _sportToAdd;
+  final GlobalKey<LegacyProfileSetupSectionState> _legacySetupKey =
+      GlobalKey<LegacyProfileSetupSectionState>();
 
-  static const _sports = [
-    'Tennis',
-    'Golf',
-    'Pickleball',
-    'Badminton',
-    'Ski',
-    'Snowboard',
-    'Running',
-    'Gym',
-  ];
-
-  static const _levels = [
-    'Beginner',
-    'Intermediate',
-    'Advanced',
-    'Competitive',
-    'Pro',
-  ];
-
-  final Map<String, Set<String>> _availability = {
-    'Mon': <String>{},
-    'Tue': <String>{},
-    'Wed': <String>{},
-    'Thu': <String>{},
-    'Fri': <String>{},
-    'Sat': <String>{},
-    'Sun': <String>{},
-  };
+  /// Snapshot for [LegacyProfileSetupSection] sport_levels / availability sync.
+  Map<String, dynamic>? _setupLoadedRow;
+  int _setupLoadGen = 0;
 
   Future<List<Map<String, dynamic>>>? _myPostsFuture;
 
@@ -4845,47 +4292,27 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _loading = true);
 
     try {
-      final supabase = Supabase.instance.client;
-      final row = await supabase
-          .from('profiles')
-          .select(
-            'display_name,birth_year,city,intro,avatar_url,sport_levels,availability',
-          )
-          .eq('id', user.id)
-          .maybeSingle();
+      final row = await fetchProfileSetupRow(
+        client: Supabase.instance.client,
+        userId: user.id,
+      );
 
       if (row != null) {
-        _nameCtrl.text = (row['display_name'] ?? '') as String;
-        _birthYearCtrl.text = row['birth_year'] == null
-            ? ''
-            : row['birth_year'].toString();
-        _cityCtrl.text = (row['city'] ?? '') as String;
-        _introCtrl.text = (row['intro'] ?? '') as String;
-        _avatarUrl = row['avatar_url'] as String?;
-
-        final sl = row['sport_levels'];
-        if (sl is Map) {
-          _sportLevels
-            ..clear()
-            ..addAll(sl.map((k, v) => MapEntry(k.toString(), v.toString())));
-        }
-        // ✅ 防止已存在的 sport 还留在 dropdown 里
-        if (_sportToAdd != null && _sportLevels.containsKey(_sportToAdd)) {
-          _sportToAdd = null;
-        }
-
-        final avail = row['availability'];
-        if (avail is Map) {
-          for (final day in _availability.keys) {
-            final v = avail[day];
-            if (v is List) {
-              _availability[day] = v.map((e) => e.toString()).toSet();
-            }
-          }
-        }
+        final v = ProfileSetupFieldValues.fromRow(row);
+        _nameCtrl.text = v.displayName;
+        _birthYearCtrl.text = v.birthYearText;
+        _cityCtrl.text = v.city;
+        _introCtrl.text = v.intro;
+        _avatarUrl = v.avatarUrl;
       }
 
-      if (mounted) setState(() => _loaded = true);
+      if (mounted) {
+        setState(() {
+          _loaded = true;
+          _setupLoadedRow = row;
+          _setupLoadGen++;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loaded = true);
@@ -4898,49 +4325,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    final user = _user;
-    if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please login first')));
-      return;
-    }
-
-    final birthYear = int.tryParse(_birthYearCtrl.text.trim());
-
-    final availabilityJson = <String, dynamic>{};
-    _availability.forEach((day, slots) {
-      availabilityJson[day] = slots.toList()..sort();
-    });
-
-    setState(() => _loading = true);
-
-    try {
-      final supabase = Supabase.instance.client;
-      await supabase.from('profiles').upsert({
-        'id': user.id,
-        'display_name': _nameCtrl.text.trim(),
-        'birth_year': birthYear,
-        'city': _cityCtrl.text.trim(),
-        'intro': _introCtrl.text.trim(),
-        'avatar_url': _avatarUrl,
-        'sport_levels': _sportLevels,
-        'availability': availabilityJson,
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('✅ Profile saved')));
-      SmeetShell.refreshAuthState();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Save failed: $e')));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    await _legacySetupKey.currentState?.saveProfile();
   }
 
   Future<String> _uploadToMediaBucketXFile(
@@ -4950,29 +4335,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = _user;
     if (user == null) throw Exception('Not logged in');
 
-    final supabase = Supabase.instance.client;
-    final uuid = const Uuid().v4();
-
-    final ext = (xfile.name.split('.').last).toLowerCase();
-    final path = '${user.id}/$folder/$uuid.$ext';
-
-    final Uint8List bytes = await xfile.readAsBytes();
-
-    String contentType = 'application/octet-stream';
-    if (ext == 'png') contentType = 'image/png';
-    if (ext == 'jpg' || ext == 'jpeg') contentType = 'image/jpeg';
-    if (ext == 'mp4') contentType = 'video/mp4';
-    if (ext == 'mov') contentType = 'video/quicktime';
-
-    await supabase.storage
-        .from('media')
-        .uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
-        );
-
-    return supabase.storage.from('media').getPublicUrl(path);
+    return MediaUploadService().uploadXFileToMediaBucket(
+      xfile,
+      userId: user.id,
+      folder: folder,
+    );
   }
 
   Future<void> _pickAndUploadAvatar() async {
@@ -5007,14 +4374,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = _user;
     if (user == null) return [];
 
-    final supabase = Supabase.instance.client;
-    final data = await supabase
-        .from('posts')
-        .select('id, caption, media_type, media_urls, created_at, author_id')
-        .eq('author_id', user.id)
-        .order('created_at', ascending: false);
-
-    return (data as List).cast<Map<String, dynamic>>();
+    return _postsService.fetchMyPosts(user.id);
   }
 
   Future<void> _createPost({required String mediaType}) async {
@@ -5045,8 +4405,7 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final url = await _uploadToMediaBucketXFile(x, folder: 'posts');
 
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
+      final user = Supabase.instance.client.auth.currentUser;
 
       if (user == null) {
         if (!mounted) return;
@@ -5055,19 +4414,14 @@ class _ProfilePageState extends State<ProfilePage> {
         ).showSnackBar(const SnackBar(content: Text('Please login to post')));
         return;
       }
-      final inserted = await supabase
-          .from('posts')
-          .insert({
-            'author_id': user.id,
-            'sport': 'tennis',
-            'visibility': 'public',
-            'media_urls': [url],
-            'media_type': mediaType,
-            'caption': caption.trim(),
-            'content': caption.trim(),
-          })
-          .select('id, author_id, created_at')
-          .single();
+      final payload = PostsService.buildMediaPostPayload(
+        authorId: user.id,
+        mediaUrl: url,
+        mediaType: mediaType,
+        captionTrimmed: caption.trim(),
+      );
+      final inserted =
+          await _postsService.insertPostReturningSummary(payload);
 
       debugPrint('✅ INSERT OK => $inserted');
 
@@ -5200,8 +4554,6 @@ class _ProfilePageState extends State<ProfilePage> {
       return const AppLoadingState(message: 'Loading your profile…');
     }
 
-    final slots = const ['Morning', 'Afternoon', 'Night'];
-
     // No nested Scaffold. [LayoutBuilder] logs constraints; if height is unbounded
     // (some parent combinations on mobile), [SizedBox] gives TabBarView a finite height.
     return LayoutBuilder(
@@ -5323,226 +4675,30 @@ class _ProfilePageState extends State<ProfilePage> {
                     SingleChildScrollView(
                       child: Column(
                         children: [
-                          _card(
-                            context,
-                            child: Column(
-                              children: [
-                                TextField(
-                                  controller: _nameCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Display name',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _birthYearCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Birth year',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _cityCtrl,
-                                        decoration: const InputDecoration(
-                                          labelText: 'City',
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: _introCtrl,
-                                  maxLines: 3,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Sports-only bio',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          LegacyProfileSetupSection(
+                            key: _legacySetupKey,
+                            nameCtrl: _nameCtrl,
+                            birthYearCtrl: _birthYearCtrl,
+                            cityCtrl: _cityCtrl,
+                            introCtrl: _introCtrl,
+                            currentAvatarUrl: () => _avatarUrl,
+                            loadGeneration: _setupLoadGen,
+                            loadedProfileRow: _setupLoadedRow,
+                            onBusyChanged: (busy) {
+                              if (mounted) setState(() => _loading = busy);
+                            },
+                            onProfileSaved: SmeetShell.refreshAuthState,
                           ),
-
-                          // Sports & Level
-                          _card(
-                            context,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Sports & Level',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w900),
-                                ),
-                                const SizedBox(height: 10),
-                                // ✅ 防止 Dropdown value 不在 items 里导致红屏
-                                Builder(
-                                  builder: (context) {
-                                    final availableSports = _sports
-                                        .where(
-                                          (s) => !_sportLevels.containsKey(s),
-                                        )
-                                        .toList();
-                                    final safeValue =
-                                        availableSports.contains(_sportToAdd)
-                                        ? _sportToAdd
-                                        : null;
-
-                                    return DropdownButtonFormField<String>(
-                                      initialValue: safeValue,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Choose a sport',
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      items: availableSports
-                                          .map(
-                                            (s) => DropdownMenuItem(
-                                              value: s,
-                                              child: Text(s),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (v) =>
-                                          setState(() => _sportToAdd = v),
-                                    );
-                                  },
-                                ),
-
-                                const SizedBox(height: 10),
-                                if (_sportToAdd != null)
-                                  DropdownButtonFormField<String>(
-                                    initialValue:
-                                        _sportLevels[_sportToAdd!] ??
-                                        _levels.first,
-                                    decoration: InputDecoration(
-                                      labelText: '${_sportToAdd!} level',
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    items: _levels
-                                        .map(
-                                          (l) => DropdownMenuItem(
-                                            value: l,
-                                            child: Text(l),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (v) {
-                                      if (v == null) return;
-                                      setState(() {
-                                        _sportLevels[_sportToAdd!] = v;
-                                      });
-                                    },
-                                  ),
-                                const SizedBox(height: 12),
-                                if (_sportLevels.isEmpty)
-                                  Text(
-                                    'No sports added yet.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: cs.onSurface.withOpacity(0.7),
-                                        ),
-                                  )
-                                else
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: _sportLevels.entries.map((e) {
-                                      return InputChip(
-                                        label: Text('${e.key}: ${e.value}'),
-                                        onDeleted: () {
-                                          setState(() {
-                                            _sportLevels.remove(e.key);
-                                            if (_sportToAdd == e.key) {
-                                              _sportToAdd = null;
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                                  ),
-                              ],
-                            ),
-                          ),
-
-                          // Availability
-                          _card(
-                            context,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Availability',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w900),
-                                ),
-                                const SizedBox(height: 10),
-                                ..._availability.keys.map((day) {
-                                  final selected = _availability[day]!;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          day,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: slots.map((s) {
-                                            final isOn = selected.contains(s);
-                                            return ChoiceChip(
-                                              label: Text(s),
-                                              selected: isOn,
-                                              onSelected: (on) {
-                                                setState(() {
-                                                  if (on) {
-                                                    selected.add(s);
-                                                  } else {
-                                                    selected.remove(s);
-                                                  }
-                                                });
-                                              },
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-
                           const SizedBox(height: 12),
                           const LegalSectionCard(),
-
                           const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: _loading ? null : _saveProfile,
+                              onPressed: _loading
+                                  ? null
+                                  : () => _legacySetupKey.currentState
+                                      ?.saveProfile(),
                               child: Text(
                                 _loading ? 'Saving...' : 'Save Profile',
                               ),
@@ -5678,27 +4834,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _card(BuildContext context, {required Widget child}) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.primary.withOpacity(0.10)),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-            color: Colors.black.withOpacity(0.04),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
 }
 
 /// 一个统一的占位页（后面再替换成真实页面）
@@ -5894,6 +5029,8 @@ class _PostMediaState extends State<_PostMedia> {
   }
 }
 
+/// Mutual likes from [matches] + [profiles]; tap opens the existing direct
+/// [ChatRoomPage] when one exists (same resolution as Chat / Inbox DMs).
 class MatchesPage extends StatefulWidget {
   const MatchesPage({super.key});
 
@@ -5905,6 +5042,9 @@ class _MatchesPageState extends State<MatchesPage> {
   User? get _user => Supabase.instance.client.auth.currentUser;
 
   late Future<List<Map<String, dynamic>>> _future;
+  final ChatConversationListService _chatList = ChatConversationListService();
+  final SupabaseMatchesInboxRepository _matchesRepo =
+      SupabaseMatchesInboxRepository();
 
   @override
   void initState() {
@@ -5913,44 +5053,77 @@ class _MatchesPageState extends State<MatchesPage> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchMatches() async {
-    final u = _user;
-    if (u == null) return [];
+    if (_user == null) return [];
+    final rows = await _matchesRepo.fetchMatchRelationships();
+    return rows.map((e) => e.toLegacyProfileMap()).toList();
+  }
 
-    final supabase = Supabase.instance.client;
+  Future<void> _onMatchRowTap(
+    BuildContext context,
+    Map<String, dynamic> profile,
+    String displayName,
+  ) async {
+    final me = _user?.id;
+    final peerId = profile['id']?.toString();
+    if (me == null || peerId == null || peerId.isEmpty) return;
 
-    // matches: user_a, user_b
-    final rows = await supabase
-        .from('matches')
-        .select('user_a,user_b,created_at')
-        .or('user_a.eq.${u.id},user_b.eq.${u.id}')
-        .order('created_at', ascending: false);
+    try {
+      final chatId = await _chatList.findDirectChatIdForPeer(
+        myUserId: me,
+        peerUserId: peerId,
+      );
+      if (!context.mounted) return;
 
-    final list = (rows as List).cast<Map<String, dynamic>>();
+      if (chatId != null && chatId.isNotEmpty) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatRoomPage(
+              chatId: chatId,
+              title: displayName,
+              chatKind: 'direct',
+              directPeerUserId: peerId,
+            ),
+          ),
+        );
+        return;
+      }
 
-    // 取出 other ids
-    final otherIds = list
-        .map((m) {
-          final a = m['user_a'].toString();
-          final b = m['user_b'].toString();
-          return a == u.id ? b : a;
-        })
-        .toSet()
-        .toList();
-
-    if (otherIds.isEmpty) return [];
-
-    final prof = await supabase
-        .from('profiles')
-        .select(
-          'id,display_name,city,intro,avatar_url,sport_levels,availability',
-        )
-        .inFilter('id', otherIds);
-
-    final profiles = (prof as List).cast<Map<String, dynamic>>();
-
-    // 按 otherIds 顺序排一下
-    final map = {for (final p in profiles) p['id'].toString(): p};
-    return otherIds.map((id) => map[id] ?? {'id': id}).toList();
+      final intro = (profile['intro'] ?? '').toString().trim();
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(displayName),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  intro.isEmpty ? 'No bio yet.' : intro,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No direct chat is linked yet. New mutual likes from Swipe '
+                  'open a chat automatically; otherwise check the Chat tab.',
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open chat: $e')),
+      );
+    }
   }
 
   @override
@@ -6002,26 +5175,7 @@ class _MatchesPageState extends State<MatchesPage> {
                   ),
                   subtitle: Text(city.isEmpty ? 'City not set' : city),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    // MVP：先弹出简介（你后面可以做完整 ProfileViewPage）
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: Text(name),
-                        content: Text(
-                          (p['intro'] ?? '').toString().isEmpty
-                              ? 'No bio yet.'
-                              : (p['intro'] ?? '').toString(),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  onTap: () => unawaited(_onMatchRowTap(context, p, name)),
                 ),
               );
             },

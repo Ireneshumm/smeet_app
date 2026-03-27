@@ -1,16 +1,15 @@
 # smeet_app
 
-A new Flutter project.
+Flutter app for Smeet.
+
+## Release / gray-box builds
+
+- **Release** builds **must** pass Supabase credentials via `--dart-define` (see `lib/core/config/supabase_env.dart`). Builds without them fail fast on startup.
+- **Debug / profile** `flutter run` can omit defines and use the dev fallbacks in `supabase_env.dart` (rotate keys if this repository is public).
+- Pre-release smoke checklist and route behavior: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- [Flutter documentation](https://docs.flutter.dev/)
