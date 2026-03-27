@@ -2133,7 +2133,6 @@ class _SwipeMatchAvatar extends StatelessWidget {
       radius: 44,
       backgroundColor: cs.primaryContainer,
       backgroundImage: hasUrl ? NetworkImage(url!) : null,
-      onBackgroundImageError: (_, __) {},
       child: hasUrl
           ? null
           : Text(
@@ -2569,16 +2568,6 @@ class _SwipePageState extends State<SwipePage> {
     }
   }
 
-  String _sportsText(Map<String, dynamic> p) {
-    final sl = p['sport_levels'];
-    if (sl is! Map) return '-';
-    final items = sl.entries
-        .map((e) => '${e.key}: ${e.value}')
-        .take(4)
-        .toList();
-    return items.isEmpty ? '-' : items.join('  •  ');
-  }
-
   /// Compact sport tags for the full-bleed card overlay (Tinder-style).
   List<Widget> _sportOverlayChips(Map<String, dynamic> p) {
     final sl = p['sport_levels'];
@@ -2673,6 +2662,7 @@ class _SwipePageState extends State<SwipePage> {
     final intro = (cur['intro'] ?? '').toString();
     final avatar = (cur['avatar_url'] ?? '').toString();
     final overlap = _overlapHint(cur);
+    final sportChips = _sportOverlayChips(cur);
 
     final theme = Theme.of(context);
     final gradientHeight =
@@ -2714,9 +2704,20 @@ class _SwipePageState extends State<SwipePage> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Stack(
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                        color: Colors.black.withValues(alpha: 0.10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Stack(
                     fit: StackFit.expand,
                     children: [
                       ColoredBox(
@@ -2736,7 +2737,7 @@ class _SwipePageState extends State<SwipePage> {
                           fit: BoxFit.cover,
                           width: constraints.maxWidth,
                           height: constraints.maxHeight,
-                          errorBuilder: (_, __, ___) => Center(
+                          errorBuilder: (context, error, stackTrace) => Center(
                             child: Icon(
                               Icons.broken_image_outlined,
                               size: 64,
@@ -2814,7 +2815,7 @@ class _SwipePageState extends State<SwipePage> {
                                 ),
                               ],
                             ),
-                            if (_sportOverlayChips(cur).isNotEmpty) ...[
+                            if (sportChips.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               Text(
                                 'Sports',
@@ -2825,7 +2826,7 @@ class _SwipePageState extends State<SwipePage> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Wrap(children: _sportOverlayChips(cur)),
+                              Wrap(children: sportChips),
                             ],
                             if (overlap.isNotEmpty) ...[
                               const SizedBox(height: 10),
@@ -2868,6 +2869,7 @@ class _SwipePageState extends State<SwipePage> {
                         ),
                     ],
                   ),
+                ),
                 );
               },
             ),

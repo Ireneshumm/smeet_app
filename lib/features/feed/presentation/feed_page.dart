@@ -5,6 +5,7 @@ import 'package:smeet_app/features/feed/data/mock_feed_repository.dart';
 import 'package:smeet_app/features/feed/data/supabase_feed_repository.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
 import 'package:smeet_app/features/feed/presentation/feed_detail_page.dart';
+import 'package:smeet_app/widgets/app_page_states.dart';
 
 /// Data source for the feed list (toggle without leaving the page).
 enum FeedListDataSource {
@@ -78,18 +79,7 @@ class _FeedPageState extends State<FeedPage> {
     });
   }
 
-  IconData _iconFor(FeedContentType t) {
-    switch (t) {
-      case FeedContentType.post:
-        return Icons.article_outlined;
-      case FeedContentType.video:
-        return Icons.play_circle_outline;
-      case FeedContentType.game:
-        return Icons.sports_tennis;
-    }
-  }
-
-  String _badge(FeedContentType t) {
+  static String _badge(FeedContentType t) {
     switch (t) {
       case FeedContentType.post:
         return 'Post';
@@ -97,6 +87,77 @@ class _FeedPageState extends State<FeedPage> {
         return 'Video';
       case FeedContentType.game:
         return 'Game';
+    }
+  }
+
+  /// One-line meta: time / spots / venue / length — kept calm for Live placeholders.
+  static String _keyInfoLine(FeedItem item) {
+    final parts = <String>[];
+    if (item.type == FeedContentType.video &&
+        (item.durationLabel?.trim().isNotEmpty ?? false)) {
+      parts.add(item.durationLabel!.trim());
+    }
+    final sub = item.subtitle.trim();
+    if (sub.isNotEmpty) parts.add(sub);
+    final venue = item.gameVenue?.trim();
+    if (venue != null && venue.isNotEmpty) {
+      if (!parts.any((p) => p.contains(venue))) parts.add(venue);
+    }
+    return parts.join(' · ');
+  }
+
+  /// Large word on gradient placeholder (sport name for games).
+  static String _coverHeroWord(FeedItem item) {
+    switch (item.type) {
+      case FeedContentType.game:
+        final t = item.title.split('·').first.trim();
+        return t.isEmpty ? 'Game' : t;
+      case FeedContentType.post:
+        return 'Post';
+      case FeedContentType.video:
+        return 'Video';
+    }
+  }
+
+  static List<Color> _coverGradient(FeedContentType type, ColorScheme cs) {
+    switch (type) {
+      case FeedContentType.game:
+        return [
+          cs.primary.withValues(alpha: 0.82),
+          cs.primary.withValues(alpha: 0.52),
+        ];
+      case FeedContentType.post:
+        return [
+          cs.secondary.withValues(alpha: 0.72),
+          cs.secondary.withValues(alpha: 0.48),
+        ];
+      case FeedContentType.video:
+        return [
+          cs.tertiary.withValues(alpha: 0.78),
+          cs.tertiary.withValues(alpha: 0.52),
+        ];
+    }
+  }
+
+  static Color _typeChipBackground(FeedContentType t, ColorScheme cs) {
+    switch (t) {
+      case FeedContentType.game:
+        return cs.primaryContainer;
+      case FeedContentType.post:
+        return cs.secondaryContainer;
+      case FeedContentType.video:
+        return cs.tertiaryContainer;
+    }
+  }
+
+  static Color _typeChipForeground(FeedContentType t, ColorScheme cs) {
+    switch (t) {
+      case FeedContentType.game:
+        return cs.onPrimaryContainer;
+      case FeedContentType.post:
+        return cs.onSecondaryContainer;
+      case FeedContentType.video:
+        return cs.onTertiaryContainer;
     }
   }
 
@@ -109,93 +170,154 @@ class _FeedPageState extends State<FeedPage> {
   }
 
   Widget _feedItemCard(ThemeData theme, FeedItem item) {
-    return Card(
+    final cs = theme.colorScheme;
+    final url = item.coverImageUrl?.trim();
+    final hasCover = url != null && url.isNotEmpty;
+    final keyLine = _keyInfoLine(item);
+    final hero = _coverHeroWord(item);
+
+    return Material(
+      color: cs.surface,
+      elevation: 1.5,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _openDetail(item),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  _iconFor(item.type),
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.82,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (hasCover)
+                    Image.network(
+                      url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _FeedGradientCover(
+                        gradientColors: _coverGradient(item.type, cs),
+                        heroText: hero,
+                        showHero: true,
+                      ),
+                    )
+                  else
+                    _FeedGradientCover(
+                      gradientColors: _coverGradient(item.type, cs),
+                      heroText: hero,
+                      showHero: true,
+                    ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 76,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.5),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: _FeedTypeChip(
+                      label: _badge(item.type),
+                      backgroundColor:
+                          _typeChipBackground(item.type, cs).withValues(
+                        alpha: 0.94,
+                      ),
+                      foregroundColor: _typeChipForeground(item.type, cs),
+                    ),
+                  ),
+                  if (item.type == FeedContentType.video &&
+                      (item.durationLabel?.trim().isNotEmpty ?? false))
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
+                            vertical: 4,
                           ),
                           child: Text(
-                            _badge(item.type),
+                            item.durationLabel!.trim(),
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        if (item.durationLabel != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            item.durationLabel!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
+                  if (keyLine.isNotEmpty)
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 10,
+                      child: Text(
+                        keyLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          fontWeight: FontWeight.w600,
+                          shadows: const [
+                            Shadow(
+                              blurRadius: 8,
+                              color: Colors.black45,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                    ),
+                  ),
+                  if (item.subtitle.trim().isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      item.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       item.subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
+                        height: 1.35,
                       ),
                     ),
-                    if (item.gameVenue != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        item.gameVenue!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.outline,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -215,7 +337,7 @@ class _FeedPageState extends State<FeedPage> {
         children: [
           if (_usesToggle)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: SegmentedButton<FeedListDataSource>(
                 segments: const [
                   ButtonSegment<FeedListDataSource>(
@@ -237,15 +359,16 @@ class _FeedPageState extends State<FeedPage> {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
             child: Text(
               !_usesToggle
                   ? 'Using a custom feed source for this screen.'
                   : _source == FeedListDataSource.supabase
-                      ? 'Showing upcoming games from your project.'
-                      : 'Preview mode: sample cards for layout only.',
+                      ? 'Upcoming games from your project.'
+                      : 'Preview: sample cards for layout.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.9),
+                height: 1.35,
               ),
             ),
           ),
@@ -258,12 +381,10 @@ class _FeedPageState extends State<FeedPage> {
 
                 if (snapshot.connectionState != ConnectionState.done) {
                   slivers.add(
-                    SliverFillRemaining(
+                    const SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: cs.primary,
-                        ),
+                      child: AppLoadingState(
+                        message: 'Loading feed…',
                       ),
                     ),
                   );
@@ -271,7 +392,13 @@ class _FeedPageState extends State<FeedPage> {
                   slivers.add(
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _FeedErrorState(onRetry: _reload),
+                      child: AppErrorState(
+                        message: 'We couldn’t load the feed',
+                        detail:
+                            'Check your connection, pull down to refresh, or tap Retry.',
+                        onRetry: _reload,
+                        retryLabel: 'Retry',
+                      ),
                     ),
                   );
                 } else {
@@ -280,23 +407,29 @@ class _FeedPageState extends State<FeedPage> {
                     slivers.add(
                       SliverFillRemaining(
                         hasScrollBody: false,
-                        child: _EmptyFeedState(
-                          isMock: isMock,
-                          onRetry: _reload,
+                        child: AppEmptyState(
+                          title: isMock
+                              ? 'Nothing to preview yet'
+                              : 'Nothing to show yet',
+                          subtitle: isMock
+                              ? 'Sample cards will show when preview data is ready. Pull to refresh anytime.'
+                              : 'No upcoming games right now. Check back later, or open Preview for sample cards.',
+                          icon: isMock
+                              ? Icons.auto_awesome_outlined
+                              : Icons.sports_tennis,
+                          actionLabel: 'Refresh',
+                          onAction: _reload,
                         ),
                       ),
                     );
                   } else {
                     slivers.add(
                       SliverPadding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 12,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, i) => Padding(
-                              padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                              padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
                               child: _feedItemCard(theme, items[i]),
                             ),
                             childCount: items.length,
@@ -323,122 +456,76 @@ class _FeedPageState extends State<FeedPage> {
   }
 }
 
-class _FeedErrorState extends StatelessWidget {
-  const _FeedErrorState({required this.onRetry});
+class _FeedGradientCover extends StatelessWidget {
+  const _FeedGradientCover({
+    required this.gradientColors,
+    required this.heroText,
+    required this.showHero,
+  });
 
-  final VoidCallback onRetry;
+  final List<Color> gradientColors;
+  final String heroText;
+  final bool showHero;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: 56,
-              color: cs.outline,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'We couldn’t load the feed',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check your connection, then pull down to refresh or tap Retry.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Pull down to refresh.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors.length >= 2
+              ? gradientColors
+              : [gradientColors.first, gradientColors.first],
         ),
       ),
+      child: showHero
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  heroText,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                        letterSpacing: -0.5,
+                      ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
 
-class _EmptyFeedState extends StatelessWidget {
-  const _EmptyFeedState({
-    required this.isMock,
-    required this.onRetry,
+class _FeedTypeChip extends StatelessWidget {
+  const _FeedTypeChip({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
   });
 
-  final bool isMock;
-  final VoidCallback onRetry;
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Center(
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isMock ? Icons.auto_awesome_outlined : Icons.sports_tennis,
-              size: 56,
-              color: cs.outline,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isMock ? 'Nothing to preview yet' : 'Nothing to show yet',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: foregroundColor,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isMock
-                  ? 'Sample cards will appear here when preview data is available. You can pull to refresh or retry.'
-                  : 'There aren’t any upcoming games to list right now. Check back later, or use Preview to see sample cards.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Pull down to refresh.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
         ),
       ),
     );
