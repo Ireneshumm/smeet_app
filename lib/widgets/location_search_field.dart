@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Matches `SmeetTheme.smeetMint` in `main.dart` (avoid importing `main.dart`).
+/// Matches `SmeetApp.smeetMint` in `app/smeet_app.dart` (avoid importing `main.dart`).
 const Color kSmeetMint = Color(0xFF56CDBE);
 
 class LocationResult {
