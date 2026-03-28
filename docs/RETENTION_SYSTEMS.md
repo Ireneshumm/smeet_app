@@ -1,5 +1,17 @@
 # Retention systems (Smeet)
 
+工程说明：数据库对象、客户端服务与扩展点。发布边界与商店口径见 [`RELEASE_AND_GREY_SCOPE.md`](./RELEASE_AND_GREY_SCOPE.md)。
+
+**相关文档**
+
+| 文档 | 用途 |
+|------|------|
+| [`SUPABASE_RETENTION_HANDTEST.md`](./SUPABASE_RETENTION_HANDTEST.md) | 目标环境 migration 核对 SQL、五项手测记录表 |
+| [`RETENTION_HANDTEST_SCRIPT.md`](./RETENTION_HANDTEST_SCRIPT.md) | 五项逐步手测脚本 |
+| [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) | Release `--dart-define`、占位符校验（`supabase_env.dart`） |
+
+---
+
 ## Database (migration `20260328120000_retention_systems.sql`)
 
 ### Tables
@@ -35,6 +47,8 @@
 - `swipes` (like) → `incoming_like` for recipient if not yet mutual and not duplicate.
 - `matches` (insert) → `mutual_match` for both users; marks related `incoming_like` rows read.
 
+---
+
 ## Flutter services
 
 - `lib/core/services/app_notification_badges.dart` — shell badge notifiers + `refreshAppNotificationBadges` / `clearAppNotificationBadges`.
@@ -43,19 +57,34 @@
 - `lib/core/services/profile_identity_service.dart` — `get_identity_stats` + `computeBadgeLabels` (Dart rules).
 - `lib/core/services/entitlements_service.dart` — read map for future gating.
 
+---
+
 ## Badge rules (Dart)
 
 Defined in `computeBadgeLabels` in `profile_identity_service.dart`: e.g. New Player (no games), Weekly Hitter (≥2 sessions this month), Social Starter (≥1 match), Game Organizer (≥1 hosted), Regular (≥5 joined). Adjust thresholds there.
+
+---
 
 ## Merchant / membership hooks
 
 - **Account/host typing:** `profiles.account_type`, `games.host_type` / `host_org_id` for future dashboards and listings.
 - **Entitlements:** add rows to `user_entitlements` when billing exists; gate features in Dart via `EntitlementsService` (default: allow all if no row).
 
+---
+
 ## Manual Supabase setup
 
 1. Apply migration: `supabase db push` or run the SQL file in the SQL Editor.
-2. Enable **Realtime** for `user_notifications` if publication step did not apply (Dashboard → Database → Replication).
+2. Confirm objects with [`SUPABASE_RETENTION_HANDTEST.md`](./SUPABASE_RETENTION_HANDTEST.md) (migration 核对步骤).
+3. Enable **Realtime** for `user_notifications` if the publication step did not apply (Dashboard → Database → Replication).
+
+---
+
+## Release client config
+
+Release builds must pass real `SUPABASE_URL` and `SUPABASE_ANON_KEY` via `--dart-define`; placeholder-like values are rejected at startup (`lib/core/config/supabase_env.dart`). See [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) §1.1.
+
+---
 
 ## Follow-ups
 
