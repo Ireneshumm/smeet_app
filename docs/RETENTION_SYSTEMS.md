@@ -25,6 +25,7 @@
 ### Columns added
 
 - `profiles.account_type` — `player` (default), `coach`, `club`, `venue`, `organizer`, `brand`.
+- `profiles.swipe_intro_video_url` — optional HTTPS URL for Swipe card video (see `20260329103000_profiles_swipe_intro_video_url.sql`); else latest video post, else avatar.
 - `games.host_type` — default `player`; `games.host_org_id` nullable for future org-hosted games.
 
 ### Notification types

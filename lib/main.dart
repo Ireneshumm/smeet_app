@@ -19,7 +19,9 @@ import 'package:smeet_app/core/widgets/game_urgency_chip.dart';
 import 'package:smeet_app/core/services/app_notification_badges.dart';
 import 'package:smeet_app/core/services/user_notifications_repository.dart';
 import 'package:smeet_app/core/services/game_event_notification_service.dart';
+import 'package:smeet_app/core/services/swipe_candidate_media_service.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
+import 'package:smeet_app/widgets/swipe_card_hero_media.dart';
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/game_balance.dart';
 import 'package:smeet_app/geo_utils.dart';
@@ -2595,11 +2597,14 @@ class _SwipePageState extends State<SwipePage> {
     final raw = await supabase
         .from('profiles')
         .select(
-          'id, display_name, city, intro, avatar_url, sport_levels, availability',
+          'id, display_name, city, intro, avatar_url, sport_levels, availability, swipe_intro_video_url',
         )
         .limit(50);
 
     _candidates = (raw as List).cast<Map<String, dynamic>>();
+    await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(
+      _candidates,
+    );
   }
 
   // 判断：是否有共同运动
@@ -2634,7 +2639,7 @@ class _SwipePageState extends State<SwipePage> {
     final raw = await supabase
         .from('profiles')
         .select(
-          'id, display_name, city, intro, avatar_url, sport_levels, availability',
+          'id, display_name, city, intro, avatar_url, sport_levels, availability, swipe_intro_video_url',
         )
         .neq('id', u.id)
         .limit(50);
@@ -2657,6 +2662,10 @@ class _SwipePageState extends State<SwipePage> {
       return !blockSets.iBlocked.contains(id) &&
           !blockSets.blockedMe.contains(id);
     }).toList();
+
+    await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(
+      filtered,
+    );
 
     _candidates = filtered;
   }
@@ -3019,6 +3028,9 @@ class _SwipePageState extends State<SwipePage> {
     final city = (cur['city'] ?? '').toString();
     final intro = (cur['intro'] ?? '').toString();
     final avatar = (cur['avatar_url'] ?? '').toString();
+    final swipeRv = cur['_swipe_resolved_video_url']?.toString().trim();
+    final resolvedSwipeVideo =
+        (swipeRv != null && swipeRv.isNotEmpty) ? swipeRv : null;
     final overlap = _overlapHint(cur);
     final sportChips = _sportOverlayChips(cur);
 
@@ -3081,28 +3093,16 @@ class _SwipePageState extends State<SwipePage> {
                       ColoredBox(
                         color: cs.surfaceContainerHighest,
                       ),
-                      if (avatar.isEmpty)
-                        Center(
-                          child: Icon(
-                            Icons.person_rounded,
-                            size: 96,
-                            color: cs.primary.withValues(alpha: 0.35),
+                      Positioned.fill(
+                        child: SwipeCardHeroMedia(
+                          key: ValueKey(
+                            'swipe_media_${cur['id']?.toString() ?? ''}',
                           ),
-                        )
-                      else
-                        Image.network(
-                          avatar,
-                          fit: BoxFit.cover,
-                          width: constraints.maxWidth,
-                          height: constraints.maxHeight,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Icon(
-                              Icons.broken_image_outlined,
-                              size: 64,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
+                          candidateKey: cur['id']?.toString() ?? '',
+                          resolvedVideoUrl: resolvedSwipeVideo,
+                          avatarUrl: avatar,
                         ),
+                      ),
                       Positioned(
                         left: 0,
                         right: 0,
