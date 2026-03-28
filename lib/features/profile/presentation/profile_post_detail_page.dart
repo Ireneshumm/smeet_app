@@ -185,3 +185,113 @@ class ProfilePostDetailBody extends StatelessWidget {
     );
   }
 }
+
+/// Opens from a full [posts] row (grid tap). [onDeleted] runs after successful delete before pop.
+class UnifiedProfilePostDetailPage extends StatefulWidget {
+  const UnifiedProfilePostDetailPage({
+    super.key,
+    required this.initialRow,
+    this.onDeleted,
+  });
+
+  final Map<String, dynamic> initialRow;
+  final VoidCallback? onDeleted;
+
+  @override
+  State<UnifiedProfilePostDetailPage> createState() =>
+      _UnifiedProfilePostDetailPageState();
+}
+
+class _UnifiedProfilePostDetailPageState
+    extends State<UnifiedProfilePostDetailPage> {
+  final PostsService _posts = PostsService();
+  bool _deleting = false;
+
+  String get _title {
+    final c = (widget.initialRow['caption'] as String?)?.trim() ?? '';
+    if (c.isEmpty) return 'Post';
+    return c.length > 48 ? '${c.substring(0, 45)}…' : c;
+  }
+
+  bool get _isOwner {
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    final aid = widget.initialRow['author_id']?.toString();
+    return me != null && aid != null && me == aid;
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this post?'),
+        content: const Text(
+          'This removes the post from your profile. Media files in storage may remain until cleaned up separately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final id = widget.initialRow['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _posts.deletePost(id);
+      if (!mounted) return;
+      widget.onDeleted?.call();
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Post deleted')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Couldn’t delete: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          if (_isOwner)
+            _deleting
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    tooltip: 'Delete',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _confirmDelete,
+                  ),
+        ],
+      ),
+      body: ProfilePostDetailBody(row: widget.initialRow),
+    );
+  }
+}

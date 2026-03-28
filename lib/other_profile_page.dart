@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/features/profile/presentation/profile_post_detail_page.dart';
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/block_user_confirm_dialog.dart';
-import 'package:smeet_app/widgets/post_media_display.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
+import 'package:smeet_app/widgets/profile_posts_grid.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 
 Widget _availabilityWidget(dynamic availability) {
@@ -49,10 +51,20 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
   bool _theyBlocked = false;
   bool _busy = false;
 
+  final PostsService _postsService = PostsService();
+  late Future<List<Map<String, dynamic>>> _postsFuture;
+
   @override
   void initState() {
     super.initState();
+    _postsFuture = _postsService.fetchPostsForAuthor(widget.userId);
     _loadBlockState();
+  }
+
+  void _refreshPosts() {
+    setState(() {
+      _postsFuture = _postsService.fetchPostsForAuthor(widget.userId);
+    });
   }
 
   Future<void> _loadBlockState() async {
@@ -135,16 +147,6 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
         )
         .eq('id', widget.userId)
         .maybeSingle();
-  }
-
-  Future<List<Map<String, dynamic>>> _loadPosts() async {
-    final data = await Supabase.instance.client
-        .from('posts')
-        .select('id, caption, media_type, media_urls, created_at, author_id')
-        .eq('author_id', widget.userId)
-        .order('created_at', ascending: false)
-        .limit(24);
-    return (data as List).cast<Map<String, dynamic>>();
   }
 
   @override
@@ -385,7 +387,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                   ),
                   const SizedBox(height: 12),
                   FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _loadPosts(),
+                    future: _postsFuture,
                     builder: (context, postSnap) {
                       if (postSnap.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -402,29 +404,17 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                       if (posts.isEmpty) {
                         return const Text('No posts yet.');
                       }
-                      return GridView.builder(
+                      return ProfilePostsGrid(
                         shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 4 / 5,
-                        ),
-                        itemCount: posts.length,
-                        itemBuilder: (context, i) {
-                          final post = posts[i];
-                          final urls = (post['media_urls'] as List?) ?? [];
-                          final first =
-                              urls.isEmpty ? '' : urls.first.toString();
-                          final type =
-                              (post['media_type'] ?? 'image').toString();
-                          final cap = (post['caption'] ?? '').toString();
-                          return _PostPreviewTile(
-                            imageUrl: first,
-                            mediaType: type,
-                            caption: cap,
+                        posts: posts,
+                        onOpenPost: (post) {
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => UnifiedProfilePostDetailPage(
+                                initialRow: post,
+                                onDeleted: _refreshPosts,
+                              ),
+                            ),
                           );
                         },
                       );
@@ -464,94 +454,6 @@ class _ReportUserActionButton extends StatelessWidget {
           targetUserId: targetUserId,
         );
       },
-    );
-  }
-}
-
-class _PostPreviewTile extends StatelessWidget {
-  const _PostPreviewTile({
-    required this.imageUrl,
-    required this.mediaType,
-    required this.caption,
-  });
-
-  final String imageUrl;
-  final String mediaType;
-  final String caption;
-
-  @override
-  Widget build(BuildContext context) {
-    final isVideo = mediaType.toLowerCase() == 'video';
-    final cs = Theme.of(context).colorScheme;
-
-    return Material(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(kPostMediaThumbRadius),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Post'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (isVideo && imageUrl.isNotEmpty)
-                      PostMediaDetailVideo(url: imageUrl)
-                    else if (imageUrl.isNotEmpty)
-                      PostMediaDetailImages(urls: [imageUrl])
-                    else
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Text(
-                          'No media',
-                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    if (caption.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(caption),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: PostMediaGridCell(
-                imageUrl: isVideo ? '' : imageUrl,
-                isVideo: isVideo,
-              ),
-            ),
-            if (caption.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                child: Text(
-                  caption,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

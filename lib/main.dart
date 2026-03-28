@@ -31,7 +31,7 @@ import 'package:smeet_app/widgets/app_page_states.dart';
 import 'package:smeet_app/widgets/match_relationship_card.dart';
 import 'package:smeet_app/widgets/legal_section_card.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
-import 'package:smeet_app/widgets/post_media_display.dart';
+import 'package:smeet_app/widgets/profile_posts_grid.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 import 'package:smeet_app/widgets/signup_legal_agreement.dart';
 import 'package:smeet_app/features/feed/feed.dart';
@@ -5601,44 +5601,22 @@ class _ProfilePageState extends State<ProfilePage> {
                                 );
                               }
 
-                              return ListView.builder(
-                                itemCount: posts.length,
-                                itemBuilder: (context, i) {
-                                  final p = posts[i];
-
-                                  final caption = (p['caption'] ?? '')
-                                      .toString();
-                                  final type = (p['media_type'] ?? 'image')
-                                      .toString()
-                                      .toLowerCase();
-
-                                  final List mediaUrls =
-                                      (p['media_urls'] ?? []) as List;
-                                  final String url = mediaUrls.isNotEmpty
-                                      ? mediaUrls.first.toString()
-                                      : '';
-
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary.withOpacity(0.10),
+                              return ProfilePostsGrid(
+                                posts: posts,
+                                padding: const EdgeInsets.only(bottom: 8),
+                                onOpenPost: (p) async {
+                                  await Navigator.of(context).push<void>(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          UnifiedProfilePostDetailPage(
+                                        initialRow: p,
+                                        onDeleted: () {
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _myPostsFuture = _fetchMyPosts();
+                                          });
+                                        },
                                       ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        PostProfileListMedia(type: type, url: url),
-
-                                        const SizedBox(height: 10),
-                                        Text(caption),
-                                      ],
                                     ),
                                   );
                                 },

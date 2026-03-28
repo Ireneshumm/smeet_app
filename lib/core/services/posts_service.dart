@@ -25,8 +25,6 @@ class PostsService {
     return (data as List).cast<Map<String, dynamic>>();
   }
 
-  /// Single row by [postId], same columns as [myPostsSelectColumns].
-  /// Returns `null` when missing, RLS denies, or the request fails.
   /// Public posts for a profile (e.g. other user). Newest first.
   Future<List<Map<String, dynamic>>> fetchPostsForAuthor(
     String authorId, {
@@ -50,6 +48,8 @@ class PostsService {
     await _client.from('posts').delete().eq('id', postId).eq('author_id', u.id);
   }
 
+  /// Single row by [postId], same columns as [myPostsSelectColumns].
+  /// Returns `null` when missing, RLS denies, or the request fails.
   Future<Map<String, dynamic>?> fetchPostById(String postId) async {
     try {
       final data = await _client
