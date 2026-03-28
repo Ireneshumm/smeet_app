@@ -3,7 +3,7 @@
 本文档用于在**目标 Supabase 项目**上记录：migration 是否已执行，以及五项 retention 能力的手测结论。  
 **说明**：仓库内无法代连你的生产/灰度库；下表「手测结果」须由你在目标环境填完。
 
-**逐步执行脚本**（前置、造数、点击路径、预期、分层排查、关键文件）：见 [`RETENTION_HANDTEST_SCRIPT.md`](./RETENTION_HANDTEST_SCRIPT.md)。
+**逐步执行脚本**：[`RETENTION_HANDTEST_SCRIPT.md`](./RETENTION_HANDTEST_SCRIPT.md)。**测试员执行记录模板**：[`RETENTION_HANDTEST_RECORD_TEMPLATE.md`](./RETENTION_HANDTEST_RECORD_TEMPLATE.md)。
 
 ---
 

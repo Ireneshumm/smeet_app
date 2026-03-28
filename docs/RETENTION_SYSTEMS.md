@@ -8,6 +8,7 @@
 |------|------|
 | [`SUPABASE_RETENTION_HANDTEST.md`](./SUPABASE_RETENTION_HANDTEST.md) | 目标环境 migration 核对 SQL、五项手测记录表 |
 | [`RETENTION_HANDTEST_SCRIPT.md`](./RETENTION_HANDTEST_SCRIPT.md) | 五项逐步手测脚本 |
+| [`RETENTION_HANDTEST_RECORD_TEMPLATE.md`](./RETENTION_HANDTEST_RECORD_TEMPLATE.md) | 测试员执行记录模板 |
 | [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) | Release `--dart-define`、占位符校验（`supabase_env.dart`） |
 
 ---

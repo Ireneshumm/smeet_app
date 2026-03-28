@@ -1171,6 +1171,16 @@ class _HomePageState extends State<HomePage> {
     return (startsAt: startsAt, endsAt: endsAt);
   }
 
+  /// One-line summary for the When block (e.g. Sat, Mar 30 · 7:00 PM – 9:00 PM).
+  String _whenSummaryLine(BuildContext context) {
+    final sched = _computeGameSchedule();
+    if (sched == null) return '';
+    final d = DateFormat('EEE, MMM d').format(sched.startsAt);
+    final a = DateFormat.jm().format(sched.startsAt);
+    final b = DateFormat.jm().format(sched.endsAt);
+    return '$d · $a – $b';
+  }
+
   /// Sync checks for Create Game (after [FormState.validate]). Returns a user-facing message or null.
   String? _validateCreateGameFields() {
     if (_sport.trim().isEmpty) {
@@ -1526,17 +1536,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    String dateLabel;
-    if (_gameDate == null) {
-      dateLabel = 'Select date';
-    } else {
-      final dt = _gameDate!;
-      final y = dt.year.toString().padLeft(4, '0');
-      final m = dt.month.toString().padLeft(2, '0');
-      final d = dt.day.toString().padLeft(2, '0');
-      dateLabel = '$y-$m-$d';
-    }
-
     String startLabel =
         _startTime == null ? 'Select start time' : _startTime!.format(context);
     String endLabel =
@@ -1632,69 +1631,188 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // Game date
-            _SectionCard(
-              child: InkWell(
-                onTap: _pickGameDate,
-                borderRadius: BorderRadius.circular(14),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Game date',
-                    border: OutlineInputBorder(),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today_outlined),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(dateLabel)),
-                      const Icon(Icons.chevron_right),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Start / end time
+            // When: date + start/end (single block)
             _SectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  InkWell(
-                    onTap: _pickStartTime,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Start time',
-                        border: OutlineInputBorder(),
+                  Text(
+                    'When',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_computeGameSchedule() != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.primary.withOpacity(0.2)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.schedule),
+                          Icon(
+                            Icons.event_available_outlined,
+                            size: 18,
+                            color: cs.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _whenSummaryLine(context),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  InkWell(
+                    onTap: _pickGameDate,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 2,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 20,
+                            color: cs.primary,
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(startLabel)),
-                          const Icon(Icons.chevron_right),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Date',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: cs.onSurface.withOpacity(0.65),
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _gameDate == null
+                                      ? 'Select date'
+                                      : DateFormat(
+                                          'EEE, MMM d',
+                                        ).format(_gameDate!),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: cs.onSurface.withOpacity(0.45),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: _pickEndTime,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'End time',
-                        border: OutlineInputBorder(),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: _pickStartTime,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: cs.outline.withOpacity(0.35),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Start',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: cs.onSurface.withOpacity(0.65),
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  startLabel,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.schedule_outlined),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(endLabel)),
-                          const Icon(Icons.chevron_right),
-                        ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: _pickEndTime,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: cs.outline.withOpacity(0.35),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'End',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: cs.onSurface.withOpacity(0.65),
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  endLabel,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -5279,6 +5397,7 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         }
         final safeH = _profileTabSafeHeight(constraints, context);
+        final identityUser = Supabase.instance.client.auth.currentUser;
 
         return SizedBox(
           height: safeH,
@@ -5352,8 +5471,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              const SizedBox(height: 12),
-              ProfileIdentitySection(userId: u.id),
+              if (identityUser != null) ...[
+                const SizedBox(height: 12),
+                ProfileIdentitySection(userId: identityUser.id),
+              ],
               const SizedBox(height: 12),
 
               // Tabs

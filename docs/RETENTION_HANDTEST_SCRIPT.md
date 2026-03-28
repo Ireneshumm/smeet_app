@@ -1,7 +1,8 @@
 # Retention 五项 — 逐步手测执行脚本
 
 面向：**目标 Supabase 已应用** `supabase/migrations/20260328120000_retention_systems.sql` 后的联调。  
-每步可配合 `docs/SUPABASE_RETENTION_HANDTEST.md` 记录 Pass/Fail。
+**测试员填写**：[`RETENTION_HANDTEST_RECORD_TEMPLATE.md`](./RETENTION_HANDTEST_RECORD_TEMPLATE.md)。  
+Migration 核对：`docs/SUPABASE_RETENTION_HANDTEST.md`。
 
 ---
 
