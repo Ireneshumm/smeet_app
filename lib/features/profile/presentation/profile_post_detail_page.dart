@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/services/posts_service.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
@@ -49,15 +50,16 @@ class _ProfileMvpPostDetailPageState extends State<ProfileMvpPostDetailPage> {
               ),
             );
           }
-          return _PostDetailBody(row: row);
+          return ProfilePostDetailBody(row: row);
         },
       ),
     );
   }
 }
 
-class _PostDetailBody extends StatelessWidget {
-  const _PostDetailBody({required this.row});
+/// Shared body for post detail (media + caption + meta).
+class ProfilePostDetailBody extends StatelessWidget {
+  const ProfilePostDetailBody({super.key, required this.row});
 
   final Map<String, dynamic> row;
 

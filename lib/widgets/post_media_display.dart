@@ -612,7 +612,15 @@ class PostMediaGridCell extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (isVideo)
+              if (isVideo && imageUrl.isNotEmpty)
+                Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.92),
+                  ),
+                )
+              else if (isVideo)
                 ColoredBox(color: Colors.black.withValues(alpha: 0.92))
               else if (imageUrl.isNotEmpty)
                 Image.network(

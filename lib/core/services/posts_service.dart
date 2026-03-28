@@ -27,6 +27,29 @@ class PostsService {
 
   /// Single row by [postId], same columns as [myPostsSelectColumns].
   /// Returns `null` when missing, RLS denies, or the request fails.
+  /// Public posts for a profile (e.g. other user). Newest first.
+  Future<List<Map<String, dynamic>>> fetchPostsForAuthor(
+    String authorId, {
+    int limit = 24,
+  }) async {
+    final data = await _client
+        .from('posts')
+        .select(myPostsSelectColumns)
+        .eq('author_id', authorId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Deletes a post row; requires RLS allowing delete for own rows. Storage blobs are not removed here.
+  Future<void> deletePost(String postId) async {
+    final u = _client.auth.currentUser;
+    if (u == null) {
+      throw StateError('Not signed in');
+    }
+    await _client.from('posts').delete().eq('id', postId).eq('author_id', u.id);
+  }
+
   Future<Map<String, dynamic>?> fetchPostById(String postId) async {
     try {
       final data = await _client
