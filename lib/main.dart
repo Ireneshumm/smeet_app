@@ -14,6 +14,12 @@ import 'package:smeet_app/core/services/chat_conversation_list_service.dart';
 import 'package:smeet_app/core/services/joined_games_service.dart';
 import 'package:smeet_app/core/services/media_upload_service.dart';
 import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/core/formatting/game_countdown.dart';
+import 'package:smeet_app/core/widgets/game_urgency_chip.dart';
+import 'package:smeet_app/core/services/app_notification_badges.dart';
+import 'package:smeet_app/core/services/user_notifications_repository.dart';
+import 'package:smeet_app/core/services/game_event_notification_service.dart';
+import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/game_balance.dart';
 import 'package:smeet_app/geo_utils.dart';
@@ -1056,10 +1062,15 @@ class _HomePageState extends State<HomePage> {
     return out;
   }
 
+  Timer? _countdownTick;
+
   @override
   void initState() {
     super.initState();
     _gamesStream = _fetchGamesStream();
+    _countdownTick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   /// Recreate the games stream after an error (lightweight retry).
@@ -1079,6 +1090,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _countdownTick?.cancel();
     _scrollCtrl.dispose();
     _courtFeeCtrl.dispose();
     super.dispose();
@@ -1984,6 +1996,17 @@ class _HomePageState extends State<HomePage> {
                     final sportLevelLine = gameLevel.isEmpty
                         ? sport.toString()
                         : '$sport • $gameLevel';
+                    final now = DateTime.now();
+                    final countdownLine = formatGameCountdownLine(
+                      startsAt: startsAt,
+                      endsAt: endsAt,
+                      now: now,
+                    );
+                    final urgency = buildGameUrgencyChip(
+                      players: players,
+                      joinedCount: joined,
+                      cs: Theme.of(context).colorScheme,
+                    );
 
                     return Container(
                       width: double.infinity,
@@ -2011,12 +2034,21 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  sportLevelLine,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        sportLevelLine,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                    ),
+                                    if (urgency != null) urgency,
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -2034,6 +2066,21 @@ class _HomePageState extends State<HomePage> {
                                   style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(fontWeight: FontWeight.w600),
                                 ),
+                                if (countdownLine.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    countdownLine,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                  ),
+                                ],
                                 const SizedBox(height: 4),
                                 Text(
                                   suburb.isEmpty
@@ -2143,6 +2190,197 @@ class _SwipeMatchAvatar extends StatelessWidget {
                 color: cs.onPrimaryContainer,
               ),
             ),
+    );
+  }
+}
+
+/// Incoming likes (driven by [user_notifications] `incoming_like` rows).
+class LikesYouPage extends StatefulWidget {
+  const LikesYouPage({super.key});
+
+  @override
+  State<LikesYouPage> createState() => _LikesYouPageState();
+}
+
+class _LikesYouPageState extends State<LikesYouPage> {
+  final UserNotificationsRepository _notifRepo = UserNotificationsRepository();
+  Future<List<Map<String, dynamic>>>? _profilesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) {
+      setState(() => _profilesFuture = Future.value([]));
+      return;
+    }
+    setState(() {
+      _profilesFuture = _fetchProfiles(u.id);
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchProfiles(String uid) async {
+    final client = Supabase.instance.client;
+    final notifs = await client
+        .from('user_notifications')
+        .select('actor_user_id')
+        .eq('user_id', uid)
+        .eq('type', 'incoming_like')
+        .eq('is_read', false);
+    final ids = (notifs as List)
+        .map((e) => e['actor_user_id']?.toString())
+        .where((e) => e != null && e!.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+    if (ids.isEmpty) return [];
+    final profs = await client.from('profiles').select().inFilter('id', ids);
+    return (profs as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> _pass(Map<String, dynamic> p) async {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) return;
+    final peer = p['id'].toString();
+    await Supabase.instance.client.from('swipes').upsert(
+      {'from_user': u.id, 'to_user': peer, 'action': 'pass'},
+      onConflict: 'from_user,to_user',
+    );
+    await _notifRepo.markIncomingLikesFromUserRead(peer);
+    await refreshAppNotificationBadges();
+    _reload();
+  }
+
+  Future<void> _likeBack(Map<String, dynamic> p) async {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) return;
+    final peer = p['id'].toString();
+    final name = (p['display_name'] ?? 'Chat').toString();
+    final supabase = Supabase.instance.client;
+    try {
+      await supabase.from('swipes').upsert(
+        {'from_user': u.id, 'to_user': peer, 'action': 'like'},
+        onConflict: 'from_user,to_user',
+      );
+      final back = await supabase
+          .from('swipes')
+          .select('id')
+          .eq('from_user', peer)
+          .eq('to_user', u.id)
+          .eq('action', 'like')
+          .maybeSingle();
+
+      if (back != null) {
+        final a = u.id.compareTo(peer) < 0 ? u.id : peer;
+        final b = u.id.compareTo(peer) < 0 ? peer : u.id;
+        await supabase.from('matches').upsert({'user_a': a, 'user_b': b});
+        final chatRow =
+            await supabase.from('chats').insert({}).select('id').single();
+        final chatId = chatRow['id'];
+        await supabase.from('chat_members').insert([
+          {'chat_id': chatId, 'user_id': a},
+          {'chat_id': chatId, 'user_id': b},
+        ]);
+        if (!mounted) return;
+        await _notifRepo.markIncomingLikesFromUserRead(peer);
+        await refreshAppNotificationBadges();
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatRoomPage(
+              chatId: chatId.toString(),
+              title: name,
+              chatKind: 'direct',
+              directPeerUserId: peer,
+            ),
+          ),
+        );
+      }
+      _reload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_userFacingSwipeError(e))),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Likes you')),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _profilesFuture,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final list = snap.data ?? [];
+          if (list.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No new likes right now. Keep swiping!',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: list.length,
+            itemBuilder: (context, i) {
+              final p = list[i];
+              final name = (p['display_name'] ?? 'Someone').toString();
+              final city = (p['city'] ?? '').toString();
+              final av = (p['avatar_url'] ?? '').toString();
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage:
+                            av.isEmpty ? null : NetworkImage(av),
+                        child: av.isEmpty ? const Icon(Icons.person) : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(city.isEmpty ? '—' : city),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _pass(p),
+                        child: const Text('Pass'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () => _likeBack(p),
+                        child: const Text('Like back'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -2558,6 +2796,7 @@ class _SwipePageState extends State<SwipePage> {
       setState(() {
         _index += 1;
       });
+      unawaited(refreshAppNotificationBadges());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2953,11 +3192,15 @@ class MyGamePage extends StatefulWidget {
 
 class _MyGamePageState extends State<MyGamePage> {
   late Future<List<Map<String, dynamic>>> _myGamesFuture;
+  Timer? _countdownTick;
 
   @override
   void initState() {
     super.initState();
     _myGamesFuture = _fetchMyGames();
+    _countdownTick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -3031,6 +3274,12 @@ class _MyGamePageState extends State<MyGamePage> {
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
+  }
+
+  @override
+  void dispose() {
+    _countdownTick?.cancel();
+    super.dispose();
   }
 
   Future<void> _attachRoster(Map<String, dynamic> g) async {
@@ -3186,6 +3435,17 @@ class _MyGamePageState extends State<MyGamePage> {
                     (loc.split(',').first.trim().isEmpty
                         ? 'Game chat'
                         : loc.split(',').first.trim());
+            final playersCap = (g['players'] as num?)?.toInt() ?? 0;
+            final urgency = buildGameUrgencyChip(
+              players: playersCap,
+              joinedCount: joinedC,
+              cs: cs,
+            );
+            final countdownLine = formatGameCountdownLine(
+              startsAt: startsAt,
+              endsAt: endsAt,
+              now: DateTime.now(),
+            );
 
             final balance = balanceLabelForGroup(
               sportKey: sport,
@@ -3215,6 +3475,7 @@ class _MyGamePageState extends State<MyGamePage> {
                               ),
                         ),
                       ),
+                      if (urgency != null) ...[urgency, const SizedBox(width: 8)],
                       Text(
                         '\$${perPerson.toStringAsFixed(2)} each',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -3231,6 +3492,16 @@ class _MyGamePageState extends State<MyGamePage> {
                           fontWeight: FontWeight.w700,
                         ),
                   ),
+                  if (countdownLine.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      countdownLine,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: cs.primary,
+                          ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     startLine,
@@ -5081,6 +5352,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
+              const SizedBox(height: 12),
+              ProfileIdentitySection(userId: u.id),
               const SizedBox(height: 12),
 
               // Tabs

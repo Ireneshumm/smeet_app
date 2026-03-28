@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/block_user_confirm_dialog.dart';
 import 'package:smeet_app/widgets/post_media_display.dart';
+import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
 
 Widget _availabilityWidget(dynamic availability) {
@@ -318,6 +319,13 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                 if (intro.isNotEmpty && !_iBlocked) ...[
                   const SizedBox(height: 12),
                   Text(intro),
+                ],
+                if (!_iBlocked) ...[
+                  const SizedBox(height: 16),
+                  ProfileIdentitySection(
+                    userId: widget.userId,
+                    heading: 'Sports identity',
+                  ),
                 ],
                 const SizedBox(height: 16),
                 Align(

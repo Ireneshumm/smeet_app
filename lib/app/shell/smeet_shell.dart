@@ -71,6 +71,40 @@ class _SmeetShellState extends State<SmeetShell> {
   /// Avoid duplicate welcome SnackBars for the same signed-in user this session.
   String? _profileWelcomeSnackUserId;
 
+  StreamSubscription<List<Map<String, dynamic>>>? _retentionNotifSub;
+  Timer? _gameEventNotifTimer;
+
+  void _stopRetentionListeners() {
+    _retentionNotifSub?.cancel();
+    _retentionNotifSub = null;
+    _gameEventNotifTimer?.cancel();
+    _gameEventNotifTimer = null;
+  }
+
+  void _bindRetentionStreams() {
+    _stopRetentionListeners();
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) {
+      clearAppNotificationBadges();
+      return;
+    }
+    final repo = UserNotificationsRepository();
+    _retentionNotifSub = repo.watchMine().listen((_) {
+      unawaited(refreshAppNotificationBadges());
+    });
+    unawaited(refreshAppNotificationBadges());
+    _gameEventNotifTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted) return;
+      if (Supabase.instance.client.auth.currentUser == null) return;
+      unawaited(
+        GameEventNotificationService().runChecksForJoinedGames(_joinedLocal),
+      );
+    });
+    unawaited(
+      GameEventNotificationService().runChecksForJoinedGames(_joinedLocal),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +117,8 @@ class _SmeetShellState extends State<SmeetShell> {
       if (ev == AuthChangeEvent.signedOut) {
         _authResolveEpoch++;
         _authResolveQueued = false;
+        _stopRetentionListeners();
+        clearAppNotificationBadges();
         if (mounted) {
           setState(() {
             _phase = ShellAuthPhase.signedOut;
@@ -113,6 +149,7 @@ class _SmeetShellState extends State<SmeetShell> {
       _instance = null;
     }
     _authSub?.cancel();
+    _stopRetentionListeners();
     super.dispose();
   }
 
@@ -150,6 +187,8 @@ class _SmeetShellState extends State<SmeetShell> {
       debugPrint(
         '[shell_auth] no session → signedOut, reset tab to Home (was index=$_index)',
       );
+      _stopRetentionListeners();
+      clearAppNotificationBadges();
       setState(() {
         _phase = ShellAuthPhase.signedOut;
         _profileWelcomeSnackUserId = null;
@@ -172,6 +211,7 @@ class _SmeetShellState extends State<SmeetShell> {
       if (!mounted || startEpoch != _authResolveEpoch) return;
       // Fail open: keep app usable if RLS/network breaks profile read.
       setState(() => _phase = ShellAuthPhase.signedInProfileReady);
+      if (mounted) _bindRetentionStreams();
       return;
     }
 
@@ -202,6 +242,7 @@ class _SmeetShellState extends State<SmeetShell> {
     } else {
       setState(() => _phase = ShellAuthPhase.signedInProfileReady);
     }
+    if (mounted) _bindRetentionStreams();
   }
 
   Future<void> _syncJoinedFromDb() async {
@@ -278,6 +319,54 @@ class _SmeetShellState extends State<SmeetShell> {
         ProfilePage(key: ValueKey(_profileSessionKey)),
       ];
 
+  List<Widget>? _retentionAppBarActions(BuildContext context) {
+    if (_phase == ShellAuthPhase.signedOut) return null;
+    if (Supabase.instance.client.auth.currentUser == null) return null;
+    return [
+      if (_index == 1)
+        ValueListenableBuilder<int>(
+          valueListenable: smeetIncomingLikesCount,
+          builder: (context, n, _) {
+            return Badge(
+              isLabelVisible: n > 0,
+              label: Text(n > 99 ? '99+' : '$n'),
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LikesYouPage(),
+                    ),
+                  );
+                },
+                child: const Text('Likes you'),
+              ),
+            );
+          },
+        ),
+      ValueListenableBuilder<int>(
+        valueListenable: smeetAppNotificationsUnread,
+        builder: (context, n, _) {
+          return IconButton(
+            tooltip: 'Notifications',
+            onPressed: () async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationsPage(),
+                ),
+              );
+              await refreshAppNotificationBadges();
+            },
+            icon: Badge(
+              isLabelVisible: n > 0,
+              label: Text(n > 99 ? '99+' : '$n'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
   String get _title {
     switch (_index) {
       case 0:
@@ -338,6 +427,7 @@ class _SmeetShellState extends State<SmeetShell> {
               )
             : Text(_title),
         centerTitle: true,
+        actions: _retentionAppBarActions(context),
       ),
       // Use IndexedStack to keep pages alive when switching tabs.
       // Web: offstage children skip layout; isolate focus, semantics, pointers,
