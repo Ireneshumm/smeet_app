@@ -20,6 +20,7 @@ import 'package:smeet_app/geo_utils.dart';
 import 'package:smeet_app/other_profile_page.dart';
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
+import 'package:smeet_app/widgets/match_relationship_card.dart';
 import 'package:smeet_app/widgets/legal_section_card.dart';
 import 'package:smeet_app/widgets/location_search_field.dart';
 import 'package:smeet_app/widgets/post_media_display.dart';
@@ -5326,38 +5327,13 @@ class _MatchesPageState extends State<MatchesPage> {
         return;
       }
 
-      final intro = (profile['intro'] ?? '').toString().trim();
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(displayName),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  intro.isEmpty ? 'No bio yet.' : intro,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'There isn’t a chat linked to this person yet. '
-                  'New mutual likes on Swipe open a chat automatically; '
-                  'you can also check the Chat tab.',
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        height: 1.35,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
+      final intro = (profile['intro'] ?? '').toString();
+      final avatar = (profile['avatar_url'] ?? '').toString();
+      await showMatchRelationshipNoChatDialog(
+        context,
+        displayName: displayName,
+        intro: intro,
+        avatarUrl: avatar,
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -5372,61 +5348,46 @@ class _MatchesPageState extends State<MatchesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Matches')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const AppLoadingState(message: 'Loading matches…');
+            return const AppLoadingState(message: 'Loading your matches…');
           }
           final items = snap.data ?? [];
           if (items.isEmpty) {
             return AppEmptyState(
               icon: Icons.favorite_border,
-              title: 'No matches yet',
-              subtitle:
-                  'When you and someone both like each other on Swipe, they’ll show up here. '
-                  'Existing chats stay in the Chat tab.',
+              title: MatchRelationshipPresentation.emptyTitle,
+              subtitle: MatchRelationshipPresentation.emptySubtitle,
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             itemCount: items.length,
             itemBuilder: (context, i) {
               final p = items[i];
               final name = (p['display_name'] ?? 'Unknown').toString();
               final city = (p['city'] ?? '').toString();
-              final avatar = (p['avatar_url'] ?? '').toString();
+              final cityLabel =
+                  city.trim().isEmpty ? 'City not set' : city.trim();
+              var matchedAt =
+                  DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+              final rawAt = p['matched_at'];
+              if (rawAt != null) {
+                final parsed = DateTime.tryParse(rawAt.toString());
+                if (parsed != null) matchedAt = parsed;
+              }
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: cs.primary.withOpacity(0.10)),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: cs.primary.withOpacity(0.12),
-                    backgroundImage: avatar.isEmpty
-                        ? null
-                        : NetworkImage(avatar),
-                    child: avatar.isEmpty
-                        ? Icon(Icons.person, color: cs.primary)
-                        : null,
-                  ),
-                  title: Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(city.isEmpty ? 'City not set' : city),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => unawaited(_onMatchRowTap(context, p, name)),
-                ),
+              return MatchRelationshipCard(
+                displayName: name,
+                cityLabel: cityLabel,
+                avatarUrl: (p['avatar_url'] ?? '').toString(),
+                matchedAt: matchedAt,
+                onTap: () => unawaited(_onMatchRowTap(context, p, name)),
               );
             },
           );
