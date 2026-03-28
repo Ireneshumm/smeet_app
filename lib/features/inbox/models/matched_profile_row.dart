@@ -28,6 +28,7 @@ class MatchedProfileRow {
       'city': city,
       'intro': intro,
       'avatar_url': avatarUrl,
+      'matched_at': matchedAt.toUtc().toIso8601String(),
       if (sportLevels != null) 'sport_levels': sportLevels,
       if (availability != null) 'availability': availability,
     };

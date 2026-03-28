@@ -364,8 +364,8 @@ class _FeedPageState extends State<FeedPage> {
               !_usesToggle
                   ? 'Using a custom feed source for this screen.'
                   : _source == FeedListDataSource.supabase
-                      ? 'Upcoming games from your project.'
-                      : 'Preview: sample cards for layout.',
+                      ? 'Upcoming games — tap a card to open the full view.'
+                      : 'Preview cards — tap any card to see the same detail layout.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.9),
                 height: 1.35,

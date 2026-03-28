@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/formatting/chat_row_unread_label.dart';
@@ -15,6 +14,7 @@ import 'package:smeet_app/features/inbox/models/chat_list_item.dart';
 import 'package:smeet_app/features/inbox/models/matched_profile_row.dart';
 import 'package:smeet_app/features/inbox/presentation/inbox_detail_page.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
+import 'package:smeet_app/widgets/match_relationship_card.dart';
 
 /// Opens a real chat room from a **Game Chats** or **DMs** row (implemented in app layer).
 typedef InboxOpenChatCallback =
@@ -593,32 +593,12 @@ class _InboxPageState extends State<InboxPage>
   }
 
   void _showMatchNoDirectChatDialog(MatchedProfileRow row) {
-    final intro = row.intro.trim();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(row.displayName),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(intro.isEmpty ? 'No bio yet.' : intro),
-              const SizedBox(height: 12),
-              Text(
-                'No direct chat is linked yet. New mutual likes from Swipe '
-                'open a chat automatically; otherwise check the Chat tab.',
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
+    unawaited(
+      showMatchRelationshipNoChatDialog(
+        context,
+        displayName: row.displayName,
+        intro: row.intro,
+        avatarUrl: row.avatarUrl,
       ),
     );
   }
@@ -627,86 +607,20 @@ class _InboxPageState extends State<InboxPage>
     List<MatchedProfileRow> items, {
     ScrollPhysics? physics,
   }) {
-    final cs = Theme.of(context).colorScheme;
     return ListView.builder(
       physics: physics,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final row = items[i];
         final cityLabel =
             row.city.trim().isEmpty ? 'City not set' : row.city.trim();
-        final timeStr =
-            DateFormat.MMMd().add_jm().format(row.matchedAt.toLocal());
-        final avatar = row.avatarUrl.trim();
-        // Relationship rows: not chat cards — tertiary accent + MATCH chip.
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: cs.tertiary.withValues(alpha: 0.35),
-                ),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: cs.tertiary.withValues(alpha: 0.18),
-                  backgroundImage:
-                      avatar.isEmpty ? null : NetworkImage(row.avatarUrl),
-                  child: avatar.isEmpty
-                      ? Icon(Icons.favorite_outline, color: cs.tertiary)
-                      : null,
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: cs.tertiary.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'MATCH',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: cs.tertiary,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        row.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ],
-                ),
-                subtitle: Text(
-                  'Mutual match · $cityLabel',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  timeStr,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.outline,
-                      ),
-                ),
-                onTap: () => unawaited(_onMatchRowTap(row)),
-              ),
-            ),
-          ),
+        return MatchRelationshipCard(
+          displayName: row.displayName,
+          cityLabel: cityLabel,
+          avatarUrl: row.avatarUrl,
+          matchedAt: row.matchedAt,
+          onTap: () => unawaited(_onMatchRowTap(row)),
         );
       },
     );
@@ -720,7 +634,7 @@ class _InboxPageState extends State<InboxPage>
       future: _matchesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const AppLoadingState(message: 'Loading matches…');
+          return const AppLoadingState(message: 'Loading your matches…');
         }
         if (snapshot.hasError) {
           return AppErrorState(
@@ -733,11 +647,10 @@ class _InboxPageState extends State<InboxPage>
         }
         final items = snapshot.data ?? const [];
         if (items.isEmpty) {
-          return const AppEmptyState(
+          return AppEmptyState(
             icon: Icons.favorite_border,
-            title: 'No matches yet.',
-            subtitle:
-                'When you and someone both like each other on Swipe, they appear here.',
+            title: MatchRelationshipPresentation.emptyTitle,
+            subtitle: MatchRelationshipPresentation.emptySubtitle,
           );
         }
         return RefreshIndicator(
