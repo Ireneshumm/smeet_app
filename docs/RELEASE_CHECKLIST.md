@@ -10,20 +10,23 @@
 
 ### 1.1 Release 构建（必须带 dart-define）
 
-`lib/core/config/supabase_env.dart` 规定：**`kReleaseMode` 下若未同时设置 `SUPABASE_URL` 与 `SUPABASE_ANON_KEY`，应用会在启动时抛错**（避免误发带仓库内嵌密钥的「正式包」）。
+`lib/core/config/supabase_env.dart` 规定：
 
-示例：
+- **`kReleaseMode` 下若未同时设置** `SUPABASE_URL` 与 `SUPABASE_ANON_KEY`，应用会在启动时抛错（避免误发带仓库内嵌密钥的「正式包」）。
+- **`kReleaseMode` 下若两值已设置但像文档占位符**（例如 URL 含 `your_project`、`example.com`，或 anon key 过短、非 JWT 形态），应用也会在启动时抛错——请**只使用** Supabase Dashboard → **Settings → API** 中的 **Project URL** 与 **anon public** 整段复制，勿粘贴文档里的 `YOUR_PROJECT` / `YOUR_ANON_JWT` 字样。
+
+示例（**须将值替换为 Dashboard 真实值**；下面仅为命令格式）：
 
 ```bash
 flutter build apk --release \
-  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_JWT
+  --dart-define=SUPABASE_URL=https://xxxxxxxxxxxxxx.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9......
 ```
 
 ```bash
 flutter build ios --release \
-  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_JWT
+  --dart-define=SUPABASE_URL=https://xxxxxxxxxxxxxx.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9......
 ```
 
 - **人工 / CI**：在 Xcode Archive、Play 内测流水线、Codemagic 等中同步传入相同 `--dart-define`（或等价注入方式）。
