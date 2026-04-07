@@ -2,7 +2,6 @@
 library;
 
 export 'data/feed_repository.dart';
-export 'data/mock_feed_repository.dart';
 export 'data/supabase_feed_repository.dart';
 export 'feed_routes.dart';
 export 'models/feed_item.dart';

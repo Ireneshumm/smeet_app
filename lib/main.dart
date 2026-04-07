@@ -1,12 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart'; // kIsWeb
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart'
+    show
+        defaultTargetPlatform,
+        kDebugMode,
+        kIsWeb,
+        kReleaseMode,
+        TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:smeet_app/core/config/google_oauth_config.dart';
 import 'package:smeet_app/core/config/supabase_env.dart';
 import 'package:smeet_app/core/formatting/chat_row_unread_label.dart';
 import 'package:smeet_app/core/notifiers/smeet_open_chat_room_notifier.dart';
@@ -19,14 +32,18 @@ import 'package:smeet_app/core/widgets/game_urgency_chip.dart';
 import 'package:smeet_app/core/services/app_notification_badges.dart';
 import 'package:smeet_app/core/services/user_notifications_repository.dart';
 import 'package:smeet_app/core/services/game_event_notification_service.dart';
+import 'package:smeet_app/core/services/push_token_service.dart';
 import 'package:smeet_app/core/services/swipe_candidate_media_service.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/widgets/swipe_card_hero_media.dart';
 import 'package:smeet_app/app/smeet_app.dart';
-import 'package:smeet_app/game_balance.dart';
+import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/services/location_service.dart';
+import 'package:smeet_app/core/services/sport_definitions_service.dart';
 import 'package:smeet_app/geo_utils.dart';
 import 'package:smeet_app/other_profile_page.dart';
 import 'package:smeet_app/services/block_service.dart';
+import 'package:smeet_app/widgets/circular_network_avatar.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
 import 'package:smeet_app/widgets/match_relationship_card.dart';
 import 'package:smeet_app/widgets/legal_section_card.dart';
@@ -39,10 +56,54 @@ import 'package:smeet_app/features/inbox/inbox.dart';
 import 'package:smeet_app/features/create/create.dart';
 import 'package:smeet_app/features/notifications/notifications.dart';
 import 'package:smeet_app/features/profile/presentation/legacy_profile_setup_section.dart';
+import 'package:smeet_app/features/profile/widgets/battle_report_sheet.dart';
+import 'package:smeet_app/features/profile/widgets/sport_achievement_wall.dart';
 import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
 import 'package:smeet_app/features/profile/profile.dart';
+import 'package:smeet_app/features/explore/presentation/explore_page.dart';
 
 part 'app/shell/smeet_shell.dart';
+
+void _bindSmeetPushHandlers() {
+  if (kIsWeb) return;
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint('[Push] foreground: ${message.data}');
+  });
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _handlePushTap(message.data);
+  });
+  FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    if (message == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handlePushTap(message.data);
+    });
+  });
+}
+
+void _handlePushTap(Map<String, dynamic> data) {
+  final type = data['type']?.toString() ?? '';
+  final nav = SmeetApp.navigatorKey.currentState;
+  if (nav == null) return;
+
+  switch (type) {
+    case 'incoming_like':
+      nav.push<void>(
+        MaterialPageRoute<void>(builder: (_) => const LikesYouPage()),
+      );
+      break;
+    case 'game_reminder':
+    case 'battle_report_reminder':
+      nav.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => MyGamePage(
+            joinedLocal: <String>{},
+            listRevision: 0,
+          ),
+        ),
+      );
+      break;
+  }
+}
 
 /// 12h time like "2:00 PM"
 String formatTime12h(DateTime dt) {
@@ -167,7 +228,43 @@ String unreadLabelForChatTab(int n) {
 
 Map<String, WidgetBuilder> _smeetNamedRoutesForNonRelease() {
   return {
-    FeedRoutes.list: (_) => const FeedPage(),
+    FeedRoutes.list: (context) => FeedPage(
+          onEnsureLoggedIn: _ensureLoginAndPrompt,
+          onOpenLikesYou: (c) {
+            Navigator.of(c).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const LikesYouPage(),
+              ),
+            );
+          },
+          onOpenMatches: (c) {
+            Navigator.of(c).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const MatchesPage(),
+              ),
+            );
+          },
+          onOpenMyGame: (c) {
+            Navigator.of(c).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => MyGamePage(
+                  joinedLocal: <String>{},
+                  listRevision: 0,
+                ),
+              ),
+            );
+          },
+          onOpenHome: (c) {
+            Navigator.of(c).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => HomePage(
+                  joinedLocal: <String>{},
+                  onGamesMutated: () {},
+                ),
+              ),
+            );
+          },
+        ),
     InboxRoutes.list: (_) => InboxPage(
           onEnsureLoggedIn: _ensureLoginAndPrompt,
           onAfterLiveChatClosed: SmeetShell.requestChatInboxRefresh,
@@ -259,8 +356,23 @@ Future<void> main() async {
     anonKey: cfg.anonKey,
   );
 
-  final namedRoutes =
-      kReleaseMode ? const <String, WidgetBuilder>{} : _smeetNamedRoutesForNonRelease();
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      _bindSmeetPushHandlers();
+      PushTokenService(Supabase.instance.client).listenTokenRefresh();
+      final u = Supabase.instance.client.auth.currentUser;
+      if (u != null) {
+        unawaited(
+          PushTokenService(Supabase.instance.client).registerCurrentToken(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Push] Firebase setup skipped/failed: $e');
+    }
+  }
+
+  final namedRoutes = _smeetNamedRoutesForNonRelease();
 
   runApp(
     SmeetApp(
@@ -771,174 +883,368 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Google sign-in isn’t available on web in this build.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final webClientId = GoogleOAuthDartDefines.webClientId.trim();
+    if (webClientId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Google sign-in isn’t configured. Add GOOGLE_WEB_CLIENT_ID '
+            'via --dart-define (see google_oauth_config.dart).',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final iosClientId = GoogleOAuthDartDefines.iosClientId.trim();
+      final useIosClient =
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+                  defaultTargetPlatform == TargetPlatform.macOS) &&
+              iosClientId.isNotEmpty;
+
+      final googleSignIn = GoogleSignIn(
+        clientId: useIosClient ? iosClientId : null,
+        serverClientId: webClientId,
+      );
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        throw Exception('No ID token from Google');
+      }
+
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SmeetShell.refreshAuthState();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('[Auth] Google sign in failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google sign in failed. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() => _loading = true);
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null) {
+        throw Exception('No identity token from Apple');
+      }
+
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: idToken,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SmeetShell.refreshAuthState();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('[Auth] Apple sign in failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apple sign in failed. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final underlineBorder = UnderlineInputBorder(
+      borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.5)),
+    );
     return Scaffold(
-      appBar: AppBar(title: Text(_isLogin ? 'Log in' : 'Sign up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_isLogin) ...[
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: cs.primary.withOpacity(0.2),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: cs.onSurface,
+        title: Text(_isLogin ? 'Log in' : 'Sign up'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 160,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.12,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: Text(
+                            '🎾 🏀 ⚽ 🏃 🏸 ⛳ 🏊',
+                            style: TextStyle(
+                              fontSize: 120,
+                              letterSpacing: 4,
+                              color: cs.primary.withValues(alpha: 0.35),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'New to Smeet?',
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: cs.onPrimaryContainer,
-                                  ),
-                        ),
-                        const SizedBox(height: 12),
-                        _authGuidanceLine(context, '1', 'Sign up for an account'),
-                        const SizedBox(height: 8),
-                        _authGuidanceLine(
-                          context,
-                          '2',
-                          '(If required) verify your email',
-                        ),
-                        const SizedBox(height: 8),
-                        _authGuidanceLine(
-                          context,
-                          '3',
-                          'Sign in to start matching with people near you.',
-                        ),
-                      ],
+                  Text(
+                    'Smeet',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: cs.primary,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ] else ...[
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: cs.outlineVariant.withOpacity(0.5),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Create your account',
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'You’ll use this email to log in and get match updates. '
-                          'If your organizer asks for email verification, check your inbox '
-                          'after signing up — then come back and use Login.',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    height: 1.45,
-                                    color: cs.onSurface.withOpacity(0.88),
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              TextField(
-                controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-                autocorrect: false,
-                textInputAction: TextInputAction.next,
+                ],
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _pwCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  suffixIcon: IconButton(
-                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                ),
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) {
-                  if (!_loading) _submit();
-                },
+            ),
+            if (_isLogin) ...[
+              _authGuidanceLine(context, '1', 'Sign up for an account'),
+              const SizedBox(height: 8),
+              _authGuidanceLine(
+                context,
+                '2',
+                '(If required) verify your email',
               ),
-              if (!_isLogin) ...[
-                const SizedBox(height: 14),
-                SignupLegalAgreement(
-                  accepted: _acceptedTermsAndPrivacy,
-                  loading: _loading,
-                  onChanged: (v) =>
-                      setState(() => _acceptedTermsAndPrivacy = v ?? false),
+              const SizedBox(height: 8),
+              _authGuidanceLine(
+                context,
+                '3',
+                'Sign in to start matching with people near you.',
+              ),
+              const SizedBox(height: 20),
+            ] else ...[
+              Text(
+                'Create your account — you’ll use this email to log in and get match updates.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.45,
+                      color: cs.onSurface.withValues(alpha: 0.88),
+                    ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            TextField(
+              controller: _emailCtrl,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                enabledBorder: underlineBorder,
+                focusedBorder: underlineBorder.copyWith(
+                  borderSide: BorderSide(color: cs.primary, width: 1.5),
                 ),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: Text(
-                    _loading
-                        ? 'Please wait…'
-                        : (_isLogin ? 'Log in' : 'Create account'),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _pwCtrl,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                enabledBorder: underlineBorder,
+                focusedBorder: underlineBorder.copyWith(
+                  borderSide: BorderSide(color: cs.primary, width: 1.5),
+                ),
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                   ),
                 ),
               ),
-              if (_isLogin) ...[
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.center,
-                  child: TextButton(
-                    onPressed: _loading ? null : _showForgotPassword,
-                    child: const Text('Forgot password?'),
-                  ),
+              obscureText: _obscurePassword,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!_loading) _submit();
+              },
+            ),
+            if (!_isLogin) ...[
+              const SizedBox(height: 14),
+              SignupLegalAgreement(
+                accepted: _acceptedTermsAndPrivacy,
+                loading: _loading,
+                onChanged: (v) =>
+                    setState(() => _acceptedTermsAndPrivacy = v ?? false),
+              ),
+            ],
+            const SizedBox(height: 22),
+            SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  shape: const StadiumBorder(),
                 ),
-              ],
-              const SizedBox(height: 4),
-              TextButton(
-                onPressed: _loading
-                    ? null
-                    : () => setState(() {
-                          _isLogin = !_isLogin;
-                          if (!_isLogin) {
-                            _acceptedTermsAndPrivacy = false;
-                          }
-                        }),
+                onPressed: _loading ? null : _submit,
                 child: Text(
-                  _isLogin
-                      ? 'New here? Sign up'
-                      : 'Already have an account? Log in',
+                  _loading
+                      ? 'Please wait…'
+                      : (_isLogin ? 'Log in' : 'Create account'),
+                ),
+              ),
+            ),
+            if (_isLogin) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.center,
+                child: TextButton(
+                  onPressed: _loading ? null : _showForgotPassword,
+                  child: const Text('Forgot password?'),
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 4),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: cs.primary),
+              onPressed: _loading
+                  ? null
+                  : () => setState(() {
+                        _isLogin = !_isLogin;
+                        if (!_isLogin) {
+                          _acceptedTermsAndPrivacy = false;
+                        }
+                      }),
+              child: Text(
+                _isLogin
+                    ? 'New here? Sign up'
+                    : 'Already have an account? Log in',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'or continue with',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                          fontSize: 12,
+                        ),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: _loading ? null : _signInWithGoogle,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text(
+                      'G',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF4285F4),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Continue with Google'),
+                  ],
+                ),
+              ),
+            ),
+            if (defaultTargetPlatform == TargetPlatform.iOS ||
+                defaultTargetPlatform == TargetPlatform.macOS) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                    shape: const StadiumBorder(),
+                    foregroundColor: cs.onSurface,
+                  ),
+                  onPressed: _loading ? null : _signInWithApple,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.apple, size: 22, color: Colors.black),
+                      SizedBox(width: 10),
+                      Text('Continue with Apple'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
@@ -996,15 +1302,11 @@ class _HomePageState extends State<HomePage> {
 
   // Form state
   String _sport = 'Tennis';
-  /// Target level for this game (not the creator’s profile level).
-  String _gameLevel = 'Beginner';
-  static const _gameLevels = [
-    'Beginner',
-    'Intermediate',
-    'Advanced',
-    'Competitive',
-    'Pro',
-  ];
+  /// Target level for this game (`level_key` from [sport_level_definitions]).
+  String _gameLevel = '';
+  final SportDefinitionsService _sportDefsSvc =
+      SportDefinitionsService(Supabase.instance.client);
+  List<SportLevelDefinition> _gameLevelOptions = [];
   DateTime? _gameDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -1032,9 +1334,13 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _filterUpcoming(
     List<Map<String, dynamic>> games,
   ) {
+    final now = DateTime.now();
     final (lat0, lng0) = _searchCenter;
     final out = <Map<String, dynamic>>[];
     for (final g in games) {
+      final endsAt = DateTime.tryParse(g['ends_at']?.toString() ?? '');
+      if (endsAt != null && endsAt.isBefore(now)) continue;
+
       final players = (g['players'] as num?)?.toInt() ?? 0;
       final joined = (g['joined_count'] as num?)?.toInt() ?? 0;
       if (players <= 0 || joined >= players) continue;
@@ -1073,6 +1379,45 @@ class _HomePageState extends State<HomePage> {
     _countdownTick = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_autoDetectLocation());
+    });
+    unawaited(_loadGameLevelOptions(_sport));
+  }
+
+  Future<void> _loadGameLevelOptions(String sport) async {
+    final levels = await _sportDefsSvc.getLevelsForSport(sport);
+    if (!mounted) return;
+    setState(() {
+      _gameLevelOptions = levels;
+      if (levels.isNotEmpty &&
+          !levels.any((l) => l.levelKey == _gameLevel)) {
+        _gameLevel = levels.first.levelKey;
+      }
+      if (levels.isEmpty) {
+        _gameLevel = '';
+      }
+    });
+  }
+
+  Future<void> _autoDetectLocation() async {
+    final pos = await SmeetLocationService.getCurrentPosition();
+    if (pos == null || !mounted) return;
+    final city = SmeetLocationService.nearestPresetCity(
+      pos.lat,
+      pos.lng,
+      kPresetCityCenters,
+    );
+    if (city == null) return;
+    for (final e in kPresetCityCenters.entries) {
+      if (e.value.containsKey(city)) {
+        setState(() {
+          _filterCountry = e.key;
+          _filterCity = city;
+        });
+        break;
+      }
+    }
   }
 
   /// Recreate the games stream after an error (lightweight retry).
@@ -1426,7 +1771,6 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         _sport = 'Tennis';
-        _gameLevel = 'Beginner';
         _gameDate = null;
         _startTime = null;
         _endTime = null;
@@ -1434,6 +1778,7 @@ class _HomePageState extends State<HomePage> {
         _selectedLocation = null;
         _courtFeeCtrl.text = '20';
       });
+      unawaited(_loadGameLevelOptions('Tennis'));
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _upcomingKey.currentContext;
         if (ctx == null) return;
@@ -1592,44 +1937,58 @@ class _HomePageState extends State<HomePage> {
                   labelText: 'Sport',
                   border: OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'Tennis', child: Text('Tennis')),
-                  DropdownMenuItem(value: 'Golf', child: Text('Golf')),
-                  DropdownMenuItem(
-                    value: 'Pickleball',
-                    child: Text('Pickleball'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Badminton',
-                    child: Text('Badminton'),
-                  ),
-                  DropdownMenuItem(value: 'Ski', child: Text('Ski')),
-                  DropdownMenuItem(
-                    value: 'Snowboard',
-                    child: Text('Snowboard'),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _sport = v ?? 'Tennis'),
+                items: kSupportedSports
+                    .map(
+                      (s) => DropdownMenuItem(
+                        value: s.$1,
+                        child: Text('${s.$2} ${s.$3}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  setState(() => _sport = v ?? 'Tennis');
+                  unawaited(_loadGameLevelOptions(v ?? 'Tennis'));
+                },
               ),
             ),
 
-            // Game level (target level for this game)
+            // Game level (sport-specific keys from sport_level_definitions)
             _SectionCard(
               child: DropdownButtonFormField<String>(
-                initialValue: _gameLevel,
+                value: _gameLevelOptions.isEmpty
+                    ? 'loading'
+                    : (_gameLevelOptions.any((l) => l.levelKey == _gameLevel)
+                        ? _gameLevel
+                        : null),
                 decoration: const InputDecoration(
-                  labelText: 'Game level (target for this game)',
+                  labelText: 'Game level (target for this session)',
                   border: OutlineInputBorder(),
-                  helperText:
-                      'Suitable skill level for this session — not your profile level',
                 ),
-                items: _gameLevels
-                    .map(
-                      (lv) => DropdownMenuItem(value: lv, child: Text(lv)),
-                    )
-                    .toList(),
-                onChanged: (v) =>
-                    setState(() => _gameLevel = v ?? _gameLevels.first),
+                items: _gameLevelOptions.isEmpty
+                    ? const [
+                        DropdownMenuItem(
+                          value: 'loading',
+                          child: Text('Loading...'),
+                        ),
+                      ]
+                    : _gameLevelOptions
+                        .map(
+                          (l) => DropdownMenuItem(
+                            value: l.levelKey,
+                            child: Text(
+                              '${l.levelLabel} — ${l.levelDescription ?? ''}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged: _gameLevelOptions.isEmpty
+                    ? null
+                    : (v) {
+                        if (v != null && v != 'loading') {
+                          setState(() => _gameLevel = v);
+                        }
+                      },
               ),
             ),
 
@@ -2029,6 +2388,15 @@ class _HomePageState extends State<HomePage> {
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => unawaited(_autoDetectLocation()),
+                      icon: const Icon(Icons.near_me_outlined, size: 20),
+                      label: const Text('Use my location'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2293,28 +2661,25 @@ class _SwipeMatchAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final hasUrl = url != null && url!.isNotEmpty;
     final t = fallbackLabel.trim();
     final initial =
         t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
-    return CircleAvatar(
-      radius: 44,
+    return CircularNetworkAvatar(
+      size: 88,
+      imageUrl: url,
       backgroundColor: cs.primaryContainer,
-      backgroundImage: hasUrl ? NetworkImage(url!) : null,
-      child: hasUrl
-          ? null
-          : Text(
-              initial,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: cs.onPrimaryContainer,
-              ),
-            ),
+      placeholder: Text(
+        initial,
+        style: theme.textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: cs.onPrimaryContainer,
+        ),
+      ),
     );
   }
 }
 
-/// Incoming likes (driven by [user_notifications] `incoming_like` rows).
+/// Incoming play invites (same DB type: [user_notifications] `incoming_like`).
 class LikesYouPage extends StatefulWidget {
   const LikesYouPage({super.key});
 
@@ -2353,7 +2718,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
         .eq('is_read', false);
     final ids = (notifs as List)
         .map((e) => e['actor_user_id']?.toString())
-        .where((e) => e != null && e!.isNotEmpty)
+        .where((e) => e != null && e.isNotEmpty)
         .cast<String>()
         .toSet()
         .toList();
@@ -2366,10 +2731,11 @@ class _LikesYouPageState extends State<LikesYouPage> {
     final u = Supabase.instance.client.auth.currentUser;
     if (u == null) return;
     final peer = p['id'].toString();
-    await Supabase.instance.client.from('swipes').upsert(
-      {'from_user': u.id, 'to_user': peer, 'action': 'pass'},
-      onConflict: 'from_user,to_user',
-    );
+    await Supabase.instance.client.from('swipes').insert({
+      'from_user': u.id,
+      'to_user': peer,
+      'action': 'skip',
+    });
     await _notifRepo.markIncomingLikesFromUserRead(peer);
     await refreshAppNotificationBadges();
     _reload();
@@ -2378,52 +2744,124 @@ class _LikesYouPageState extends State<LikesYouPage> {
   Future<void> _likeBack(Map<String, dynamic> p) async {
     final u = Supabase.instance.client.auth.currentUser;
     if (u == null) return;
+
     final peer = p['id'].toString();
     final name = (p['display_name'] ?? 'Chat').toString();
     final supabase = Supabase.instance.client;
-    try {
-      await supabase.from('swipes').upsert(
-        {'from_user': u.id, 'to_user': peer, 'action': 'like'},
-        onConflict: 'from_user,to_user',
-      );
-      final back = await supabase
-          .from('swipes')
-          .select('id')
-          .eq('from_user', peer)
-          .eq('to_user', u.id)
-          .eq('action', 'like')
-          .maybeSingle();
 
-      if (back != null) {
+    try {
+      debugPrint('[PlayBack] Step1: insert swipe play');
+      await supabase.from('swipes').insert({
+        'from_user': u.id,
+        'to_user': peer,
+        'action': 'play',
+      });
+      debugPrint('[PlayBack] Step1 OK');
+
+      debugPrint('[PlayBack] Step2: mark read');
+      await _notifRepo.markIncomingLikesFromUserRead(peer);
+      await refreshAppNotificationBadges();
+      debugPrint('[PlayBack] Step2 OK');
+
+      debugPrint('[PlayBack] Step3: find/create chat');
+      final myChats = await supabase
+          .from('chat_members')
+          .select('chat_id')
+          .eq('user_id', u.id);
+      final myChatIds = (myChats as List)
+          .map((e) => e['chat_id'].toString())
+          .toList();
+      debugPrint('[PlayBack] myChatIds: $myChatIds');
+
+      String? existingChatId;
+      if (myChatIds.isNotEmpty) {
+        final peerChats = await supabase
+            .from('chat_members')
+            .select('chat_id')
+            .eq('user_id', peer)
+            .inFilter('chat_id', myChatIds);
+        final peerChatIds = (peerChats as List)
+            .map((e) => e['chat_id'].toString())
+            .toList();
+        debugPrint('[PlayBack] peerChatIds: $peerChatIds');
+
+        if (peerChatIds.isNotEmpty) {
+          final directChat = await supabase
+              .from('chats')
+              .select('id, chat_kind')
+              .inFilter('id', peerChatIds)
+              .neq('chat_kind', 'game')
+              .limit(1)
+              .maybeSingle();
+          existingChatId = directChat?['id']?.toString();
+          debugPrint('[PlayBack] existingChatId: $existingChatId');
+        }
+      }
+
+      late final String chatId;
+      if (existingChatId != null) {
+        chatId = existingChatId;
+        debugPrint('[PlayBack] Using existing chat: $chatId');
+      } else {
+        debugPrint('[PlayBack] Creating new chat');
+        final chatRow = await supabase
+            .from('chats')
+            .insert({'chat_kind': 'direct'})
+            .select('id')
+            .single();
+        chatId = chatRow['id'].toString();
+        debugPrint('[PlayBack] New chat created: $chatId');
+
+        await supabase.from('chat_members').insert([
+          {'chat_id': chatId, 'user_id': u.id},
+          {'chat_id': chatId, 'user_id': peer},
+        ]);
+        debugPrint('[PlayBack] chat_members inserted');
+      }
+
+      try {
+        debugPrint('[PlayBack] Step4: upsert match');
         final a = u.id.compareTo(peer) < 0 ? u.id : peer;
         final b = u.id.compareTo(peer) < 0 ? peer : u.id;
-        await supabase.from('matches').upsert({'user_a': a, 'user_b': b});
-        final chatRow =
-            await supabase.from('chats').insert({}).select('id').single();
-        final chatId = chatRow['id'];
-        await supabase.from('chat_members').insert([
-          {'chat_id': chatId, 'user_id': a},
-          {'chat_id': chatId, 'user_id': b},
-        ]);
-        if (!mounted) return;
-        await _notifRepo.markIncomingLikesFromUserRead(peer);
-        await refreshAppNotificationBadges();
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatRoomPage(
-              chatId: chatId.toString(),
-              title: name,
-              chatKind: 'direct',
-              directPeerUserId: peer,
-            ),
+        await supabase.from('matches').upsert(
+          {'user_a': a, 'user_b': b},
+          onConflict: 'user_a,user_b',
+        );
+        debugPrint('[PlayBack] Step4 OK');
+      } catch (matchErr) {
+        debugPrint('[PlayBack] matches upsert failed (non-fatal): $matchErr');
+      }
+
+      if (!mounted) return;
+      debugPrint('[PlayBack] Step5: navigate to ChatRoomPage chat=$chatId');
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatRoomPage(
+            chatId: chatId,
+            title: name,
+            chatKind: 'direct',
+            directPeerUserId: peer,
           ),
+        ),
+      );
+      _reload();
+    } catch (e, st) {
+      debugPrint('[PlayBack] FAILED: $e');
+      debugPrint('[PlayBack] stack: $st');
+      if (e is PostgrestException) {
+        debugPrint(
+          '[PlayBack] PG code=${e.code} msg=${e.message} '
+          'details=${e.details} hint=${e.hint}',
         );
       }
-      _reload();
-    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_userFacingSwipeError(e))),
+          SnackBar(
+            content: Text(
+              'Error: ${e is PostgrestException ? e.message : e.toString()}',
+            ),
+            duration: const Duration(seconds: 8),
+          ),
         );
       }
     }
@@ -2432,7 +2870,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Likes you')),
+      appBar: AppBar(title: const Text('Wants to Play')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _profilesFuture,
         builder: (context, snap) {
@@ -2445,7 +2883,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'No new likes right now. Keep swiping!',
+                  'No new invites right now. Keep smeeting!',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -2464,10 +2902,10 @@ class _LikesYouPageState extends State<LikesYouPage> {
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        backgroundImage:
-                            av.isEmpty ? null : NetworkImage(av),
-                        child: av.isEmpty ? const Icon(Icons.person) : null,
+                      CircularNetworkAvatar(
+                        size: 40,
+                        imageUrl: av,
+                        placeholder: const Icon(Icons.person),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -2486,12 +2924,12 @@ class _LikesYouPageState extends State<LikesYouPage> {
                       ),
                       TextButton(
                         onPressed: () => _pass(p),
-                        child: const Text('Pass'),
+                        child: const Text('Skip'),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: () => _likeBack(p),
-                        child: const Text('Like back'),
+                        child: const Text('Play!'),
                       ),
                     ],
                   ),
@@ -2523,6 +2961,13 @@ class _SwipePageState extends State<SwipePage> {
   List<Map<String, dynamic>> _candidates = [];
   int _index = 0;
 
+  /// For sport overlay chips — [levelLabel] from DB definitions.
+  Map<String, List<SportLevelDefinition>> _sportLevelDefsBySport = {};
+
+  double _dragDx = 0;
+  double _dragDy = 0;
+  bool _isDragging = false;
+
   @override
   void initState() {
     super.initState();
@@ -2530,42 +2975,32 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   Future<void> _bootstrap() async {
-    if (_user == null) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-
-      try {
-        _myProfile = null;
-        await _loadGuestCandidates();
-        _index = 0;
-      } catch (e) {
-        if (mounted) {
-          setState(() => _error = e.toString());
-        } else {
-          _error = e.toString();
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-      }
-
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      await _loadMyProfile();
-      await _loadCandidates();
+      if (_user != null) {
+        try {
+          await _loadMyProfile();
+        } catch (e) {
+          debugPrint('[Swipe] profile load failed (non-fatal): $e');
+          _myProfile = null;
+        }
+        await _loadCandidates();
+      } else {
+        _myProfile = null;
+        await _loadGuestCandidates();
+      }
+      await _loadSportLevelDefinitions();
       _index = 0;
     } catch (e) {
-      _error = e.toString();
+      if (mounted) {
+        setState(() => _error = e.toString());
+      } else {
+        _error = e.toString();
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -2590,7 +3025,7 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   /// Guest-mode candidate loader (read-only browsing).
-  /// Actions (like/pass) will still require login via `_swipe`.
+  /// Actions (play/skip) will still require login via `_swipe`.
   Future<void> _loadGuestCandidates() async {
     final supabase = Supabase.instance.client;
 
@@ -2607,12 +3042,13 @@ class _SwipePageState extends State<SwipePage> {
     );
   }
 
-  // 判断：是否有共同运动
+  /// Whether [other] shares a sport with the viewer. If we have no profile
+  /// sports, treat as "any" so sorting still shows everyone.
   bool _hasCommonSport(Map<String, dynamic> other) {
     final mySl = _myProfile?['sport_levels'];
+    if (mySl is! Map) return true;
     final otSl = other['sport_levels'];
-
-    if (mySl is! Map || otSl is! Map) return false;
+    if (otSl is! Map) return false;
 
     final mySports = mySl.keys.map((e) => e.toString()).toSet();
     final otSports = otSl.keys.map((e) => e.toString()).toSet();
@@ -2621,53 +3057,88 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   Future<void> _loadCandidates() async {
-    final supabase = Supabase.instance.client;
-    final u = _user!;
+    try {
+      final supabase = Supabase.instance.client;
+      final u = _user!;
 
-    // 1) 取我已经 swipe 过的人（避免重复出现）
-    final swiped = await supabase
-        .from('swipes')
-        .select('to_user')
-        .eq('from_user', u.id);
+      final raw = await supabase
+          .from('profiles')
+          .select(
+            'id, display_name, city, intro, avatar_url, '
+            'sport_levels, availability, swipe_intro_video_url, '
+            'location_lat, location_lng',
+          )
+          .neq('id', u.id)
+          .limit(200);
 
-    final swipedIds = (swiped as List)
-        .map((e) => e['to_user']?.toString())
-        .whereType<String>()
-        .toSet();
+      var list = (raw as List).cast<Map<String, dynamic>>();
 
-    // 2) 拉一批 profiles（简单MVP：先拉 50 个，再本地过滤）
-    final raw = await supabase
-        .from('profiles')
-        .select(
-          'id, display_name, city, intro, avatar_url, sport_levels, availability, swipe_intro_video_url',
-        )
-        .neq('id', u.id)
-        .limit(50);
+      final blockSets = await BlockService.fetchMyBlockSets();
+      list = list.where((p) {
+        final id = p['id']?.toString();
+        if (id == null) return false;
+        if (blockSets.iBlocked.contains(id)) return false;
+        if (blockSets.blockedMe.contains(id)) return false;
+        return true;
+      }).toList();
 
-    final list = (raw as List).cast<Map<String, dynamic>>();
+      await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(list);
 
-    // 3) 本地过滤：没 swipe 过 + 有共同运动（不限定等级或 availability）
-    var filtered = list.where((p) {
-      final id = p['id']?.toString();
-      if (id == null) return false;
-      if (swipedIds.contains(id)) return false;
-      if (!_hasCommonSport(p)) return false;
-      return true;
-    }).toList();
+      final myPos = await SmeetLocationService.getCurrentPosition();
+      final myLat = myPos?.lat;
+      final myLng = myPos?.lng;
 
-    final blockSets = await BlockService.fetchMyBlockSets();
-    filtered = filtered.where((p) {
-      final id = p['id']?.toString();
-      if (id == null) return false;
-      return !blockSets.iBlocked.contains(id) &&
-          !blockSets.blockedMe.contains(id);
-    }).toList();
+      list.sort((a, b) {
+        bool hasVideo(Map<String, dynamic> m) {
+          final u1 = (m['swipe_intro_video_url'] ?? '').toString().trim();
+          final u2 = (m['_swipe_resolved_video_url'] ?? '').toString().trim();
+          return u1.isNotEmpty || u2.isNotEmpty;
+        }
 
-    await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(
-      filtered,
-    );
+        final aHasVideo = hasVideo(a);
+        final bHasVideo = hasVideo(b);
+        if (aHasVideo != bHasVideo) return aHasVideo ? -1 : 1;
 
-    _candidates = filtered;
+        final aCommon = _hasCommonSport(a) ? 0 : 1;
+        final bCommon = _hasCommonSport(b) ? 0 : 1;
+        if (aCommon != bCommon) return aCommon.compareTo(bCommon);
+
+        if (myLat != null && myLng != null) {
+          final aLat = (a['location_lat'] as num?)?.toDouble();
+          final aLng = (a['location_lng'] as num?)?.toDouble();
+          final bLat = (b['location_lat'] as num?)?.toDouble();
+          final bLng = (b['location_lng'] as num?)?.toDouble();
+
+          if (aLat != null &&
+              aLng != null &&
+              bLat != null &&
+              bLng != null) {
+            final aDist = haversineKm(myLat, myLng, aLat, aLng);
+            final bDist = haversineKm(myLat, myLng, bLat, bLng);
+            return aDist.compareTo(bDist);
+          }
+        }
+        return 0;
+      });
+
+      _candidates = list;
+    } catch (e, st) {
+      debugPrint('[Swipe] _loadCandidates failed: $e');
+      debugPrint('[Swipe] stack: $st');
+      if (e is PostgrestException) {
+        debugPrint('[Swipe] PG code=${e.code} msg=${e.message}');
+      }
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _loadSportLevelDefinitions() async {
+    try {
+      final m =
+          await SportDefinitionsService(Supabase.instance.client).getAllSports();
+      if (!mounted) return;
+      setState(() => _sportLevelDefsBySport = m);
+    } catch (_) {}
   }
 
   Map<String, dynamic>? get _current {
@@ -2679,7 +3150,7 @@ class _SwipePageState extends State<SwipePage> {
   void _flashDecisionStamp(String action) {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return;
-    final isLike = action == 'like';
+    final isPlay = action == 'play';
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (ctx) => IgnorePointer(
@@ -2695,14 +3166,14 @@ class _SwipePageState extends State<SwipePage> {
               );
             },
             child: Text(
-              isLike ? 'LIKE' : 'PASS',
+              isPlay ? 'PLAY!' : 'SKIP',
               style: TextStyle(
                 fontSize: 52,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
-                color: isLike
+                color: isPlay
                     ? const Color(0xFF4ADE80).withValues(alpha: 0.92)
-                    : Colors.white.withValues(alpha: 0.92),
+                    : const Color(0xFFEF4444).withValues(alpha: 0.95),
                 shadows: const [
                   Shadow(blurRadius: 16, color: Colors.black54),
                 ],
@@ -2741,7 +3212,7 @@ class _SwipePageState extends State<SwipePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'It’s a match!',
+                  'Game on! 🎾',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -2749,7 +3220,7 @@ class _SwipePageState extends State<SwipePage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'You and $peerName both liked each other.',
+                  'You and $peerName both want to play!',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                     height: 1.35,
@@ -2767,7 +3238,7 @@ class _SwipePageState extends State<SwipePage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Icon(
-                        Icons.favorite_rounded,
+                        Icons.sports_rounded,
                         color: cs.primary,
                         size: 32,
                       ),
@@ -2818,13 +3289,13 @@ class _SwipePageState extends State<SwipePage> {
                       Navigator.of(ctx).pop();
                       onSayHi();
                     },
-                    child: const Text('Say hi'),
+                    child: const Text('Let\'s play! 👋'),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Keep swiping'),
+                  child: const Text('Keep exploring'),
                 ),
               ],
             ),
@@ -2854,39 +3325,39 @@ class _SwipePageState extends State<SwipePage> {
       final supabase = Supabase.instance.client;
       final toUser = cur['id'].toString();
 
-      // 1) 写入 swipes（upsert 防止重复）
-      await supabase.from('swipes').upsert(
-        {'from_user': u.id, 'to_user': toUser, 'action': action},
-        onConflict: 'from_user,to_user', // ✅ 就是这一句
-      );
+      await supabase.from('swipes').insert({
+        'from_user': u.id,
+        'to_user': toUser,
+        'action': action,
+      });
 
-      // 2) 如果 Like：检查对方是否也 Like 过我，成立则写入 matches
-      if (action == 'like') {
+      if (action == 'play') {
         final back = await supabase
             .from('swipes')
             .select('id')
             .eq('from_user', toUser)
             .eq('to_user', u.id)
-            .eq('action', 'like')
+            .eq('action', 'play')
+            .order('created_at', ascending: false)
+            .limit(1)
             .maybeSingle();
 
         if (back != null) {
-          // 1) 规范化 pair，避免重复
           final a = u.id.compareTo(toUser) < 0 ? u.id : toUser;
           final b = u.id.compareTo(toUser) < 0 ? toUser : u.id;
 
-          // 2) 写入 matches（你原本就有）
-          await supabase.from('matches').upsert({'user_a': a, 'user_b': b});
+          await supabase.from('matches').upsert(
+            {'user_a': a, 'user_b': b},
+            onConflict: 'user_a,user_b',
+          );
 
-          // 3) ✅ 创建一个 chat
           final chatRow = await supabase
               .from('chats')
-              .insert({})
+              .insert({'chat_kind': 'direct'})
               .select('id')
               .single();
           final chatId = chatRow['id'];
 
-          // 4) ✅ 把双方加入 chat_members
           await supabase.from('chat_members').insert([
             {'chat_id': chatId, 'user_id': a},
             {'chat_id': chatId, 'user_id': b},
@@ -2921,6 +3392,9 @@ class _SwipePageState extends State<SwipePage> {
 
       // 3) 下一张
       setState(() {
+        _dragDx = 0;
+        _dragDy = 0;
+        _isDragging = false;
         _index += 1;
       });
       unawaited(refreshAppNotificationBadges());
@@ -2939,21 +3413,35 @@ class _SwipePageState extends State<SwipePage> {
   List<Widget> _sportOverlayChips(Map<String, dynamic> p) {
     final sl = p['sport_levels'];
     if (sl is! Map) return const [];
+    final defs = _sportLevelDefsBySport;
     return sl.entries.take(8).map((e) {
+      final sportKey = canonicalSportKey(e.key.toString());
+      final stored = e.value.toString();
+      final list = defs[sportKey];
+      var label = stored;
+      if (list != null) {
+        for (final d in list) {
+          if (d.matchesStored(stored)) {
+            label = d.levelLabel;
+            break;
+          }
+        }
+      }
+      final emoji = sportEmojiForKey(sportKey);
       return Padding(
         padding: const EdgeInsets.only(right: 6, bottom: 6),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
+            color: Colors.white.withValues(alpha: 0.22),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.32),
+              color: Colors.white.withValues(alpha: 0.35),
             ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Text(
-              '${e.key} · ${e.value}',
+              '$emoji $label',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -2972,20 +3460,42 @@ class _SwipePageState extends State<SwipePage> {
     final otAv = other['availability'];
     if (myAv is! Map || otAv is! Map) return '';
 
-    // 找到第一个重叠 slot 当提示
-    for (final day in myAv.keys) {
-      final mySlots = myAv[day];
-      final otSlots = otAv[day];
-      if (mySlots is List && otSlots is List) {
-        final s1 = mySlots.map((e) => e.toString()).toSet();
-        final s2 = otSlots.map((e) => e.toString()).toSet();
-        final inter = s1.intersection(s2);
-        if (inter.isNotEmpty) {
-          return 'Same slot: $day ${inter.first}';
-        }
+    final myMap = Map<dynamic, dynamic>.from(myAv);
+    final otMap = Map<dynamic, dynamic>.from(otAv);
+
+    final overlaps = <String>[];
+
+    for (final day in kAvailabilityDays) {
+      final mySlots = availabilityRawForDay(myMap, day);
+      final otSlots = availabilityRawForDay(otMap, day);
+      if (mySlots is! List || otSlots is! List) continue;
+
+      var s1 = mySlots.map((e) => e.toString()).toSet();
+      var s2 = otSlots.map((e) => e.toString()).toSet();
+      if (s1.contains('Night')) {
+        s1 = {...s1}..remove('Night')..add('Evening');
+      }
+      if (s2.contains('Night')) {
+        s2 = {...s2}..remove('Night')..add('Evening');
+      }
+      final inter = s1.intersection(s2);
+
+      if (inter.isNotEmpty) {
+        final dayShort =
+            kAvailabilityDaysShort[kAvailabilityDays.indexOf(day)];
+        final slots = kAvailabilitySlots
+            .where((s) => inter.contains(s))
+            .map((s) => availabilitySlotEmoji(s))
+            .join();
+        overlaps.add('$dayShort $slots');
       }
     }
-    return '';
+
+    if (overlaps.isEmpty) return '';
+
+    final shown = overlaps.take(3).join('  ·  ');
+    final extra = overlaps.length > 3 ? ' +${overlaps.length - 3}' : '';
+    return '📅 Free same time: $shown$extra';
   }
 
   @override
@@ -3042,6 +3552,67 @@ class _SwipePageState extends State<SwipePage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          if (_user != null)
+            ValueListenableBuilder<int>(
+              valueListenable: smeetIncomingLikesCount,
+              builder: (context, count, _) {
+                if (count <= 0) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const LikesYouPage(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              cs.primary.withValues(alpha: 0.12),
+                              cs.primary.withValues(alpha: 0.06),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: cs.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.sports_rounded,
+                              color: cs.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$count want to play with you',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: cs.primary),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           if (_user == null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -3059,7 +3630,7 @@ class _SwipePageState extends State<SwipePage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Browsing as a guest — sign in to like or pass.',
+                          'Browsing as a guest — sign in to play or skip.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: cs.onSurface.withValues(alpha: 0.85),
@@ -3074,6 +3645,9 @@ class _SwipePageState extends State<SwipePage> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final cardW = constraints.maxWidth;
+                final cardH = constraints.maxHeight;
+
                 return DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
@@ -3087,190 +3661,328 @@ class _SwipePageState extends State<SwipePage> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
-                    child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ColoredBox(
-                        color: cs.surfaceContainerHighest,
-                      ),
-                      Positioned.fill(
-                        child: SwipeCardHeroMedia(
-                          key: ValueKey(
-                            'swipe_media_${cur['id']?.toString() ?? ''}',
-                          ),
-                          candidateKey: cur['id']?.toString() ?? '',
-                          resolvedVideoUrl: resolvedSwipeVideo,
-                          avatarUrl: avatar,
-                        ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: gradientHeight,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.78),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 20,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: _loading
+                          ? null
+                          : (details) {
+                              setState(() {
+                                _isDragging = true;
+                                _dragDx = 0;
+                                _dragDy = 0;
+                              });
+                            },
+                      onPanUpdate: _loading
+                          ? null
+                          : (details) {
+                              setState(() {
+                                _dragDx += details.delta.dx;
+                                _dragDy += details.delta.dy;
+                              });
+                            },
+                      onPanEnd: _loading
+                          ? null
+                          : (details) async {
+                              final threshold = cardW * 0.35;
+                              if (_dragDx > threshold) {
+                                await _swipe('play');
+                              } else if (_dragDx < -threshold) {
+                                await _swipe('skip');
+                              }
+                              if (!mounted) return;
+                              setState(() {
+                                _dragDx = 0;
+                                _dragDy = 0;
+                                _isDragging = false;
+                              });
+                            },
+                      child: AnimatedContainer(
+                        duration: _isDragging
+                            ? Duration.zero
+                            : const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        width: cardW,
+                        height: cardH,
+                        transformAlignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..translate(_dragDx, _dragDy * 0.3)
+                          ..rotateZ(_dragDx / cardW * 0.4),
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Text(
-                              name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                height: 1.05,
-                                shadows: const [
-                                  Shadow(
-                                    blurRadius: 12,
-                                    color: Colors.black54,
-                                  ),
-                                ],
+                            ColoredBox(
+                              color: cs.surfaceContainerHighest,
+                            ),
+                            Positioned.fill(
+                              child: SwipeCardHeroMedia(
+                                key: ValueKey(
+                                  'swipe_media_${cur['id']?.toString() ?? ''}',
+                                ),
+                                candidateKey: cur['id']?.toString() ?? '',
+                                resolvedVideoUrl: resolvedSwipeVideo,
+                                avatarUrl: avatar,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on_outlined,
-                                  size: 18,
-                                  color: Colors.white.withValues(alpha: 0.92),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: gradientHeight,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.78),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    city.isEmpty ? 'City not set' : city,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.92,
-                                      ),
-                                      fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Positioned(
+                              left: 16,
+                              right: 16,
+                              bottom: 20,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.05,
                                       shadows: const [
                                         Shadow(
-                                          blurRadius: 8,
-                                          color: Colors.black45,
+                                          blurRadius: 12,
+                                          color: Colors.black54,
                                         ),
                                       ],
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            if (sportChips.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                'Sports',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.75),
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(children: sportChips),
-                            ],
-                            if (overlap.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                overlap,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: cs.secondaryContainer
-                                      .withValues(alpha: 0.95),
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.35,
-                                ),
-                              ),
-                            ],
-                            if (intro.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                intro,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.88),
-                                  height: 1.35,
-                                  shadows: const [
-                                    Shadow(
-                                      blurRadius: 10,
-                                      color: Colors.black45,
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on_outlined,
+                                        size: 18,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.92),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          city.isEmpty ? 'City not set' : city,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.92,
+                                            ),
+                                            fontWeight: FontWeight.w600,
+                                            shadows: const [
+                                              Shadow(
+                                                blurRadius: 8,
+                                                color: Colors.black45,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (sportChips.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Sports',
+                                      style: theme.textTheme.labelLarge
+                                          ?.copyWith(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75),
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Wrap(children: sportChips),
+                                  ],
+                                  if (overlap.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      overlap,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                        color: cs.secondaryContainer
+                                            .withValues(alpha: 0.95),
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.35,
+                                      ),
                                     ),
                                   ],
+                                  if (intro.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      intro,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.88),
+                                        height: 1.35,
+                                        shadows: const [
+                                          Shadow(
+                                            blurRadius: 10,
+                                            color: Colors.black45,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (_dragDx > 20)
+                              Positioned(
+                                top: 40,
+                                left: 20,
+                                child: Transform.rotate(
+                                  angle: -0.3,
+                                  child: Opacity(
+                                    opacity: (_dragDx / (cardW * 0.35))
+                                        .clamp(0.0, 1.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: const Color(0xFF4ADE80),
+                                          width: 3,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'PLAY!',
+                                        style: TextStyle(
+                                          color: Color(0xFF4ADE80),
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
+                            if (_dragDx < -20)
+                              Positioned(
+                                top: 40,
+                                right: 20,
+                                child: Transform.rotate(
+                                  angle: 0.3,
+                                  child: Opacity(
+                                    opacity: (_dragDx.abs() / (cardW * 0.35))
+                                        .clamp(0.0, 1.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Color(0xFFEF4444),
+                                          width: 3,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'SKIP',
+                                        style: TextStyle(
+                                          color: Color(0xFFEF4444),
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (_loading)
+                              Positioned.fill(
+                                child: ColoredBox(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                      if (_loading)
-                        Positioned.fill(
-                          child: ColoredBox(
-                            color: Colors.black.withValues(alpha: 0.12),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          Text(
+            '← Skip   Play →',
+            style: TextStyle(
+              color: cs.onSurface.withValues(alpha: 0.4),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Material(
                 color: Colors.white,
-                elevation: 3,
-                shadowColor: Colors.black26,
+                elevation: 2,
+                shadowColor: Colors.black.withValues(alpha: 0.12),
                 shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _loading ? null : () => _swipe('pass'),
-                  child: SizedBox(
-                    width: 72,
-                    height: 72,
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 36,
-                      color: cs.error,
+                child: Tooltip(
+                  message: 'Skip',
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _loading ? null : () => _swipe('skip'),
+                    child: SizedBox(
+                      width: 58,
+                      height: 58,
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 30,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 40),
               Material(
-                color: cs.primary,
-                elevation: 4,
-                shadowColor: Colors.black26,
+                color: Colors.white,
+                elevation: 6,
+                shadowColor: cs.primary.withValues(alpha: 0.28),
                 shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _loading ? null : () => _swipe('like'),
-                  child: SizedBox(
-                    width: 76,
-                    height: 76,
-                    child: Icon(
-                      Icons.favorite_rounded,
-                      size: 38,
-                      color: cs.onPrimary,
+                child: Tooltip(
+                  message: 'Play',
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _loading ? null : () => _swipe('play'),
+                    child: SizedBox(
+                      width: 66,
+                      height: 66,
+                      child: Icon(
+                        Icons.sports_tennis,
+                        size: 34,
+                        color: cs.primary,
+                      ),
                     ),
                   ),
                 ),
@@ -3456,30 +4168,138 @@ class _MyGamePageState extends State<MyGamePage> {
       games = [];
     }
 
-    if (games.isEmpty && widget.joinedLocal.isNotEmpty) {
-      final data = await supabase
-          .from('games')
-          .select(
-            'id, sport, game_level, starts_at, ends_at, location_text, players, joined_count, per_person, created_by, created_at, game_chat_id',
-          )
-          .inFilter('id', widget.joinedLocal.toList())
-          .order('starts_at', ascending: true);
-      games = (data as List).cast<Map<String, dynamic>>();
-    }
-
     for (final g in games) {
       await _attachRoster(g);
     }
     return games;
   }
 
+  Widget _myGameAvatarStack(List<Map<String, dynamic>> profiles, ColorScheme cs) {
+    final show = profiles.take(4).toList();
+    final extra = profiles.length - 4;
+    final n = show.length;
+    return SizedBox(
+      height: 32,
+      width: n * 20.0 + 12 + (extra > 0 ? 32 : 0),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ...show.asMap().entries.map((e) {
+            final av = e.value['avatar_url']?.toString() ?? '';
+            return Positioned(
+              left: e.key * 20.0,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: CircularNetworkAvatar(
+                  size: 32,
+                  imageUrl: av,
+                  backgroundColor: cs.primary.withValues(alpha: 0.12),
+                  placeholder: Icon(Icons.person, size: 16, color: cs.primary),
+                ),
+              ),
+            );
+          }),
+          if (extra > 0)
+            Positioned(
+              left: n * 20.0,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: cs.surfaceContainerHighest,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    '+$extra',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showParticipants(
+    BuildContext context,
+    List<Map<String, dynamic>> profiles,
+    String createdBy,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        children: [
+          Text(
+            'Players',
+            style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 12),
+          ...profiles.map((p) {
+            final id = p['id']?.toString() ?? '';
+            final name = (p['display_name'] ?? 'Player').toString();
+            final avatar = (p['avatar_url'] ?? '').toString();
+            final host = id == createdBy;
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircularNetworkAvatar(
+                size: 40,
+                imageUrl: avatar,
+                placeholder: const Icon(Icons.person, size: 20),
+              ),
+              title: Text(
+                host ? '$name 👑' : name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              onTap: id.isEmpty
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OtherProfilePage(userId: id),
+                        ),
+                      );
+                    },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _myGamesFuture,
-      builder: (context, snapshot) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Game'),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _myGamesFuture,
+        builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const AppLoadingState(message: 'Loading your games…');
         }
@@ -3546,189 +4366,326 @@ class _MyGamePageState extends State<MyGamePage> {
             final endLine = endsAt == null
                 ? 'End —'
                 : 'End: ${formatTime12h(endsAt)}';
-            final sportHeadline = gameLevel.isEmpty ? sport : '$sport • $gameLevel';
             final gameChatId = g['game_chat_id']?.toString();
             final chatTitle =
                 (sport.isNotEmpty ? '$sport · ' : '') +
                     (loc.split(',').first.trim().isEmpty
                         ? 'Game chat'
                         : loc.split(',').first.trim());
-            final playersCap = (g['players'] as num?)?.toInt() ?? 0;
-            final urgency = buildGameUrgencyChip(
-              players: playersCap,
-              joinedCount: joinedC,
-              cs: cs,
-            );
             final countdownLine = formatGameCountdownLine(
               startsAt: startsAt,
               endsAt: endsAt,
               now: DateTime.now(),
             );
-
-            final balance = balanceLabelForGroup(
-              sportKey: sport,
-              playerProfiles: profiles.map((e) => e).toList(),
-            );
+            final gameEnded =
+                endsAt != null && endsAt.isBefore(DateTime.now());
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: cs.primary.withOpacity(0.12),
-                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    offset: const Offset(0, 4),
+                    blurRadius: 16,
+                    color: Colors.black.withValues(alpha: 0.08),
+                  ),
+                ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          sportHeadline,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          cs.primary,
+                          cs.primary.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      if (urgency != null) ...[urgency, const SizedBox(width: 8)],
-                      Text(
-                        '\$${perPerson.toStringAsFixed(2)} each',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: cs.secondary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    dateLine,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  if (countdownLine.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      countdownLine,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: cs.primary,
-                          ),
                     ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    startLine,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    endLine,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    loc,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$joinedC / ${g['players'] ?? '?'} players · $balance',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withOpacity(0.75),
+                    child: Row(
+                      children: [
+                        Text(
+                          sportEmojiForKey(sport),
+                          style: const TextStyle(fontSize: 28),
                         ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (gameChatId != null && gameChatId.isNotEmpty)
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ChatRoomPage(
-                                chatId: gameChatId,
-                                title: chatTitle,
-                                chatKind: 'game',
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.chat_bubble_outline),
-                        label: const Text('Open group chat'),
-                      ),
-                    )
-                  else
-                    Text(
-                      'Group chat isn’t available for this game yet.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                    ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Participants (${profiles.length})',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  ...profiles.map((p) {
-                    final id = p['id']?.toString() ?? '';
-                    final name =
-                        (p['display_name'] ?? 'Player').toString().trim();
-                    final avatar = (p['avatar_url'] ?? '').toString();
-                    final city = (p['city'] ?? '').toString().trim();
-                    final host = id.isNotEmpty && id == createdBy;
-                    final lvl = sportLevelForSport(p, sport);
-                    final subtitle = [
-                      if (city.isNotEmpty) city,
-                      '$sport: $lvl',
-                    ].join(' · ');
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundImage:
-                            avatar.isEmpty ? null : NetworkImage(avatar),
-                        child: avatar.isEmpty
-                            ? const Icon(Icons.person, size: 20)
-                            : null,
-                      ),
-                      title: Text(
-                        host ? '$name (host)' : name,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(subtitle),
-                      trailing: const Icon(Icons.chevron_right, size: 20),
-                      onTap: id.isEmpty
-                          ? null
-                          : () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      OtherProfilePage(userId: id),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                sport.isEmpty ? 'Game' : sport,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
                                 ),
-                              );
-                            },
-                    );
-                  }),
-                  if (profiles.isEmpty)
-                    Text(
-                      'Player list will fill in as people join.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
+                              ),
+                              if (gameLevel.isNotEmpty)
+                                Text(
+                                  gameLevel,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
+                        if (countdownLine.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              countdownLine,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.tonal(
-                      onPressed: () => _leaveGame(g['id'].toString()),
-                      child: const Text('Leave game'),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              size: 16,
+                              color: cs.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              dateLine,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 16,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$startLine  →  $endLine',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (loc.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 16,
+                                color: cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  loc,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: cs.onSurface.withValues(alpha: 0.7),
+                                    decoration: TextDecoration.none,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '$joinedC / ${g['players'] ?? '?'} players',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ),
+                            if (perPerson > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '\$${perPerson.toStringAsFixed(2)}/pp',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.secondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (profiles.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => _showParticipants(
+                              context,
+                              profiles,
+                              createdBy,
+                            ),
+                            child: Row(
+                              children: [
+                                _myGameAvatarStack(profiles, cs),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'View all ${profiles.length} players',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 16,
+                                  color: cs.primary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        if (gameEnded)
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.tertiary,
+                                foregroundColor: cs.onTertiary,
+                                shape: const StadiumBorder(),
+                              ),
+                              onPressed: () {
+                                showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  useSafeArea: true,
+                                  builder: (ctx) => Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+                                    ),
+                                    child: BattleReportSheet(
+                                      client: Supabase.instance.client,
+                                      game: g,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Text('🏆'),
+                              label: const Text('Post Battle Report'),
+                            ),
+                          )
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _leaveGame(g['id'].toString()),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: const StadiumBorder(),
+                                    foregroundColor: cs.error,
+                                    side: BorderSide(
+                                      color: cs.error.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.exit_to_app_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Leave'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: gameChatId == null ||
+                                          gameChatId.isEmpty
+                                      ? null
+                                      : () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              builder: (_) => ChatRoomPage(
+                                                chatId: gameChatId,
+                                                title: chatTitle,
+                                                chatKind: 'game',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                  style: FilledButton.styleFrom(
+                                    shape: const StadiumBorder(),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Group Chat'),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -3736,7 +4693,8 @@ class _MyGamePageState extends State<MyGamePage> {
             );
           },
         );
-      },
+        },
+      ),
     );
   }
 }
@@ -4081,14 +5039,11 @@ class _ChatPageState extends State<ChatPage> {
                       border: Border.all(color: cs.primary.withOpacity(0.10)),
                     ),
                     child: ListTile(
-                      leading: CircleAvatar(
+                      leading: CircularNetworkAvatar(
+                        size: 40,
+                        imageUrl: uiAvatar,
                         backgroundColor: cs.primary.withOpacity(0.12),
-                        backgroundImage: uiAvatar != null && uiAvatar.isNotEmpty
-                            ? NetworkImage(uiAvatar)
-                            : null,
-                        child: uiAvatar == null || uiAvatar.isEmpty
-                            ? Icon(Icons.person, color: cs.primary)
-                            : null,
+                        placeholder: Icon(Icons.person, color: cs.primary),
                       ),
                       title: Row(
                         children: [
@@ -4504,10 +5459,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 final av = (p['avatar_url'] ?? '').toString();
                 final city = (p['city'] ?? '').toString();
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage:
-                        av.isEmpty ? null : NetworkImage(av),
-                    child: av.isEmpty ? const Icon(Icons.person) : null,
+                  leading: CircularNetworkAvatar(
+                    size: 40,
+                    imageUrl: av,
+                    placeholder: const Icon(Icons.person),
                   ),
                   title: Text(name.isEmpty ? id.substring(0, 8) : name),
                   subtitle: city.isEmpty ? null : Text(city),
@@ -4681,17 +5636,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
+                      CircularNetworkAvatar(
+                        size: 40,
+                        imageUrl: _directPeerAvatar,
                         backgroundColor: cs.primary.withOpacity(0.15),
-                        backgroundImage: _directPeerAvatar != null &&
-                                _directPeerAvatar!.isNotEmpty
-                            ? NetworkImage(_directPeerAvatar!)
-                            : null,
-                        child: _directPeerAvatar == null ||
-                                _directPeerAvatar!.isEmpty
-                            ? Icon(Icons.person, color: cs.primary)
-                            : null,
+                        placeholder: Icon(Icons.person, color: cs.primary),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -5416,25 +6365,55 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: cs.primary.withOpacity(0.12)),
+                  border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
+                  boxShadow: [
+                    BoxShadow(
+                      offset: const Offset(0, 2),
+                      blurRadius: 8,
+                      color: Colors.black.withValues(alpha: 0.06),
+                    ),
+                  ],
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
                       onTap: _loading ? null : _pickAndUploadAvatar,
-                      child: CircleAvatar(
-                        radius: 30,
-                        backgroundColor: cs.primary.withOpacity(0.12),
-                        backgroundImage:
-                            (_avatarUrl == null || _avatarUrl!.isEmpty)
-                            ? null
-                            : NetworkImage(_avatarUrl!),
-                        child: (_avatarUrl == null || _avatarUrl!.isEmpty)
-                            ? Icon(Icons.camera_alt, color: cs.primary)
-                            : null,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircularNetworkAvatar(
+                            size: 80,
+                            imageUrl: _avatarUrl,
+                            backgroundColor: cs.primary.withValues(alpha: 0.12),
+                            placeholder: Icon(
+                              Icons.person,
+                              color: cs.primary,
+                              size: 36,
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: cs.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -5445,8 +6424,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : _nameCtrl.text.trim(),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -5457,15 +6439,59 @@ class _ProfilePageState extends State<ProfilePage> {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: cs.onSurface.withOpacity(0.7),
+                                  fontSize: 14,
+                                  color: cs.onSurface.withValues(alpha: 0.55),
                                 ),
                           ),
+                          if (_setupLoadedRow?['sport_levels'] is Map &&
+                              (_setupLoadedRow!['sport_levels'] as Map)
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: (_setupLoadedRow!['sport_levels'] as Map)
+                                  .entries
+                                  .take(3)
+                                  .map(
+                                    (e) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: cs.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(100),
+                                      ),
+                                      child: Text(
+                                        '${sportEmojiForKey(e.key.toString())} ${e.key}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: cs.primary,
+                                            ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    TextButton(
-                      onPressed: _loading ? null : _logout,
-                      child: const Text('Logout'),
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_horiz, color: cs.onSurface),
+                      onSelected: (v) {
+                        if (v == 'logout') _logout();
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'logout',
+                          child: Text('Log out'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -5482,9 +6508,28 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: cs.primary.withOpacity(0.10)),
+                  boxShadow: [
+                    BoxShadow(
+                      offset: const Offset(0, 2),
+                      blurRadius: 8,
+                      color: Colors.black.withValues(alpha: 0.06),
+                    ),
+                  ],
                 ),
                 child: TabBar(
+                  indicatorColor: cs.primary,
+                  indicatorWeight: 3,
+                  labelColor: cs.primary,
+                  unselectedLabelColor:
+                      cs.onSurface.withValues(alpha: 0.45),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
+                  ),
                   onTap: (i) {
                     if (i == 1 && _myPostsFuture == null) {
                       setState(() {
@@ -5508,6 +6553,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     SingleChildScrollView(
                       child: Column(
                         children: [
+                          if (identityUser != null) ...[
+                            SportAchievementWall(
+                              userId: identityUser.id,
+                              supabase: Supabase.instance.client,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           LegacyProfileSetupSection(
                             key: _legacySetupKey,
                             nameCtrl: _nameCtrl,

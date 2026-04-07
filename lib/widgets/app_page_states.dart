@@ -66,17 +66,18 @@ class AppEmptyState extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: cs.primary.withValues(alpha: 0.65)),
-            const SizedBox(height: 14),
+            Icon(icon, size: 64, color: cs.primary.withValues(alpha: 0.65)),
+            const SizedBox(height: 16),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
             ),
             if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
@@ -85,7 +86,8 @@ class AppEmptyState extends StatelessWidget {
                 subtitle!,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.72),
+                      fontSize: 14,
+                      color: cs.onSurface.withValues(alpha: 0.55),
                     ),
               ),
             ],

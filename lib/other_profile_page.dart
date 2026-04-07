@@ -1,39 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/core/services/sport_definitions_service.dart';
 import 'package:smeet_app/features/profile/presentation/profile_post_detail_page.dart';
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/block_user_confirm_dialog.dart';
+import 'package:smeet_app/widgets/circular_network_avatar.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
+import 'package:smeet_app/widgets/availability_display.dart';
 import 'package:smeet_app/widgets/profile_posts_grid.dart';
 import 'package:smeet_app/widgets/report_bottom_sheet.dart';
-
-Widget _availabilityWidget(dynamic availability) {
-  if (availability is Map) {
-    final keys = availability.keys.map((k) => k.toString()).toList()..sort();
-    if (keys.isEmpty) {
-      return const Text('Not set');
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: keys.map((day) {
-        final slots = availability[day];
-        final slotStr = slots is List
-            ? slots.map((e) => e.toString()).join(', ')
-            : slots?.toString() ?? '';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Text(
-            '$day: $slotStr',
-            style: const TextStyle(height: 1.35),
-          ),
-        );
-      }).toList(),
-    );
-  }
-  return Text(availability.toString());
-}
 
 /// Read-only profile for another user: basics + recent posts / media (Phase 4).
 class OtherProfilePage extends StatefulWidget {
@@ -296,14 +274,27 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                CircleAvatar(
-                  radius: 48,
-                  backgroundColor: cs.primary.withValues(alpha: 0.15),
-                  backgroundImage:
-                      avatar.isEmpty ? null : NetworkImage(avatar),
-                  child: avatar.isEmpty
-                      ? Icon(Icons.person, size: 40, color: cs.primary)
-                      : null,
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.2),
+                        width: 3,
+                      ),
+                    ),
+                    child: CircularNetworkAvatar(
+                      size: 96,
+                      imageUrl: avatar,
+                      backgroundColor: cs.primary.withValues(alpha: 0.1),
+                      placeholder: Icon(
+                        Icons.person,
+                        size: 48,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -344,14 +335,49 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                 if (sportLevels.isEmpty)
                   const Text('No sports info')
                 else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: sportLevels.entries.map<Widget>((e) {
-                      return Chip(label: Text('${e.key}: ${e.value}'));
-                    }).toList(),
+                  FutureBuilder<Map<String, List<SportLevelDefinition>>>(
+                    future: SportDefinitionsService(Supabase.instance.client)
+                        .getAllSports(),
+                    builder: (context, defsSnap) {
+                      final defsBySport = defsSnap.data;
+                      if (defsSnap.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: sportLevels.entries.map<Widget>((e) {
+                          final sk = canonicalSportKey(e.key.toString());
+                          final stored = e.value.toString();
+                          final defs = defsBySport?[sk];
+                          var levelText = stored;
+                          if (defs != null) {
+                            for (final d in defs) {
+                              if (d.matchesStored(stored)) {
+                                levelText = d.levelLabel;
+                                break;
+                              }
+                            }
+                          }
+                          final emoji = sportEmojiForKey(sk);
+                          final name = sportLabelForKey(sk);
+                          return Chip(
+                            label: Text('$emoji $name: $levelText'),
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
-                if (availability != null && !_iBlocked) ...[
+                if (!_iBlocked) ...[
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -364,7 +390,11 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _availabilityWidget(availability),
+                  AvailabilityDisplayWidget(
+                    availability: availability is Map
+                        ? Map<String, dynamic>.from(availability)
+                        : null,
+                  ),
                 ],
                 if (!_iBlocked) ...[
                   const SizedBox(height: 24),

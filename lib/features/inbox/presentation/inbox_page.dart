@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'package:smeet_app/widgets/circular_network_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/formatting/chat_row_unread_label.dart';
@@ -440,13 +442,11 @@ class _InboxPageState extends State<InboxPage>
                     ),
                   ),
                   child: ListTile(
-                    leading: CircleAvatar(
+                    leading: CircularNetworkAvatar(
+                      size: 40,
+                      imageUrl: av.isNotEmpty ? av : null,
                       backgroundColor: cs.primary.withValues(alpha: 0.12),
-                      backgroundImage:
-                          av.isNotEmpty ? NetworkImage(av) : null,
-                      child: av.isEmpty
-                          ? Icon(Icons.person, color: cs.primary)
-                          : null,
+                      placeholder: Icon(Icons.person, color: cs.primary),
                     ),
                     title: Row(
                       children: [

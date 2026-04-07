@@ -83,7 +83,9 @@ class SmeetApp extends StatelessWidget {
   static const Color smeetMint = Color(0xFF56CDBE);
   static const Color smeetDeep = Color(0xFF0B8F85);
   static const Color smeetInk = Color(0xFF0F2D2A);
-  static const Color smeetBg = Color(0xFFF7FBFA);
+  /// Warm canvas (抖音/小红书式暖白底)
+  static const Color smeetCanvas = Color(0xFFF8F7F4);
+  static const Color smeetNavBorder = Color(0xFFF0EEE8);
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +97,7 @@ class SmeetApp extends StatelessWidget {
     final theme = ThemeData(
       useMaterial3: true,
 
-      scaffoldBackgroundColor: smeetBg,
+      scaffoldBackgroundColor: smeetCanvas,
 
       colorScheme: baseScheme.copyWith(
         primary: smeetMint,
@@ -103,6 +105,39 @@ class SmeetApp extends StatelessWidget {
         surface: Colors.white,
         onPrimary: Colors.white,
         onSurface: smeetInk,
+      ),
+
+      textTheme: Typography.blackMountainView.copyWith(
+        displaySmall: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
+          color: smeetInk,
+        ),
+        titleLarge: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          height: 1.25,
+          color: smeetInk,
+        ),
+        titleMedium: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          height: 1.3,
+          color: smeetInk,
+        ),
+        bodyLarge: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          height: 1.4,
+          color: smeetInk,
+        ),
+        bodySmall: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          height: 1.35,
+          color: smeetInk.withValues(alpha: 0.55),
+        ),
       ),
 
       appBarTheme: const AppBarTheme(
@@ -113,10 +148,15 @@ class SmeetApp extends StatelessWidget {
         scrolledUnderElevation: 0,
       ),
 
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        indicatorColor: smeetMint.withOpacity(0.18),
-        labelTextStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 12)),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: 0.06),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        margin: EdgeInsets.zero,
       ),
 
       filledButtonTheme: FilledButtonThemeData(
@@ -124,10 +164,21 @@ class SmeetApp extends StatelessWidget {
           backgroundColor: const WidgetStatePropertyAll(smeetMint),
           foregroundColor: const WidgetStatePropertyAll(Colors.white),
           padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          ),
+          shape: WidgetStatePropertyAll(
+            StadiumBorder(),
+          ),
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: ButtonStyle(
+          padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           ),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            StadiumBorder(),
           ),
         ),
       ),
@@ -155,7 +206,7 @@ class SmeetApp extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 12, 88),
+                        padding: const EdgeInsets.fromLTRB(0, 0, 12, 104),
                         child: FloatingActionButton.small(
                           heroTag: 'smeet_mvp_debug_launcher',
                           // Omit tooltip: FAB Tooltip needs Overlay; builder Stack is not under it.

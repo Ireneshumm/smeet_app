@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
-import 'package:smeet_app/widgets/post_media_display.dart';
+import 'package:smeet_app/widgets/adaptive_media.dart';
 
-/// Two-column grid for profile posts: image thumbnails, video with poster attempt + play icon.
+/// Two-column masonry grid for profile posts: intrinsic image/video aspect per cell.
 class ProfilePostsGrid extends StatelessWidget {
   const ProfilePostsGrid({
     super.key,
@@ -35,17 +36,14 @@ class ProfilePostsGrid extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return GridView.builder(
+    return MasonryGridView.count(
       padding: padding,
       shrinkWrap: shrinkWrap,
       physics: physics ??
           (shrinkWrap ? const NeverScrollableScrollPhysics() : null),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 4 / 5,
-      ),
+      crossAxisCount: 2,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
       itemCount: posts.length,
       itemBuilder: (context, i) {
         final p = posts[i];
@@ -63,13 +61,34 @@ class ProfilePostsGrid extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: PostMediaGridCell(
+                  if (isVideo)
+                    AdaptiveVideoCover(
+                      coverUrl: url,
+                      borderRadius: BorderRadius.circular(12),
+                    )
+                  else if (url.isNotEmpty)
+                    AdaptiveNetworkImage(
                       imageUrl: url,
-                      isVideo: isVideo,
+                      borderRadius: BorderRadius.circular(12),
+                    )
+                  else
+                    AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                  ),
                   if (caption.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(

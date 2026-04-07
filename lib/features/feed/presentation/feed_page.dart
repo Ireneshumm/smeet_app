@@ -1,164 +1,143 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/services/activity_summary_service.dart';
+import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/features/feed/data/feed_repository.dart';
-import 'package:smeet_app/features/feed/data/mock_feed_repository.dart';
 import 'package:smeet_app/features/feed/data/supabase_feed_repository.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
+import 'package:smeet_app/core/services/app_notification_badges.dart';
 import 'package:smeet_app/features/feed/presentation/feed_detail_page.dart';
+import 'package:smeet_app/features/feed/widgets/activity_banner.dart';
+import 'package:smeet_app/features/feed/widgets/feed_game_card.dart';
+import 'package:smeet_app/features/feed/widgets/feed_post_card.dart';
+import 'package:smeet_app/features/notifications/notifications.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
 
-/// Data source for the feed list (toggle without leaving the page).
-enum FeedListDataSource {
-  /// Real `games` rows from Supabase (upcoming only, v1).
-  supabase,
-
-  /// Local mock rows (mixed types).
-  mock,
-}
-
-/// Feed list: mock or Supabase-backed (v1 = games only for live data).
+/// Feed list: Supabase-backed games + posts (or injected [repository] for tests).
 class FeedPage extends StatefulWidget {
   const FeedPage({
     super.key,
     this.repository,
-    this.initialSource = FeedListDataSource.supabase,
+    this.onOpenLikesYou,
+    this.onOpenMatches,
+    this.onOpenMyGame,
+    this.onOpenHome,
+    this.onEnsureLoggedIn,
   });
 
-  /// When non-null, used for both modes (caller must supply a composite); normally null.
   final FeedRepository? repository;
 
-  /// Default segment when opening from the MVP launcher.
-  final FeedListDataSource initialSource;
+  final void Function(BuildContext)? onOpenLikesYou;
+  final void Function(BuildContext)? onOpenMatches;
+  final void Function(BuildContext)? onOpenMyGame;
+  final void Function(BuildContext)? onOpenHome;
+
+  /// Join / gated actions: push auth if needed. From shell (`_ensureLoginAndPrompt`).
+  final Future<bool> Function(BuildContext context)? onEnsureLoggedIn;
 
   @override
   State<FeedPage> createState() => _FeedPageState();
 }
 
 class _FeedPageState extends State<FeedPage> {
-  late FeedListDataSource _source = widget.initialSource;
-  late final MockFeedRepository _mockRepo = MockFeedRepository();
-  late final SupabaseFeedRepository _supabaseRepo = SupabaseFeedRepository();
-  Future<List<FeedItem>>? _future;
+  late final SupabaseFeedRepository _defaultRepo = SupabaseFeedRepository();
 
-  FeedRepository get _activeRepo {
-    if (widget.repository != null) {
-      return widget.repository!;
+  FeedRepository get _activeRepo => widget.repository ?? _defaultRepo;
+
+  Future<List<FeedItem>>? _future;
+  Future<({double lat, double lng})?>? _locationFuture;
+  Future<ActivitySummary>? _activityFuture;
+
+  /// `null` = All sports.
+  String? _sportFilter;
+
+  /// Active `game_participants` rows (status joined) for AppBar badge.
+  int _joinedGameCount = 0;
+
+  Future<void> _loadJoinedCount() async {
+    final u = Supabase.instance.client.auth.currentUser;
+    if (u == null) {
+      if (mounted) setState(() => _joinedGameCount = 0);
+      return;
     }
-    return _source == FeedListDataSource.mock ? _mockRepo : _supabaseRepo;
+    try {
+      final rows = await Supabase.instance.client
+          .from('game_participants')
+          .select('game_id')
+          .eq('user_id', u.id)
+          .eq('status', 'joined');
+      if (!mounted) return;
+      setState(() => _joinedGameCount = (rows as List).length);
+    } catch (_) {}
   }
 
-  bool get _usesToggle => widget.repository == null;
+  void _bindActivityFuture() {
+    final client = Supabase.instance.client;
+    final uid = client.auth.currentUser?.id;
+    _activityFuture =
+        uid != null ? ActivitySummaryService(client).fetch(uid) : null;
+  }
+
+  Future<List<FeedItem>> _loadFeed() async {
+    final pos = kIsWeb
+        ? null
+        : await (_locationFuture ??
+            SmeetLocationService.getCurrentPosition());
+    return _activeRepo.fetchFeed(
+      userLat: pos?.lat,
+      userLng: pos?.lng,
+      sport: _sportFilter,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _future = _activeRepo.fetchFeed();
+    _locationFuture =
+        kIsWeb ? Future.value(null) : SmeetLocationService.getCurrentPosition();
+    _future = _loadFeed();
+    _bindActivityFuture();
+    _loadJoinedCount();
   }
 
   void _reload() {
     setState(() {
-      _future = _activeRepo.fetchFeed();
+      _future = _loadFeed();
+      _bindActivityFuture();
     });
   }
 
-  /// Pull-to-refresh — same [FeedRepository.fetchFeed] as initial load / toggle.
   Future<void> _refreshFeed() async {
-    final items = await _activeRepo.fetchFeed();
+    final items = await _loadFeed();
     if (!mounted) return;
+    final client = Supabase.instance.client;
+    final uid = client.auth.currentUser?.id;
     setState(() {
       _future = Future.value(items);
+      _activityFuture =
+          uid != null ? ActivitySummaryService(client).fetch(uid) : null;
     });
+    await _loadJoinedCount();
   }
 
-  void _onSourceChanged(FeedListDataSource next) {
-    if (!_usesToggle) return;
-    if (_source == next) return;
+  void _onSportChipTap(String? key) {
+    if (key == null) {
+      if (_sportFilter == null) return;
+      setState(() {
+        _sportFilter = null;
+        _future = _loadFeed();
+      });
+      return;
+    }
+    final next = _sportFilter == key ? null : key;
     setState(() {
-      _source = next;
-      _future = _activeRepo.fetchFeed();
+      _sportFilter = next;
+      _future = _loadFeed();
     });
-  }
-
-  static String _badge(FeedContentType t) {
-    switch (t) {
-      case FeedContentType.post:
-        return 'Post';
-      case FeedContentType.video:
-        return 'Video';
-      case FeedContentType.game:
-        return 'Game';
-    }
-  }
-
-  /// One-line meta: time / spots / venue / length — kept calm for Live placeholders.
-  static String _keyInfoLine(FeedItem item) {
-    final parts = <String>[];
-    if (item.type == FeedContentType.video &&
-        (item.durationLabel?.trim().isNotEmpty ?? false)) {
-      parts.add(item.durationLabel!.trim());
-    }
-    final sub = item.subtitle.trim();
-    if (sub.isNotEmpty) parts.add(sub);
-    final venue = item.gameVenue?.trim();
-    if (venue != null && venue.isNotEmpty) {
-      if (!parts.any((p) => p.contains(venue))) parts.add(venue);
-    }
-    return parts.join(' · ');
-  }
-
-  /// Large word on gradient placeholder (sport name for games).
-  static String _coverHeroWord(FeedItem item) {
-    switch (item.type) {
-      case FeedContentType.game:
-        final t = item.title.split('·').first.trim();
-        return t.isEmpty ? 'Game' : t;
-      case FeedContentType.post:
-        return 'Post';
-      case FeedContentType.video:
-        return 'Video';
-    }
-  }
-
-  static List<Color> _coverGradient(FeedContentType type, ColorScheme cs) {
-    switch (type) {
-      case FeedContentType.game:
-        return [
-          cs.primary.withValues(alpha: 0.82),
-          cs.primary.withValues(alpha: 0.52),
-        ];
-      case FeedContentType.post:
-        return [
-          cs.secondary.withValues(alpha: 0.72),
-          cs.secondary.withValues(alpha: 0.48),
-        ];
-      case FeedContentType.video:
-        return [
-          cs.tertiary.withValues(alpha: 0.78),
-          cs.tertiary.withValues(alpha: 0.52),
-        ];
-    }
-  }
-
-  static Color _typeChipBackground(FeedContentType t, ColorScheme cs) {
-    switch (t) {
-      case FeedContentType.game:
-        return cs.primaryContainer;
-      case FeedContentType.post:
-        return cs.secondaryContainer;
-      case FeedContentType.video:
-        return cs.tertiaryContainer;
-    }
-  }
-
-  static Color _typeChipForeground(FeedContentType t, ColorScheme cs) {
-    switch (t) {
-      case FeedContentType.game:
-        return cs.onPrimaryContainer;
-      case FeedContentType.post:
-        return cs.onSecondaryContainer;
-      case FeedContentType.video:
-        return cs.onTertiaryContainer;
-    }
   }
 
   void _openDetail(FeedItem item) {
@@ -169,158 +148,195 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
-  Widget _feedItemCard(ThemeData theme, FeedItem item) {
-    final cs = theme.colorScheme;
-    final url = item.coverImageUrl?.trim();
-    final hasCover = url != null && url.isNotEmpty;
-    final keyLine = _keyInfoLine(item);
-    final hero = _coverHeroWord(item);
+  void _shareMoment() {
+    final fn = widget.onOpenHome;
+    if (fn != null) {
+      fn(context);
+    }
+  }
 
-    return Material(
-      color: cs.surface,
-      elevation: 1.5,
-      shadowColor: Colors.black.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+  Widget _feedPost(ThemeData theme, FeedItem item) {
+    return FeedPostCard(
+      item: item,
+      onTap: () => _openDetail(item),
+    );
+  }
+
+  Widget _buildFeedEntry(ThemeData theme, FeedItem item) {
+    if (item.type == FeedContentType.game) {
+      return FeedGameCard(
+        item: item,
         onTap: () => _openDetail(item),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 1.82,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (hasCover)
-                    Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _FeedGradientCover(
-                        gradientColors: _coverGradient(item.type, cs),
-                        heroText: hero,
-                        showHero: true,
-                      ),
-                    )
-                  else
-                    _FeedGradientCover(
-                      gradientColors: _coverGradient(item.type, cs),
-                      heroText: hero,
-                      showHero: true,
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 76,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.5),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: _FeedTypeChip(
-                      label: _badge(item.type),
-                      backgroundColor:
-                          _typeChipBackground(item.type, cs).withValues(
-                        alpha: 0.94,
-                      ),
-                      foregroundColor: _typeChipForeground(item.type, cs),
-                    ),
-                  ),
-                  if (item.type == FeedContentType.video &&
-                      (item.durationLabel?.trim().isNotEmpty ?? false))
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            item.durationLabel!.trim(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (keyLine.isNotEmpty)
-                    Positioned(
-                      left: 12,
-                      right: 12,
-                      bottom: 10,
-                      child: Text(
-                        keyLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontWeight: FontWeight.w600,
-                          shadows: const [
-                            Shadow(
-                              blurRadius: 8,
-                              color: Colors.black45,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+        onEnsureLoggedIn: widget.onEnsureLoggedIn,
+        onOpenMyGame: widget.onOpenMyGame,
+        onRefresh: () {
+          _reload();
+          _loadJoinedCount();
+        },
+      );
+    }
+    return _feedPost(theme, item);
+  }
+
+  /// Sports present in the current feed payload (posts + games).
+  static Set<String> _distinctSportKeys(List<FeedItem> items) {
+    final s = <String>{};
+    for (final it in items) {
+      final raw = it.sport.trim();
+      if (raw.isEmpty) continue;
+      s.add(canonicalSportKey(raw));
+    }
+    return s;
+  }
+
+  static int _nearbyGamesTodayCount(List<FeedItem> items) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    return items.where((e) {
+      if (e.type != FeedContentType.game) return false;
+      if (e.distanceKm == null) return false;
+      final t = e.publishedAt.toLocal();
+      return !t.isBefore(start) && t.isBefore(end);
+    }).length;
+  }
+
+  Widget _buildSportFilterChips(ColorScheme cs, List<FeedItem> items) {
+    final keys = _distinctSportKeys(items).toList()
+      ..sort(
+        (a, b) =>
+            sportLabelForKey(a).toLowerCase().compareTo(
+                  sportLabelForKey(b).toLowerCase(),
+                ),
+      );
+
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          _SportFilterChip(
+            label: '🏃 All',
+            selected: _sportFilter == null,
+            onTap: () => _onSportChipTap(null),
+          ),
+          ...keys.map(
+            (k) => _SportFilterChip(
+              label: '${sportEmojiForKey(k)} ${sportLabelForKey(k)}',
+              selected: _sportFilter == k,
+              onTap: () => _onSportChipTap(k),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      height: 1.25,
-                    ),
-                  ),
-                  if (item.subtitle.trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      item.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget? _buildNearbyGamesBanner(ColorScheme cs, List<FeedItem> items) {
+    final n = _nearbyGamesTodayCount(items);
+    if (n <= 0) return null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => widget.onOpenHome?.call(context),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                cs.primary,
+                cs.primary.withValues(alpha: 0.7),
+              ],
             ),
-          ],
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              const Text('⚡', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  n == 1
+                      ? '1 game happening near you today'
+                      : '$n games happening near you today',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Games full-width; posts in 2-column masonry (variable row heights).
+  void _appendFeedBodySlivers(
+    List<Widget> slivers,
+    ThemeData theme,
+    List<FeedItem> items,
+  ) {
+    var i = 0;
+    var segmentIndex = 0;
+    while (i < items.length) {
+      final it = items[i];
+      if (it.isGameContent) {
+        final top = segmentIndex == 0 ? 4.0 : 0.0;
+        final isLast = i == items.length - 1;
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(12, top, 12, isLast ? 80 : 8),
+            sliver: SliverToBoxAdapter(
+              child: FeedGameCard(
+                item: it,
+                onTap: () => _openDetail(it),
+                onEnsureLoggedIn: widget.onEnsureLoggedIn,
+                onOpenMyGame: widget.onOpenMyGame,
+                onRefresh: () {
+                  _reload();
+                  _loadJoinedCount();
+                },
+              ),
+            ),
+          ),
+        );
+        segmentIndex++;
+        i++;
+      } else {
+        final chunk = <FeedItem>[];
+        while (i < items.length && !items[i].isGameContent) {
+          chunk.add(items[i]);
+          i++;
+        }
+        final top = segmentIndex == 0 ? 4.0 : 0.0;
+        final isLast = i >= items.length;
+        slivers.add(
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(12, top, 12, isLast ? 80 : 8),
+            sliver: SliverMasonryGrid.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childCount: chunk.length,
+              itemBuilder: (context, index) =>
+                  _buildFeedEntry(theme, chunk[index]),
+            ),
+          ),
+        );
+        segmentIndex++;
+      }
+    }
   }
 
   @override
@@ -329,203 +345,229 @@ class _FeedPageState extends State<FeedPage> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Feed'),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_usesToggle)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: SegmentedButton<FeedListDataSource>(
-                segments: const [
-                  ButtonSegment<FeedListDataSource>(
-                    value: FeedListDataSource.supabase,
-                    label: Text('Live'),
-                    icon: Icon(Icons.cloud_outlined, size: 18),
-                  ),
-                  ButtonSegment<FeedListDataSource>(
-                    value: FeedListDataSource.mock,
-                    label: Text('Mock'),
-                    icon: Icon(Icons.auto_awesome_outlined, size: 18),
-                  ),
-                ],
-                selected: {_source},
-                onSelectionChanged: (s) {
-                  if (s.isEmpty) return;
-                  _onSourceChanged(s.first);
-                },
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
-            child: Text(
-              !_usesToggle
-                  ? 'Using a custom feed source for this screen.'
-                  : _source == FeedListDataSource.supabase
-                      ? 'Upcoming games — tap a card to open the full view.'
-                      : 'Preview cards — tap any card to see the same detail layout.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.9),
-                height: 1.35,
-              ),
-            ),
-          ),
-          Expanded(
-            child: FutureBuilder<List<FeedItem>>(
-              future: _future,
-              builder: (context, snapshot) {
-                final isMock = _source == FeedListDataSource.mock;
-                final slivers = <Widget>[];
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: RefreshIndicator(
+        onRefresh: _refreshFeed,
+        child: FutureBuilder<List<FeedItem>>(
+          future: _future,
+          builder: (context, snapshot) {
+            final loaded = snapshot.connectionState == ConnectionState.done;
+            final items = snapshot.data ?? const <FeedItem>[];
+            final chipItems = loaded ? items : const <FeedItem>[];
 
-                if (snapshot.connectionState != ConnectionState.done) {
-                  slivers.add(
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: AppLoadingState(
-                        message: 'Loading feed…',
-                      ),
-                    ),
-                  );
-                } else if (snapshot.hasError) {
-                  slivers.add(
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: AppErrorState(
-                        message: 'We couldn’t load the feed',
-                        detail:
-                            'Check your connection, pull down to refresh, or tap Retry.',
-                        onRetry: _reload,
-                        retryLabel: 'Retry',
-                      ),
-                    ),
-                  );
-                } else {
-                  final items = snapshot.data ?? const [];
-                  if (items.isEmpty) {
-                    slivers.add(
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: AppEmptyState(
-                          title: isMock
-                              ? 'Nothing to preview yet'
-                              : 'Nothing to show yet',
-                          subtitle: isMock
-                              ? 'Sample cards will show when preview data is ready. Pull to refresh anytime.'
-                              : 'No upcoming games right now. Check back later, or open Preview for sample cards.',
-                          icon: isMock
-                              ? Icons.auto_awesome_outlined
-                              : Icons.sports_tennis,
-                          actionLabel: 'Refresh',
-                          onAction: _reload,
-                        ),
-                      ),
-                    );
-                  } else {
-                    slivers.add(
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, i) => Padding(
-                              padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
-                              child: _feedItemCard(theme, items[i]),
-                            ),
-                            childCount: items.length,
+            final slivers = <Widget>[
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 56,
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16),
+                        child: Text(
+                          'Smeet',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: cs.primary,
+                            letterSpacing: -0.5,
                           ),
                         ),
                       ),
-                    );
-                  }
-                }
-
-                return RefreshIndicator(
-                  onRefresh: _refreshFeed,
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: slivers,
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeedGradientCover extends StatelessWidget {
-  const _FeedGradientCover({
-    required this.gradientColors,
-    required this.heroText,
-    required this.showHero,
-  });
-
-  final List<Color> gradientColors;
-  final String heroText;
-  final bool showHero;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors.length >= 2
-              ? gradientColors
-              : [gradientColors.first, gradientColors.first],
-        ),
-      ),
-      child: showHero
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  heroText,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontWeight: FontWeight.w900,
-                        height: 1.05,
-                        letterSpacing: -0.5,
+                      const Spacer(),
+                      IconButton(
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            const Icon(Icons.sports_rounded),
+                            if (_joinedGameCount > 0)
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: cs.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      _joinedGameCount > 9
+                                          ? '9+'
+                                          : '$_joinedGameCount',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        tooltip: 'My Game',
+                        onPressed: () {
+                          widget.onOpenMyGame?.call(context);
+                        },
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.search_rounded),
+                        onPressed: () {},
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.notifications_outlined),
+                        onPressed: () async {
+                          await Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const NotificationsPage(),
+                            ),
+                          );
+                          await refreshAppNotificationBadges();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
                 ),
               ),
-            )
-          : null,
+              SliverToBoxAdapter(
+                child: _buildSportFilterChips(cs, chipItems),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              if (loaded) ...[
+                SliverToBoxAdapter(
+                  child: _buildNearbyGamesBanner(cs, items) ??
+                      const SizedBox.shrink(),
+                ),
+              ],
+              if (widget.repository == null && _activityFuture != null)
+                SliverToBoxAdapter(
+                  child: FutureBuilder<ActivitySummary>(
+                    future: _activityFuture,
+                    builder: (context, snap) {
+                      if (!snap.hasData) {
+                        return const SizedBox.shrink();
+                      }
+                      final s = snap.data!;
+                      return ActivityBanner(
+                        incomingLikes: s.incomingLikes,
+                        todayGames: s.todayGames,
+                        onTapLikes: widget.onOpenLikesYou == null
+                            ? null
+                            : () => widget.onOpenLikesYou!(context),
+                        onTapGames: widget.onOpenHome == null
+                            ? null
+                            : () => widget.onOpenHome!(context),
+                      );
+                    },
+                  ),
+                ),
+              if (widget.repository != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Text(
+                      'Using a custom feed source for this screen.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
+                ),
+            ];
+
+            if (snapshot.connectionState != ConnectionState.done) {
+              slivers.add(
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppLoadingState(
+                    message: 'Loading feed…',
+                  ),
+                ),
+              );
+            } else if (snapshot.hasError) {
+              slivers.add(
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppErrorState(
+                    message: 'We couldn’t load the feed',
+                    detail:
+                        'Check your connection, pull down to refresh, or tap Retry.',
+                    onRetry: _reload,
+                    retryLabel: 'Retry',
+                  ),
+                ),
+              );
+            } else if (items.isEmpty) {
+              slivers.add(
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppEmptyState(
+                    icon: Icons.dynamic_feed_outlined,
+                    title: 'No posts yet',
+                    subtitle:
+                        'Be the first to share a sports moment.',
+                    actionLabel: 'Share a moment',
+                    onAction: _shareMoment,
+                  ),
+                ),
+              );
+            } else {
+              _appendFeedBodySlivers(slivers, theme, items);
+            }
+
+            return CustomScrollView(
+              primary: true,
+              cacheExtent: 1200,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: ClampingScrollPhysics(),
+              ),
+              slivers: slivers,
+            );
+          },
+        ),
+      ),
     );
   }
 }
 
-class _FeedTypeChip extends StatelessWidget {
-  const _FeedTypeChip({
+class _SportFilterChip extends StatelessWidget {
+  const _SportFilterChip({
     required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
+    required this.selected,
+    required this.onTap,
   });
 
   final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: foregroundColor,
-              ),
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? cs.primary : cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(100),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : cs.onSurface,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
         ),
       ),
     );

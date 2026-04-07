@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:smeet_app/features/feed/models/feed_item.dart';
+import 'package:smeet_app/features/feed/widgets/feed_detail_video.dart';
+import 'package:smeet_app/widgets/adaptive_media.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
 import 'package:smeet_app/features/profile/presentation/profile_game_detail_page.dart';
 
@@ -214,11 +216,20 @@ class FeedDetailPage extends StatelessWidget {
       case FeedContentType.game:
         return 'Schedules and spots can change — open the game for the latest details.';
       case FeedContentType.video:
-        return 'In-app video playback isn’t available yet. Thanks for previewing this clip in the feed.';
+        return 'Video plays above when available. Schedules and details may change.';
       case FeedContentType.post:
         return 'This is a preview card. A full article view will arrive when posts go live in the app.';
     }
   }
+}
+
+String _feedDetailFirstMediaUrl(FeedItem item) {
+  final list = item.mediaUrls;
+  if (list != null && list.isNotEmpty) {
+    final s = list.first.trim();
+    if (s.isNotEmpty) return s;
+  }
+  return item.coverImageUrl?.trim() ?? '';
 }
 
 /// Same cover language as feed cards: image, gradient fallback, type chip, key line.
@@ -231,31 +242,38 @@ class _FeedDetailCoverBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final url = item.coverImageUrl?.trim();
-    final hasCover = url != null && url.isNotEmpty;
+    final videoUrl = item.videoUrl?.trim();
+    final hasVideo = videoUrl != null && videoUrl.isNotEmpty;
+    final mediaUrl = _feedDetailFirstMediaUrl(item);
+    final hasCover = mediaUrl.isNotEmpty;
     final keyLine = FeedDetailPage._keyInfoLine(item);
     final hero = FeedDetailPage._coverHeroWord(item);
     final gradient = FeedDetailPage._coverGradient(item.type, cs);
 
-    return AspectRatio(
-      aspectRatio: 1.82,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (hasCover)
-            Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _FdGradientCover(
-                gradientColors: gradient,
-                heroText: hero,
-              ),
-            )
-          else
-            _FdGradientCover(
+    if (hasVideo) {
+      return FeedDetailVideo(url: videoUrl);
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        if (hasCover)
+          AdaptiveNetworkImage(
+            imageUrl: mediaUrl,
+            errorBuilder: (context) => _FdGradientCover(
               gradientColors: gradient,
               heroText: hero,
             ),
+          )
+        else
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: _FdGradientCover(
+              gradientColors: gradient,
+              heroText: hero,
+            ),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -329,8 +347,7 @@ class _FeedDetailCoverBanner extends StatelessWidget {
                 ),
               ),
             ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -465,7 +482,9 @@ class _FeedDetailCtaBar extends StatelessWidget {
     }
 
     final copy = item.type == FeedContentType.video
-        ? 'Video playback in the app is coming later. You can keep browsing the feed for more picks.'
+        ? (item.videoUrl != null && item.videoUrl!.trim().isNotEmpty
+            ? 'Use the system controls on the clip above. Pull down or go back to keep browsing.'
+            : 'Video URL missing — you can still browse other feed items.')
         : 'Posts will get a richer reading experience soon. For now, keep exploring the feed.';
 
     return Column(

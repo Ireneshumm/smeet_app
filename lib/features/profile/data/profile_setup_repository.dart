@@ -63,6 +63,7 @@ Future<void> upsertProfileSetup({
 
   final availabilityJson = <String, dynamic>{};
   availability.forEach((day, slots) {
+    if (slots.isEmpty) return;
     availabilityJson[day] = slots.toList()..sort();
   });
 

@@ -13,6 +13,7 @@ import 'package:smeet_app/features/profile/presentation/profile_game_detail_page
 import 'package:smeet_app/features/profile/presentation/profile_post_detail_page.dart';
 import 'package:smeet_app/features/profile/profile_routes.dart';
 import 'package:smeet_app/widgets/post_media_display.dart';
+import 'package:smeet_app/widgets/circular_network_avatar.dart';
 
 /// Live vs mock source for the **header** only (Posts / Hosted / Joined tabs are live).
 enum ProfileMvpSummarySource {
@@ -185,20 +186,15 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 width: 2,
               ),
             ),
-            child: CircleAvatar(
-              radius: 40,
+            child: CircularNetworkAvatar(
+              size: 80,
+              imageUrl: s.avatarUrl,
               backgroundColor: cs.primaryContainer,
-              backgroundImage: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
-                  ? NetworkImage(s.avatarUrl!)
-                  : null,
-              onBackgroundImageError: (Object? error, StackTrace? stackTrace) {},
-              child: s.avatarUrl != null && s.avatarUrl!.isNotEmpty
-                  ? null
-                  : Icon(
-                      s.isGuest ? Icons.person_off_outlined : Icons.person,
-                      size: 42,
-                      color: cs.onPrimaryContainer,
-                    ),
+              placeholder: Icon(
+                s.isGuest ? Icons.person_off_outlined : Icons.person,
+                size: 42,
+                color: cs.onPrimaryContainer,
+              ),
             ),
           ),
           const SizedBox(width: 18),

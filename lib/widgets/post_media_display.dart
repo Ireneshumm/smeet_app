@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:smeet_app/widgets/adaptive_media.dart';
+
 /// Shared radii / border language for post images & video across Profile surfaces.
 const double kPostMediaListRadius = 14;
 const double kPostMediaDetailRadius = 16;
@@ -249,15 +251,22 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
           child: _emptyBox(cs, icon: Icons.image_not_supported_outlined),
         );
       }
-      return postMediaListFrame(
-        colorScheme: cs,
-        child: Image.network(
-          widget.url,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (context, error, stackTrace) =>
-              _emptyBox(cs, label: 'Couldn’t load image'),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(kPostMediaListRadius),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _postMediaBackdrop(cs),
+            border: Border.fromBorderSide(_postMediaBorderSide(cs)),
+            borderRadius: BorderRadius.circular(kPostMediaListRadius),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(kPostMediaListRadius - 1),
+            child: AdaptiveNetworkImage(
+              imageUrl: widget.url,
+              errorBuilder: (context) =>
+                  _emptyBox(cs, label: 'Couldn’t load image'),
+            ),
+          ),
         ),
       );
     }
@@ -275,48 +284,76 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
           child: _emptyBox(cs, icon: Icons.videocam_outlined, label: 'Video'),
         );
       }
-      return postMediaListFrame(
-        colorScheme: cs,
-        child: FutureBuilder<void>(
-          future: _initFuture,
-          builder: (context, snap) {
-            if (snap.hasError) {
-              return _emptyBox(cs,
-                  icon: Icons.error_outline, label: 'Video failed to load');
-            }
-            if (snap.connectionState != ConnectionState.done) {
-              return ColoredBox(
-                color: Colors.black,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(kPostMediaListRadius),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: Border.fromBorderSide(_postMediaBorderSide(cs)),
+            borderRadius: BorderRadius.circular(kPostMediaListRadius),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(kPostMediaListRadius - 1),
+            child: FutureBuilder<void>(
+              future: _initFuture,
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  return AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _emptyBox(cs,
+                        icon: Icons.error_outline,
+                        label: 'Video failed to load'),
+                  );
+                }
+                if (snap.connectionState != ConnectionState.done) {
+                  return AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: ColoredBox(
+                      color: Colors.black,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(cs.primary),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                if (!_vc!.value.isInitialized) {
+                  return AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _emptyBox(cs,
+                        icon: Icons.videocam_off_outlined,
+                        label: 'Video unavailable'),
+                  );
+                }
+                final playing = _vc!.value.isPlaying;
+                final sz = _vc!.value.size;
+                final ar =
+                    sz.height > 0 ? sz.width / sz.height : (16 / 9);
+                return AspectRatio(
+                  aspectRatio: ar,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ColoredBox(color: Colors.black),
+                      FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: sz.width,
+                          height: sz.height,
+                          child: VideoPlayer(_vc!),
+                        ),
+                      ),
+                      if (!playing) _cornerPlayBadge(),
+                      _centerPlayPause(playing),
+                    ],
                   ),
-                ),
-              );
-            }
-            if (!_vc!.value.isInitialized) {
-              return _emptyBox(cs,
-                  icon: Icons.videocam_off_outlined, label: 'Video unavailable');
-            }
-            final playing = _vc!.value.isPlaying;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                ColoredBox(color: Colors.black),
-                FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox(
-                    width: _vc!.value.size.width,
-                    height: _vc!.value.size.height,
-                    child: VideoPlayer(_vc!),
-                  ),
-                ),
-                if (!playing) _cornerPlayBadge(),
-                _centerPlayPause(playing),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       );
     }
@@ -328,7 +365,7 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
   }
 }
 
-/// Detail: one or more images, 4:5 each, full width.
+/// Detail: one or more images, intrinsic aspect each, full width.
 class PostMediaDetailImages extends StatelessWidget {
   const PostMediaDetailImages({super.key, required this.urls});
 
@@ -352,18 +389,14 @@ class PostMediaDetailImages extends StatelessWidget {
               child: ClipRRect(
                 borderRadius:
                     BorderRadius.circular(kPostMediaDetailRadius - 1),
-                child: AspectRatio(
-                  aspectRatio: 4 / 5,
-                  child: Image.network(
-                    urls[i],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => ColoredBox(
-                      color: _postMediaBackdrop(cs),
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        size: 52,
-                        color: cs.onSurfaceVariant,
-                      ),
+                child: AdaptiveNetworkImage(
+                  imageUrl: urls[i],
+                  errorBuilder: (context) => ColoredBox(
+                    color: _postMediaBackdrop(cs),
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 52,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -516,8 +549,10 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
                     cs, Icons.videocam_off_outlined, 'Video unavailable');
               }
               final playing = _vc!.value.isPlaying;
+              final sz = _vc!.value.size;
+              final ar = sz.height > 0 ? sz.width / sz.height : (16 / 9);
               return AspectRatio(
-                aspectRatio: 16 / 9,
+                aspectRatio: ar,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -583,22 +618,21 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
   }
 }
 
-/// Read-only grid cell (e.g. other user profile): fills cell, 4:5 via parent grid ratio.
+/// Read-only grid cell: intrinsic aspect from poster/image (legacy helper).
 class PostMediaGridCell extends StatelessWidget {
   const PostMediaGridCell({
     super.key,
     required this.imageUrl,
     required this.isVideo,
-    this.showPlayBadge = true,
   });
 
   final String imageUrl;
   final bool isVideo;
-  final bool showPlayBadge;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final r = BorderRadius.circular(kPostMediaThumbRadius - 1);
     return ClipRRect(
       borderRadius: BorderRadius.circular(kPostMediaThumbRadius),
       child: DecoratedBox(
@@ -609,50 +643,23 @@ class PostMediaGridCell extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(kPostMediaThumbRadius - 1),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (isVideo && imageUrl.isNotEmpty)
-                Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.92),
-                  ),
+          child: isVideo
+              ? AdaptiveVideoCover(
+                  coverUrl: imageUrl,
+                  borderRadius: r,
                 )
-              else if (isVideo)
-                ColoredBox(color: Colors.black.withValues(alpha: 0.92))
-              else if (imageUrl.isNotEmpty)
-                Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => ColoredBox(
-                    color: _postMediaBackdrop(cs),
-                    child: Icon(Icons.broken_image_outlined,
-                        color: cs.onSurfaceVariant),
-                  ),
-                )
-              else
-                ColoredBox(
-                  color: _postMediaBackdrop(cs),
-                  child: Icon(Icons.image_not_supported_outlined,
-                      color: cs.onSurfaceVariant),
-                ),
-              if (isVideo && showPlayBadge)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Icon(
-                    Icons.play_circle_filled_rounded,
-                    color: Colors.white.withValues(alpha: 0.95),
-                    size: 36,
-                    shadows: const [
-                      Shadow(blurRadius: 8, color: Colors.black54),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+              : (imageUrl.isNotEmpty
+                  ? AdaptiveNetworkImage(
+                      imageUrl: imageUrl,
+                      borderRadius: r,
+                    )
+                  : ColoredBox(
+                      color: _postMediaBackdrop(cs),
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    )),
         ),
       ),
     );

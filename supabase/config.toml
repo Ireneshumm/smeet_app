@@ -8,3 +8,10 @@
 
 [functions.google-places]
 verify_jwt = false
+
+# Database webhook + pg_cron call with service role; set FCM_SERVER_KEY in secrets.
+[functions.notify-incoming-like]
+verify_jwt = false
+
+[functions.notify-game-reminders]
+verify_jwt = false

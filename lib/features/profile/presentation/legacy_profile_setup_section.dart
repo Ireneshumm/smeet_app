@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/services/sport_definitions_service.dart';
 import 'package:smeet_app/features/profile/data/profile_setup_repository.dart';
+import 'package:smeet_app/features/profile/widgets/availability_picker.dart';
 
 /// Extracted **profile setup** UI + `profiles` upsert.
 ///
@@ -45,44 +48,33 @@ class LegacyProfileSetupSection extends StatefulWidget {
       LegacyProfileSetupSectionState();
 }
 
+/// Resolves stored level for [sport] when map keys may differ by case / legacy spelling.
+String? _storedLevelForSport(Map<String, String> levels, String sport) {
+  final c = canonicalSportKey(sport);
+  if (levels.containsKey(sport)) return levels[sport];
+  if (levels.containsKey(c)) return levels[c];
+  for (final e in levels.entries) {
+    if (canonicalSportKey(e.key) == c) return e.value;
+  }
+  return null;
+}
+
 class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
-  static const _sports = [
-    'Tennis',
-    'Golf',
-    'Pickleball',
-    'Badminton',
-    'Ski',
-    'Snowboard',
-    'Running',
-    'Gym',
-  ];
-
-  static const _levels = [
-    'Beginner',
-    'Intermediate',
-    'Advanced',
-    'Competitive',
-    'Pro',
-  ];
-
   final Map<String, String> _sportLevels = {};
-  String? _sportToAdd;
 
   final Map<String, Set<String>> _availability = {
-    'Mon': <String>{},
-    'Tue': <String>{},
-    'Wed': <String>{},
-    'Thu': <String>{},
-    'Fri': <String>{},
-    'Sat': <String>{},
-    'Sun': <String>{},
+    for (final d in kAvailabilityDays) d: <String>{},
   };
 
   int _appliedGeneration = 0;
 
+  Map<String, List<SportLevelDefinition>>? _defsBySport;
+  bool _defsLoading = true;
+
   @override
   void initState() {
     super.initState();
+    _loadDefinitions();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.loadGeneration > 0 &&
@@ -90,6 +82,38 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
         _applyLoadedRow(widget.loadedProfileRow);
       }
     });
+  }
+
+  Future<void> _loadDefinitions() async {
+    try {
+      final map =
+          await SportDefinitionsService(Supabase.instance.client).getAllSports();
+      if (!mounted) return;
+      setState(() {
+        _defsBySport = map;
+        _defsLoading = false;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[ProfileSetup] sport definitions: $e');
+      }
+      if (!mounted) return;
+      setState(() => _defsLoading = false);
+    }
+  }
+
+  String _levelDisplayLabel(String sport, String stored) {
+    final defs = _defsForSport(sport);
+    if (defs == null) return stored;
+    for (final d in defs) {
+      if (d.matchesStored(stored)) return d.levelLabel;
+    }
+    return stored;
+  }
+
+  List<SportLevelDefinition>? _defsForSport(String sport) {
+    final c = canonicalSportKey(sport);
+    return _defsBySport?[c] ?? _defsBySport?[sport];
   }
 
   @override
@@ -108,8 +132,7 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
     setState(() {
       if (row == null) {
         _sportLevels.clear();
-        _sportToAdd = null;
-        for (final d in _availability.keys) {
+        for (final d in kAvailabilityDays) {
           _availability[d] = {};
         }
         return;
@@ -119,26 +142,26 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
       if (sl is Map) {
         _sportLevels
           ..clear()
-          ..addAll(sl.map((k, v) => MapEntry(k.toString(), v.toString())));
+          ..addAll(
+            sl.map(
+              (k, v) => MapEntry(
+                canonicalSportKey(k.toString()),
+                v.toString(),
+              ),
+            ),
+          );
       } else {
         _sportLevels.clear();
-      }
-      if (_sportToAdd != null && _sportLevels.containsKey(_sportToAdd)) {
-        _sportToAdd = null;
       }
 
       final avail = row['availability'];
       if (avail is Map) {
-        for (final day in _availability.keys) {
-          final v = avail[day];
-          if (v is List) {
-            _availability[day] = v.map((e) => e.toString()).toSet();
-          } else {
-            _availability[day] = {};
-          }
+        final norm = normalizeAvailabilityMap(avail);
+        for (final day in kAvailabilityDays) {
+          _availability[day] = norm[day]?.toSet() ?? {};
         }
       } else {
-        for (final d in _availability.keys) {
+        for (final d in kAvailabilityDays) {
           _availability[d] = {};
         }
       }
@@ -193,10 +216,57 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
     }
   }
 
+  List<String> get _orderedSportKeys {
+    final fromDb = _defsBySport?.keys.toList() ?? <String>[];
+    fromDb.sort();
+    final extra = <String>[];
+    for (final e in kSupportedSports) {
+      if (!fromDb.contains(e.$1)) extra.add(e.$1);
+    }
+    return [...fromDb, ...extra];
+  }
+
+  Future<void> _openSportPickerSheet() async {
+    final defs = _defsBySport;
+    if (defs == null || defs.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load sport levels. Check your connection.'),
+        ),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (context, scrollCtrl) {
+            return _SportLevelBottomSheet(
+              defsBySport: defs,
+              sportLevels: _sportLevels,
+              orderedSportKeys: _orderedSportKeys,
+              scrollController: scrollCtrl,
+              onCommit: (sport, levelKey) {
+                setState(() => _sportLevels[sport] = levelKey);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const slots = ['Morning', 'Afternoon', 'Night'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -261,62 +331,24 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
                     ),
               ),
               const SizedBox(height: 10),
-              Builder(
-                builder: (context) {
-                  final availableSports = _sports
-                      .where((s) => !_sportLevels.containsKey(s))
-                      .toList();
-                  final safeValue =
-                      availableSports.contains(_sportToAdd) ? _sportToAdd : null;
-
-                  return DropdownButtonFormField<String>(
-                    initialValue: safeValue,
-                    decoration: const InputDecoration(
-                      labelText: 'Choose a sport',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: availableSports
-                        .map(
-                          (s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(s),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _sportToAdd = v),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              if (_sportToAdd != null)
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      _sportLevels[_sportToAdd!] ?? _levels.first,
-                  decoration: InputDecoration(
-                    labelText: '${_sportToAdd!} level',
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: _levels
-                      .map(
-                        (l) => DropdownMenuItem(
-                          value: l,
-                          child: Text(l),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      _sportLevels[_sportToAdd!] = v;
-                    });
-                  },
+              if (_defsLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                OutlinedButton.icon(
+                  onPressed: _openSportPickerSheet,
+                  icon: const Icon(Icons.sports_outlined),
+                  label: const Text('Add or edit sports'),
                 ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               if (_sportLevels.isEmpty)
                 Text(
                   'No sports added yet.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                 )
               else
@@ -324,15 +356,13 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
                   spacing: 8,
                   runSpacing: 8,
                   children: _sportLevels.entries.map((e) {
+                    final sk = canonicalSportKey(e.key);
+                    final emoji = sportEmojiForKey(sk);
+                    final label = _levelDisplayLabel(sk, e.value);
                     return InputChip(
-                      label: Text('${e.key}: ${e.value}'),
+                      label: Text('$emoji ${sportLabelForKey(sk)}: $label'),
                       onDeleted: () {
-                        setState(() {
-                          _sportLevels.remove(e.key);
-                          if (_sportToAdd == e.key) {
-                            _sportToAdd = null;
-                          }
-                        });
+                        setState(() => _sportLevels.remove(e.key));
                       },
                     );
                   }).toList(),
@@ -351,45 +381,194 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
                     ),
               ),
               const SizedBox(height: 10),
-              ..._availability.keys.map((day) {
-                final selected = _availability[day]!;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              AvailabilityPickerWidget(
+                key: ValueKey<int>(widget.loadGeneration),
+                initialValue: {
+                  for (final d in kAvailabilityDays)
+                    d: _availability[d]?.toList() ?? [],
+                },
+                onChanged: (m) {
+                  setState(() {
+                    for (final day in kAvailabilityDays) {
+                      _availability[day] = m[day]?.toSet() ?? {};
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SportLevelBottomSheet extends StatefulWidget {
+  const _SportLevelBottomSheet({
+    required this.defsBySport,
+    required this.sportLevels,
+    required this.orderedSportKeys,
+    required this.scrollController,
+    required this.onCommit,
+  });
+
+  final Map<String, List<SportLevelDefinition>> defsBySport;
+  final Map<String, String> sportLevels;
+  final List<String> orderedSportKeys;
+  final ScrollController scrollController;
+  final void Function(String sport, String levelKey) onCommit;
+
+  @override
+  State<_SportLevelBottomSheet> createState() => _SportLevelBottomSheetState();
+}
+
+class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final q = _query.trim().toLowerCase();
+    final sports = widget.orderedSportKeys.where((sk) {
+      if (q.isEmpty) return true;
+      final label = sportLabelForKey(sk).toLowerCase();
+      return sk.toLowerCase().contains(q) || label.contains(q);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+          child: Text(
+            'Sports & levels',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Search sports',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: ListView.builder(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            itemCount: sports.length,
+            itemBuilder: (context, i) {
+              final sport = sports[i];
+              final defs = widget.defsBySport[sport];
+              final emoji = sportEmojiForKey(sport);
+              final label = sportLabelForKey(sport);
+              final current =
+                  _storedLevelForSport(widget.sportLevels, sport);
+              final summary = current != null
+                  ? (defs == null
+                      ? current
+                      : defs
+                          .firstWhere(
+                            (d) => d.matchesStored(current),
+                            orElse: () => defs.first,
+                          )
+                          .levelLabel)
+                  : null;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                child: ExpansionTile(
+                  key: ValueKey(sport),
+                  title: Row(
                     children: [
-                      Text(
-                        day,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                      Text(emoji, style: const TextStyle(fontSize: 22)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: slots.map((s) {
-                          final isOn = selected.contains(s);
-                          return ChoiceChip(
-                            label: Text(s),
-                            selected: isOn,
-                            onSelected: (on) {
-                              setState(() {
-                                if (on) {
-                                  selected.add(s);
-                                } else {
-                                  selected.remove(s);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
+                      if (summary != null)
+                        Text(
+                          summary,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
                     ],
                   ),
-                );
-              }),
-            ],
+                  children: [
+                    if (defs == null || defs.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('No levels defined for this sport yet.'),
+                      )
+                    else
+                      Builder(
+                        builder: (context) {
+                          String? selectedKey;
+                          if (current != null) {
+                            for (final d in defs) {
+                              if (d.matchesStored(current)) {
+                                selectedKey = d.levelKey;
+                                break;
+                              }
+                            }
+                          }
+                          return Column(
+                            children: defs.map((d) {
+                              return RadioListTile<String>(
+                                value: d.levelKey,
+                                groupValue: selectedKey,
+                                title: Text(
+                                  d.levelLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: d.levelDescription != null &&
+                                        d.levelDescription!.trim().isNotEmpty
+                                    ? Text(
+                                        d.levelDescription!,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      )
+                                    : null,
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  widget.onCommit(sport, v);
+                                  setState(() {});
+                                },
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -412,12 +591,12 @@ class _ProfileSetupCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.primary.withOpacity(0.10)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
             offset: const Offset(0, 6),
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
           ),
         ],
       ),

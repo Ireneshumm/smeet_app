@@ -72,10 +72,12 @@ class PostsService {
   Future<void> createTextPost({
     required String userId,
     required String trimmedBody,
+    String sport = 'tennis',
   }) async {
     final payload = buildTextOnlyPostPayload(
       authorId: userId,
       captionContent: trimmedBody,
+      sport: sport,
     );
     await _client.from('posts').insert(payload);
   }
@@ -95,10 +97,11 @@ class PostsService {
   static Map<String, dynamic> buildTextOnlyPostPayload({
     required String authorId,
     required String captionContent,
+    String sport = 'tennis',
   }) {
     return {
       'author_id': authorId,
-      'sport': 'tennis',
+      'sport': sport,
       'visibility': 'public',
       'media_urls': <String>[],
       'media_type': 'image',
@@ -112,15 +115,23 @@ class PostsService {
     required String mediaUrl,
     required String mediaType,
     required String captionTrimmed,
+    String sport = 'tennis',
+    String? coverImageUrl,
   }) {
+    final trimmed = mediaUrl.trim();
+    final urls = (mediaType == 'note' || trimmed.isEmpty)
+        ? <String>[]
+        : <String>[mediaUrl];
     return {
       'author_id': authorId,
-      'sport': 'tennis',
+      'sport': sport,
       'visibility': 'public',
-      'media_urls': [mediaUrl],
+      'media_urls': urls,
       'media_type': mediaType,
       'caption': captionTrimmed,
       'content': captionTrimmed,
+      if (coverImageUrl != null && coverImageUrl.trim().isNotEmpty)
+        'cover_image_url': coverImageUrl.trim(),
     };
   }
 }

@@ -1,5 +1,4 @@
-// Placeholder legal copy for Smeet — replace with counsel-approved text before launch.
-// Sections are intentionally structured for easy substitution.
+// Legal copy for in-app Terms & Privacy (review with counsel before wide distribution).
 
 /// Single block in a legal document (heading optional for short intros).
 class LegalCopyBlock {
@@ -9,119 +8,174 @@ class LegalCopyBlock {
   final String body;
 }
 
+/// Shown at the top of Terms and Privacy screens (fixed string; avoids rebuild drift).
+const String kLegalDocumentsLastUpdated = 'March 30, 2026';
+
 const String kTermsOfUseIntro =
     'These Terms of Use (“Terms”) govern your access to and use of the Smeet mobile '
-    'application and related services (“Smeet”). By creating an account or using Smeet, '
-    'you agree to these Terms.\n\n'
-    'Smeet helps people discover sports games and connect with other players. You are '
-    'responsible for your conduct and for any content you submit.';
+    'application and related services (“Smeet,” “we,” “us”). By creating an account or '
+    'using Smeet, you agree to these Terms.\n\n'
+    'Smeet helps you discover sports games and connect with other players. You are '
+    'responsible for your conduct, your safety in the real world, and any content you submit.';
 
 const List<LegalCopyBlock> kTermsOfUseSections = [
   LegalCopyBlock(
-    heading: '1. Eligibility & accounts',
+    heading: '1. Eligibility and accounts',
     body:
-        'You must provide accurate registration information and safeguard your login '
-        'credentials. You are responsible for activity under your account.',
+        'You must meet the minimum age and eligibility requirements for your region. You '
+        'agree to provide accurate registration information and to keep your login '
+        'credentials secure. You are responsible for all activity that occurs under your '
+        'account.',
   ),
   LegalCopyBlock(
-    heading: '2. User conduct',
+    heading: '2. Acceptable use',
     body:
-        'You agree not to harass, abuse, spam, impersonate others, or post unlawful or '
-        'harmful content. We may suspend or terminate accounts that violate these Terms '
-        'or threaten community safety.',
+        'You agree to use Smeet only for lawful, respectful purposes. Without limitation, '
+        'you must not: harass, threaten, stalk, discriminate against, or harm others; '
+        'impersonate any person or entity; spam or scrape the service; upload malware or '
+        'attempt to disrupt or gain unauthorized access to Smeet, other users, or our '
+        'systems; post unlawful, fraudulent, obscene, hateful, or violent content; or use '
+        'the service to arrange illegal activity. We may investigate violations and cooperate '
+        'with law enforcement when appropriate.',
   ),
   LegalCopyBlock(
-    heading: '3. Content',
+    heading: '3. Content and license',
     body:
-        'You retain rights to content you submit, but grant Smeet a license to host, '
-        'display, and distribute that content as needed to operate the service. Do not '
-        'upload content you do not have the right to share.',
+        'You retain ownership of content you submit, but you grant Smeet a worldwide, '
+        'non-exclusive license to host, store, reproduce, display, and distribute your '
+        'content as needed to operate, promote, and improve the service. Do not upload '
+        'content you do not have the right to share.',
   ),
   LegalCopyBlock(
-    heading: '4. Disclaimers',
+    heading: '4. Account suspension and termination',
     body:
-        'Smeet is provided “as is.” We do not guarantee uninterrupted or error-free '
-        'service. Organizers and participants are responsible for real-world meetups and '
-        'safety.',
+        'We may suspend or terminate your access to Smeet, with or without notice, if we '
+        'reasonably believe you have violated these Terms, pose a risk to the community or '
+        'our operations, or must do so for legal or security reasons. You may stop using '
+        'Smeet at any time. Where the app offers account deletion, you may use that flow; '
+        'some information may be retained as described in our Privacy Policy and as '
+        'required by law. Provisions that should survive termination (including ownership, '
+        'disclaimers, and limits of liability where allowed) will survive.',
   ),
   LegalCopyBlock(
-    heading: '5. Changes',
+    heading: '5. Disclaimers',
     body:
-        'We may update these Terms. Continued use after changes constitutes acceptance of '
-        'the revised Terms. Material changes will be communicated in-app where appropriate.',
+        'Smeet is provided on an “as is” and “as available” basis. We do not warrant '
+        'uninterrupted or error-free service. Games and meetups are organized by users; '
+        'you participate at your own risk. We are not responsible for injuries, losses, '
+        'or disputes between users offline.',
   ),
   LegalCopyBlock(
-    heading: '6. Contact',
+    heading: '6. Dispute resolution',
     body:
-        'Questions about these Terms? Contact us through the in-app support or legal '
-        'contact channel provided in the app store listing.\n\n'
-        '[Replace this section with your official contact details.]',
+        'We encourage you to contact us first to resolve concerns informally. If a dispute '
+        'cannot be resolved that way, you and Smeet agree to seek resolution in accordance '
+        'with applicable law. Mandatory consumer rights in your country of residence '
+        'apply where they cannot lawfully be waived. Where permitted, you agree that the '
+        'courts of general jurisdiction in the location of Smeet’s operating entity have '
+        'exclusive jurisdiction, except that Apple is not a party to disputes between you '
+        'and Smeet; your use of the app may also be subject to the Apple Media Services '
+        'Terms and the Licensed Application End User License Agreement where applicable.',
+  ),
+  LegalCopyBlock(
+    heading: '7. Changes to these Terms',
+    body:
+        'We may update these Terms from time to time. We will post the updated Terms in '
+        'the app and may update the “last updated” date. Continued use after changes '
+        'take effect constitutes acceptance of the revised Terms, except where '
+        'additional consent is required by law.',
+  ),
+  LegalCopyBlock(
+    heading: '8. Contact',
+    body:
+        'For questions about these Terms, contact us using the support or legal contact '
+        'information shown on the Smeet product page on the App Store, or through any '
+        'in-app support or feedback option we provide.',
   ),
 ];
 
 const String kPrivacyPolicyIntro =
-    'This Privacy Policy explains how Smeet (“we,” “us”) collects, uses, and shares '
-    'information when you use our app and services.\n\n'
-    'By using Smeet, you agree to this policy. If you do not agree, please do not use the '
-    'service.';
+    'This Privacy Policy describes how Smeet (“we,” “us”) collects, uses, stores, and '
+    'shares information when you use our mobile application and related services.\n\n'
+    'By using Smeet, you acknowledge this policy. If you do not agree, please do not use '
+    'the service.';
 
 const List<LegalCopyBlock> kPrivacyPolicySections = [
   LegalCopyBlock(
     heading: '1. Information we collect',
     body:
-        '• Account information: email address and profile details you choose to provide '
-        '(e.g. display name, city, sports preferences).\n'
-        '• Content: photos, posts, messages, and other materials you submit.\n'
-        '• Usage & device data: approximate location if you enable location features, '
-        'diagnostics, and technical logs needed to operate and secure the service.\n\n'
-        '[Adjust this list to match your actual data practices.]',
+        'We may collect the following categories of information, depending on how you use Smeet:\n\n'
+        '• Account and profile: email address, display name, profile photo, city or '
+        'region, sports preferences, skill levels, and similar fields you choose to provide.\n'
+        '• Content you create: posts, photos, videos, messages, game listings, and other '
+        'materials you upload or send.\n'
+        '• Activity and device data: app usage, diagnostics, crash data, IP address, '
+        'device identifiers, and approximate or precise location if you grant location '
+        'permission (e.g. to show nearby games or venues).\n'
+        '• Communications: support requests and feedback you send to us.\n\n'
+        'We collect only what is reasonably needed to provide and improve the service, '
+        'unless we tell you otherwise or the law requires more.',
   ),
   LegalCopyBlock(
     heading: '2. How we use information',
     body:
-        'We use information to provide and improve Smeet, personalize your experience, '
-        'facilitate games and chat, send service-related notices, enforce our policies, '
-        'and comply with law.',
+        'We use the information above to: create and manage your account; show your '
+        'profile and content to other users as designed; match you with games and people; '
+        'operate chat and notifications; personalize your experience; maintain security, '
+        'prevent fraud and abuse; troubleshoot and improve the app; send service-related '
+        'messages; comply with legal obligations; and enforce our Terms and policies.',
   ),
   LegalCopyBlock(
-    heading: '3. Sharing',
+    heading: '3. How we share information',
     body:
-        'We may share information with service providers who assist us (e.g. hosting, '
-        'analytics) under strict terms, when required by law, or to protect rights and '
-        'safety. We do not sell your personal information.',
+        'We may share information: with other users as part of normal app features (e.g. '
+        'your profile in discovery or a game roster); with service providers who host data, '
+        'send push notifications, or help us operate the product, under confidentiality '
+        'and security obligations; when required by law, legal process, or government '
+        'requests; to protect the rights, safety, and security of users and Smeet; and in '
+        'connection with a merger, acquisition, or sale of assets, subject to this policy. '
+        'We do not sell your personal information for money.',
   ),
   LegalCopyBlock(
     heading: '4. Retention',
     body:
-        'We retain information as long as your account is active or as needed to provide '
-        'the service, comply with legal obligations, resolve disputes, and enforce our '
-        'agreements.',
+        'We keep information for as long as your account is active and as needed to '
+        'provide the service, comply with law, resolve disputes, and enforce our '
+        'agreements. When you delete your account where offered, we will delete or '
+        'anonymize your information within a reasonable time unless we must retain '
+        'specific data for legal or legitimate business reasons.',
   ),
   LegalCopyBlock(
-    heading: '5. Your choices',
+    heading: '5. Your choices and rights',
     body:
-        'You may update profile information in the app where supported. You can request '
-        'account deletion as described in the app (subject to backend processing). '
-        'Location access can be controlled through your device settings.',
+        'You may update certain profile fields in the app. You can control location '
+        'sharing through your device settings. Depending on where you live, you may have '
+        'rights to access, correct, delete, or export personal data, or to object to or '
+        'restrict certain processing. To exercise these rights, contact us using the '
+        'details in Section 8. You may opt out of non-essential notifications in device or '
+        'app settings where available.',
   ),
   LegalCopyBlock(
     heading: '6. Children',
     body:
-        'Smeet is not directed at children under the age required by your region. Do not '
-        'use the service if you are not old enough to consent to data processing where you '
-        'live.',
+        'Smeet is not intended for children under the age required in your jurisdiction to '
+        'consent to data processing without parental permission. Do not use the service if '
+        'you do not meet that age requirement.',
   ),
   LegalCopyBlock(
     heading: '7. International users',
     body:
-        'If you use Smeet from outside your home country, your information may be '
-        'transferred to and processed in countries where we or our providers operate.',
+        'If you use Smeet from outside the country where our servers or providers are '
+        'located, your information may be transferred to and processed in other countries. '
+        'We take steps designed to protect your information in line with this policy and '
+        'applicable law.',
   ),
   LegalCopyBlock(
-    heading: '8. Contact',
+    heading: '8. How to contact us',
     body:
-        'For privacy questions or requests, contact us at the address or email provided '
-        'in the app store listing.\n\n'
-        '[Replace with your privacy contact.]',
+        'For privacy questions, complaints, or requests (including access or deletion '
+        'where applicable), contact us using the support email or contact information '
+        'listed on the Smeet page on the App Store, or through any in-app support channel '
+        'we make available. We will respond in line with applicable law.',
   ),
 ];

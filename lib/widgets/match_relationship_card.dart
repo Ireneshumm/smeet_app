@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:smeet_app/widgets/circular_network_avatar.dart';
+
 /// Copy and widgets shared by standalone [MatchesPage] and Inbox **Matches** tab.
 class MatchRelationshipPresentation {
   MatchRelationshipPresentation._();
@@ -75,19 +77,15 @@ class MatchRelationshipCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 34,
+                  CircularNetworkAvatar(
+                    size: 68,
+                    imageUrl: trimmedAvatar.isEmpty ? null : trimmedAvatar,
                     backgroundColor: cs.tertiary.withValues(alpha: 0.2),
-                    backgroundImage: trimmedAvatar.isEmpty
-                        ? null
-                        : NetworkImage(trimmedAvatar),
-                    child: trimmedAvatar.isEmpty
-                        ? Icon(
-                            Icons.favorite_rounded,
-                            size: 32,
-                            color: cs.tertiary,
-                          )
-                        : null,
+                    placeholder: Icon(
+                      Icons.favorite_rounded,
+                      size: 32,
+                      color: cs.tertiary,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -212,13 +210,11 @@ Future<void> showMatchRelationshipNoChatDialog(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 40,
+              CircularNetworkAvatar(
+                size: 80,
+                imageUrl: av.isEmpty ? null : av,
                 backgroundColor: cs.tertiary.withValues(alpha: 0.2),
-                backgroundImage: av.isEmpty ? null : NetworkImage(av),
-                child: av.isEmpty
-                    ? Icon(Icons.favorite_rounded, color: cs.tertiary, size: 36)
-                    : null,
+                placeholder: Icon(Icons.favorite_rounded, color: cs.tertiary, size: 36),
               ),
               const SizedBox(height: 12),
               Text(
