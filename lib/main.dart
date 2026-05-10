@@ -2731,14 +2731,11 @@ class _LikesYouPageState extends State<LikesYouPage> {
     final u = Supabase.instance.client.auth.currentUser;
     if (u == null) return;
     final peer = p['id'].toString();
-    await Supabase.instance.client.from('swipes').upsert(
-      {
-        'from_user': u.id,
-        'to_user': peer,
-        'action': 'skip',
-      },
-      onConflict: 'from_user,to_user',
-    );
+    await Supabase.instance.client.from('swipes').insert({
+      'from_user': u.id,
+      'to_user': peer,
+      'action': 'skip',
+    });
     await _notifRepo.markIncomingLikesFromUserRead(peer);
     await refreshAppNotificationBadges();
     _reload();
@@ -2754,14 +2751,11 @@ class _LikesYouPageState extends State<LikesYouPage> {
 
     try {
       debugPrint('[PlayBack] Step1: insert swipe play');
-      await supabase.from('swipes').upsert(
-        {
-          'from_user': u.id,
-          'to_user': peer,
-          'action': 'play',
-        },
-        onConflict: 'from_user,to_user',
-      );
+      await supabase.from('swipes').insert({
+        'from_user': u.id,
+        'to_user': peer,
+        'action': 'play',
+      });
       debugPrint('[PlayBack] Step1 OK');
 
       debugPrint('[PlayBack] Step2: mark read');
@@ -3067,33 +3061,15 @@ class _SwipePageState extends State<SwipePage> {
       final supabase = Supabase.instance.client;
       final u = _user!;
 
-      // Fetch users I've already swiped on (any action) — exclude from candidates
-      final mySwipes = await supabase
-          .from('swipes')
-          .select('to_user')
-          .eq('from_user', u.id);
-      final swipedUserIds = (mySwipes as List)
-          .map((e) => e['to_user']?.toString())
-          .where((e) => e != null && e.isNotEmpty)
-          .cast<String>()
-          .toSet();
-
-      var profilesQuery = supabase
+      final raw = await supabase
           .from('profiles')
           .select(
             'id, display_name, city, intro, avatar_url, '
             'sport_levels, availability, swipe_intro_video_url, '
             'location_lat, location_lng',
           )
-          .neq('id', u.id);
-
-      if (swipedUserIds.isNotEmpty) {
-        // Postgrest 'not in' filter
-        final excludeList = swipedUserIds.join(',');
-        profilesQuery = profilesQuery.not('id', 'in', '($excludeList)');
-      }
-
-      final raw = await profilesQuery.limit(200);
+          .neq('id', u.id)
+          .limit(200);
 
       var list = (raw as List).cast<Map<String, dynamic>>();
 
@@ -3349,14 +3325,11 @@ class _SwipePageState extends State<SwipePage> {
       final supabase = Supabase.instance.client;
       final toUser = cur['id'].toString();
 
-      await supabase.from('swipes').upsert(
-        {
-          'from_user': u.id,
-          'to_user': toUser,
-          'action': action,
-        },
-        onConflict: 'from_user,to_user',
-      );
+      await supabase.from('swipes').insert({
+        'from_user': u.id,
+        'to_user': toUser,
+        'action': action,
+      });
 
       if (action == 'play') {
         final back = await supabase
