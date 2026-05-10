@@ -34,6 +34,7 @@ import 'package:smeet_app/core/services/user_notifications_repository.dart';
 import 'package:smeet_app/core/services/game_event_notification_service.dart';
 import 'package:smeet_app/core/services/push_token_service.dart';
 import 'package:smeet_app/core/services/swipe_candidate_media_service.dart';
+import 'package:smeet_app/core/services/swipe_write_service.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/widgets/swipe_card_hero_media.dart';
 import 'package:smeet_app/app/smeet_app.dart';
@@ -2731,13 +2732,10 @@ class _LikesYouPageState extends State<LikesYouPage> {
     final u = Supabase.instance.client.auth.currentUser;
     if (u == null) return;
     final peer = p['id'].toString();
-    await Supabase.instance.client.from('swipes').upsert(
-      {
-        'from_user': u.id,
-        'to_user': peer,
-        'action': 'skip',
-      },
-      onConflict: 'from_user,to_user',
+    await SwipeWriteService(Supabase.instance.client).recordSwipe(
+      fromUser: u.id,
+      toUser: peer,
+      action: 'skip',
     );
     await _notifRepo.markIncomingLikesFromUserRead(peer);
     await refreshAppNotificationBadges();
@@ -2754,13 +2752,10 @@ class _LikesYouPageState extends State<LikesYouPage> {
 
     try {
       debugPrint('[PlayBack] Step1: insert swipe play');
-      await supabase.from('swipes').upsert(
-        {
-          'from_user': u.id,
-          'to_user': peer,
-          'action': 'play',
-        },
-        onConflict: 'from_user,to_user',
+      await SwipeWriteService(supabase).recordSwipe(
+        fromUser: u.id,
+        toUser: peer,
+        action: 'play',
       );
       debugPrint('[PlayBack] Step1 OK');
 
@@ -3349,13 +3344,10 @@ class _SwipePageState extends State<SwipePage> {
       final supabase = Supabase.instance.client;
       final toUser = cur['id'].toString();
 
-      await supabase.from('swipes').upsert(
-        {
-          'from_user': u.id,
-          'to_user': toUser,
-          'action': action,
-        },
-        onConflict: 'from_user,to_user',
+      await SwipeWriteService(supabase).recordSwipe(
+        fromUser: u.id,
+        toUser: toUser,
+        action: action,
       );
 
       if (action == 'play') {
