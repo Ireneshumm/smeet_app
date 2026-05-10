@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart' show WebHtmlElementStrategy;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
@@ -117,6 +118,10 @@ class _PostImageState extends State<_PostImage> {
   }
 
   void _resolveRatio() {
+    if (kIsWeb) {
+      if (mounted) setState(() => _ratio = 4 / 3);
+      return;
+    }
     final image = NetworkImage(widget.imageUrl);
     final stream = image.resolve(ImageConfiguration.empty);
     _stream = stream;
@@ -137,14 +142,23 @@ class _PostImageState extends State<_PostImage> {
   @override
   Widget build(BuildContext context) {
     final ratio = _ratio ?? 4 / 3;
+    final Widget media = kIsWeb
+        ? Image.network(
+            widget.imageUrl,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+          )
+        : CachedNetworkImage(
+            imageUrl: widget.imageUrl,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          );
     return AspectRatio(
       aspectRatio: ratio,
-      child: CachedNetworkImage(
-        imageUrl: widget.imageUrl,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      ),
+      child: media,
     );
   }
 }
@@ -305,14 +319,24 @@ class FeedPostCard extends StatelessWidget {
         clipBehavior: Clip.hardEdge,
         children: [
           if (coverUrl.isNotEmpty)
-            CachedNetworkImage(
-              imageUrl: coverUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) =>
-                  _feedVideoGradientOnly(item.sport),
-              errorWidget: (context, url, error) =>
-                  _feedVideoGradientOnly(item.sport),
-            )
+            (kIsWeb
+                ? Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _feedVideoGradientOnly(item.sport),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: coverUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                        _feedVideoGradientOnly(item.sport),
+                    errorWidget: (context, url, error) =>
+                        _feedVideoGradientOnly(item.sport),
+                  ))
           else if (kIsWeb && videoUrl.isNotEmpty)
             WebVideoThumbnail(
               videoUrl: videoUrl,

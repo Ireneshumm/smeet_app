@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart' show WebHtmlElementStrategy;
 
 /// Width fills the parent; height follows the image’s intrinsic aspect ratio.
 class AdaptiveNetworkImage extends StatefulWidget {
@@ -26,6 +28,9 @@ class _AdaptiveNetworkImageState extends State<AdaptiveNetworkImage> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb && widget.imageUrl.trim().isNotEmpty) {
+      _aspectRatio = 4 / 3;
+    }
     _resolveAspectRatio();
   }
 
@@ -59,6 +64,14 @@ class _AdaptiveNetworkImageState extends State<AdaptiveNetworkImage> {
       if (mounted) {
         setState(() => _aspectRatio = 4 / 3);
       }
+      return;
+    }
+
+    // Flutter Web uses a fetch-based image pipeline that often fails on
+    // cross-origin Supabase Storage URLs; we paint via HtmlElementImage instead
+    // (see build) and use a stable aspect until layout.
+    if (kIsWeb) {
+      if (mounted) setState(() => _aspectRatio = 4 / 3);
       return;
     }
 
@@ -106,21 +119,31 @@ class _AdaptiveNetworkImageState extends State<AdaptiveNetworkImage> {
       );
     }
 
-    Widget img = CachedNetworkImage(
-      imageUrl: url,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorWidget: (context, url, err) =>
-          widget.errorBuilder?.call(context) ?? _defaultError(context),
-    );
+    final Widget img = kIsWeb
+        ? Image.network(
+            url,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+            errorBuilder: (context, error, stackTrace) =>
+                widget.errorBuilder?.call(context) ?? _defaultError(context),
+          )
+        : CachedNetworkImage(
+            imageUrl: url,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorWidget: (context, url, err) =>
+                widget.errorBuilder?.call(context) ?? _defaultError(context),
+          );
 
+    Widget clipped = img;
     if (widget.borderRadius != null) {
-      img = ClipRRect(borderRadius: widget.borderRadius!, child: img);
+      clipped = ClipRRect(borderRadius: widget.borderRadius!, child: clipped);
     }
 
     return AspectRatio(
       aspectRatio: ratio,
-      child: img,
+      child: clipped,
     );
   }
 
@@ -175,6 +198,9 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb && widget.coverUrl.trim().isNotEmpty) {
+      _aspectRatio = 16 / 9;
+    }
     _resolveAspectRatio();
   }
 
@@ -209,6 +235,11 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
       return;
     }
 
+    if (kIsWeb) {
+      if (mounted) setState(() => _aspectRatio = 16 / 9);
+      return;
+    }
+
     _detachListener();
     final provider = NetworkImage(url);
     final stream = provider.resolve(ImageConfiguration.empty);
@@ -238,31 +269,49 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
         fit: StackFit.expand,
         children: [
           cover.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: cover,
-                  fit: BoxFit.cover,
-                  memCacheWidth: widget.memCacheWidth,
-                  placeholder: (context, _) => Container(
-                    color: const Color(0xFF1A1A2E),
-                    child: const Center(
-                      child: Icon(
-                        Icons.videocam_rounded,
-                        color: Colors.white54,
-                        size: 32,
+              ? (kIsWeb
+                  ? Image.network(
+                      cover,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFF1A1A2E),
+                        child: const Center(
+                          child: Icon(
+                            Icons.videocam_rounded,
+                            color: Colors.white54,
+                            size: 32,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  errorWidget: (context, url, err) => Container(
-                    color: const Color(0xFF1A1A2E),
-                    child: const Center(
-                      child: Icon(
-                        Icons.videocam_rounded,
-                        color: Colors.white54,
-                        size: 32,
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: cover,
+                      fit: BoxFit.cover,
+                      memCacheWidth: widget.memCacheWidth,
+                      placeholder: (context, _) => Container(
+                        color: const Color(0xFF1A1A2E),
+                        child: const Center(
+                          child: Icon(
+                            Icons.videocam_rounded,
+                            color: Colors.white54,
+                            size: 32,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                )
+                      errorWidget: (context, url, err) => Container(
+                        color: const Color(0xFF1A1A2E),
+                        child: const Center(
+                          child: Icon(
+                            Icons.videocam_rounded,
+                            color: Colors.white54,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    ))
               : Container(
                   color: const Color(0xFF1A1A2E),
                   child: const Center(
