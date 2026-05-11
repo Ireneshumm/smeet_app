@@ -163,11 +163,6 @@ String _userFacingJoinGameError(Object e) {
   return 'Couldn’t join this game. Please try again.';
 }
 
-String _userFacingSwipeError(Object e) {
-  debugPrint('[Swipe] failed: $e');
-  return 'That didn’t work. Please try again.';
-}
-
 String _userFacingChatSendError(Object e) {
   debugPrint('[ChatSend] failed: $e');
   return 'Couldn’t send. Check your connection and try again.';
@@ -2732,11 +2727,14 @@ class _LikesYouPageState extends State<LikesYouPage> {
     final u = Supabase.instance.client.auth.currentUser;
     if (u == null) return;
     final peer = p['id'].toString();
-    await SwipeWriteService(Supabase.instance.client).recordSwipe(
-      fromUser: u.id,
-      toUser: peer,
+    final ok = await SwipeWriteService(Supabase.instance.client).recordSwipe(
+      fromUserId: u.id,
+      toUserId: peer,
       action: 'skip',
     );
+    if (!ok) {
+      debugPrint('[Swipe] _pass: recordSwipe returned false (continuing)');
+    }
     await _notifRepo.markIncomingLikesFromUserRead(peer);
     await refreshAppNotificationBadges();
     _reload();
@@ -2752,11 +2750,14 @@ class _LikesYouPageState extends State<LikesYouPage> {
 
     try {
       debugPrint('[PlayBack] Step1: insert swipe play');
-      await SwipeWriteService(supabase).recordSwipe(
-        fromUser: u.id,
-        toUser: peer,
+      final swipeOk = await SwipeWriteService(supabase).recordSwipe(
+        fromUserId: u.id,
+        toUserId: peer,
         action: 'play',
       );
+      if (!swipeOk) {
+        debugPrint('[PlayBack] Step1: recordSwipe returned false (continuing)');
+      }
       debugPrint('[PlayBack] Step1 OK');
 
       debugPrint('[PlayBack] Step2: mark read');
@@ -2856,13 +2857,9 @@ class _LikesYouPageState extends State<LikesYouPage> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error: ${e is PostgrestException ? e.message : e.toString()}',
-            ),
-            duration: const Duration(seconds: 8),
-          ),
+        debugPrint(
+          '[PlayBack] error (no user snackbar): '
+          '${e is PostgrestException ? e.message : e}',
         );
       }
     }
@@ -3344,11 +3341,14 @@ class _SwipePageState extends State<SwipePage> {
       final supabase = Supabase.instance.client;
       final toUser = cur['id'].toString();
 
-      await SwipeWriteService(supabase).recordSwipe(
-        fromUser: u.id,
-        toUser: toUser,
+      final swipeOk = await SwipeWriteService(supabase).recordSwipe(
+        fromUserId: u.id,
+        toUserId: toUser,
         action: action,
       );
+      if (!swipeOk) {
+        debugPrint('[Swipe] recordSwipe returned false for $toUser (continuing)');
+      }
 
       if (action == 'play') {
         final back = await supabase
@@ -3408,23 +3408,20 @@ class _SwipePageState extends State<SwipePage> {
           );
         }
       }
-
-      // 3) 下一张
-      setState(() {
-        _dragDx = 0;
-        _dragDy = 0;
-        _isDragging = false;
-        _index += 1;
-      });
-      unawaited(refreshAppNotificationBadges());
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_userFacingSwipeError(e))),
-        );
-      }
+    } catch (e, st) {
+      debugPrint('[Swipe] error (non-blocking, no snackbar): $e');
+      debugPrint('$st');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _dragDx = 0;
+          _dragDy = 0;
+          _isDragging = false;
+          _index += 1;
+          _loading = false;
+        });
+        unawaited(refreshAppNotificationBadges());
+      }
     }
   }
 
