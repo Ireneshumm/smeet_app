@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show Random;
 import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -2987,6 +2988,9 @@ class _SwipePageState extends State<SwipePage> {
           _myProfile = null;
         }
         await _loadCandidates();
+        if (_candidates.isEmpty) {
+          await _loadRelaxedSwipeDeck();
+        }
       } else {
         _myProfile = null;
         await _loadGuestCandidates();
@@ -3146,6 +3150,63 @@ class _SwipePageState extends State<SwipePage> {
       }
       if (mounted) setState(() => _error = e.toString());
     }
+  }
+
+  /// Second-chance deck: no swipe-history filter, blocks only, then shuffle.
+  /// Lets users keep swiping when the primary list is exhausted or empty.
+  Future<bool> _loadRelaxedSwipeDeck() async {
+    final supabase = Supabase.instance.client;
+    if (_user == null) {
+      await _loadGuestCandidates();
+      if (!mounted) return false;
+      setState(() {
+        _index = 0;
+        _error = null;
+      });
+      return _candidates.isNotEmpty;
+    }
+    final u = _user!;
+    try {
+      final raw = await supabase
+          .from('profiles')
+          .select(
+            'id, display_name, city, intro, avatar_url, '
+            'sport_levels, availability, swipe_intro_video_url, '
+            'location_lat, location_lng',
+          )
+          .neq('id', u.id)
+          .limit(120);
+
+      var list = (raw as List).cast<Map<String, dynamic>>();
+      final blockSets = await BlockService.fetchMyBlockSets();
+      list = list.where((p) {
+        final id = p['id']?.toString();
+        if (id == null) return false;
+        if (blockSets.iBlocked.contains(id)) return false;
+        if (blockSets.blockedMe.contains(id)) return false;
+        return true;
+      }).toList();
+
+      await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(list);
+      list.shuffle(Random());
+      if (!mounted) return false;
+      setState(() {
+        _candidates = list;
+        _index = 0;
+        _error = null;
+      });
+      debugPrint('[Swipe] relaxed deck: ${list.length} profiles');
+      return list.isNotEmpty;
+    } catch (e, st) {
+      debugPrint('[Swipe] _loadRelaxedSwipeDeck failed: $e\n$st');
+      return false;
+    }
+  }
+
+  Future<void> _refillSwipeDeckAfterExhaustion() async {
+    if (!mounted) return;
+    if (_index < _candidates.length) return;
+    await _loadRelaxedSwipeDeck();
   }
 
   Future<void> _loadSportLevelDefinitions() async {
@@ -3413,14 +3474,18 @@ class _SwipePageState extends State<SwipePage> {
       debugPrint('$st');
     } finally {
       if (mounted) {
+        final newIdx = _index + 1;
         setState(() {
           _dragDx = 0;
           _dragDy = 0;
           _isDragging = false;
-          _index += 1;
+          _index = newIdx;
           _loading = false;
         });
         unawaited(refreshAppNotificationBadges());
+        if (newIdx >= _candidates.length) {
+          unawaited(_refillSwipeDeckAfterExhaustion());
+        }
       }
     }
   }
