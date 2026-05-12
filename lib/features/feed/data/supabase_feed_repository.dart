@@ -40,9 +40,10 @@ class SupabaseFeedRepository implements FeedRepository {
         final pr = await _client
             .from('posts')
             .select(
-              'id, caption, media_type, media_urls, created_at, sport, author_id, likes_count, cover_image_url, profiles(display_name, avatar_url)',
+              'id, post_type, caption, media_type, media_urls, created_at, sport, author_id, likes_count, cover_image_url, profiles(display_name, avatar_url)',
             )
             .eq('visibility', 'public')
+            .or('post_type.is.null,post_type.neq.battle_report')
             .order('created_at', ascending: false)
             .limit(_postLimit);
         postRows = pr as List<dynamic>? ?? const [];
@@ -52,9 +53,10 @@ class SupabaseFeedRepository implements FeedRepository {
           final pr = await _client
               .from('posts')
               .select(
-                'id, caption, media_type, media_urls, created_at, sport, author_id, likes_count, cover_image_url',
+                'id, post_type, caption, media_type, media_urls, created_at, sport, author_id, likes_count, cover_image_url',
               )
               .eq('visibility', 'public')
+              .or('post_type.is.null,post_type.neq.battle_report')
               .order('created_at', ascending: false)
               .limit(_postLimit);
           postRows = pr as List<dynamic>? ?? const [];
@@ -118,6 +120,9 @@ class SupabaseFeedRepository implements FeedRepository {
     try {
       final id = row['id']?.toString();
       if (id == null || id.isEmpty) return null;
+
+      final postTypeRaw = (row['post_type'] ?? '').toString().trim();
+      if (postTypeRaw == 'battle_report') return null;
 
       final rowSport = (row['sport'] ?? '').toString().trim();
       final sportKey = rowSport.isEmpty ? '' : canonicalSportKey(rowSport);
@@ -199,6 +204,7 @@ class SupabaseFeedRepository implements FeedRepository {
         sport: sportKey,
         caption: caption,
         likesCount: likesCount,
+        postType: postTypeRaw.isEmpty ? null : postTypeRaw,
       );
     } catch (e) {
       debugPrint('[SupabaseFeedRepository] skip post row: $e');
