@@ -6513,13 +6513,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              if (identityUser != null) ...[
-                const SizedBox(height: 12),
-                ProfileIdentitySection(userId: identityUser.id),
-              ],
+              // Identity scrolls inside the Profile tab (not here) so it cannot
+              // sit fixed above TabBarView and cover content on small viewports.
               const SizedBox(height: 12),
 
-              // Tabs
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -6570,6 +6567,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         children: [
                           if (identityUser != null) ...[
+                            ProfileIdentitySection(userId: identityUser.id),
+                            const SizedBox(height: 12),
                             SportAchievementWall(
                               userId: identityUser.id,
                               supabase: Supabase.instance.client,
