@@ -58,7 +58,7 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!privacy-policy\\.html|terms-of-service\\.html).*)",
       "destination": "/index.html"
     }
   ]

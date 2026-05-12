@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../legal/privacy_policy_page.dart';
-import '../legal/terms_of_use_page.dart';
 import 'delete_account_flow.dart';
+
+const _kPrivacyPolicyUrl = 'https://smeet.com.au/privacy-policy.html';
+const _kTermsOfServiceUrl = 'https://smeet.com.au/terms-of-service.html';
+
+Future<void> _openLegalUrl(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open link')),
+    );
+  }
+}
 
 /// Opens a real, informational help dialog (no fake backend form).
 void showReportProblemDialog(BuildContext context) {
@@ -131,13 +143,7 @@ class LegalSectionCard extends StatelessWidget {
                   ),
             ),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const TermsOfUsePage(),
-                ),
-              );
-            },
+            onTap: () => _openLegalUrl(context, _kTermsOfServiceUrl),
           ),
           const Divider(height: 1),
           ListTile(
@@ -150,13 +156,7 @@ class LegalSectionCard extends StatelessWidget {
                   ),
             ),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const PrivacyPolicyPage(),
-                ),
-              );
-            },
+            onTap: () => _openLegalUrl(context, _kPrivacyPolicyUrl),
           ),
           const Divider(height: 1),
           Padding(
