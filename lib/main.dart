@@ -17,6 +17,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -371,13 +372,49 @@ Future<void> main() async {
 
   final namedRoutes = _smeetNamedRoutesForNonRelease();
 
-  runApp(
-    SmeetApp(
-      home: const SmeetShell(),
-      routes: namedRoutes,
-      showMvpDebugLauncher: kDebugMode,
-      mvpDebugLauncherItems:
-          kReleaseMode ? const <MvpDebugLauncherItem>[] : _kMvpDebugLauncherItems,
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = const String.fromEnvironment(
+        'SENTRY_DSN',
+        defaultValue:
+            'https://7e9d973b74c5578676e4812de7644c4f@o4511374283898880.ingest.us.sentry.io/4511374297726976',
+      );
+      options.tracesSampleRate = 0.1;
+      options.profilesSampleRate = 0.0;
+      options.debug = false;
+      options.environment = kReleaseMode ? 'production' : 'development';
+      options.sendDefaultPii = false;
+      options.enableAutoSessionTracking = true;
+      options.beforeSend = (event, hint) {
+        if (kDebugMode) return null;
+        final msg = (event.message?.formatted ?? '').toLowerCase();
+        String excType = '';
+        final exList = event.exceptions;
+        if (exList != null && exList.isNotEmpty) {
+          excType = (exList.first.type ?? '').toLowerCase();
+        }
+        final errStr = (event.throwable?.toString() ?? '').toLowerCase();
+        if (msg.contains('minified:hz') ||
+            msg.contains('apple sign in failed') ||
+            errStr.contains('apple sign in failed') ||
+            (excType.contains('typeerror') &&
+                (msg.contains('jsobject') || errStr.contains('jsobject')))) {
+          return null;
+        }
+        return event;
+      };
+    },
+    appRunner: () => runApp(
+      SentryUserInteractionWidget(
+        child: SmeetApp(
+          home: const SmeetShell(),
+          routes: namedRoutes,
+          showMvpDebugLauncher: kDebugMode,
+          mvpDebugLauncherItems: kReleaseMode
+              ? const <MvpDebugLauncherItem>[]
+              : _kMvpDebugLauncherItems,
+        ),
+      ),
     ),
   );
 }
@@ -1707,6 +1744,9 @@ class _HomePageState extends State<HomePage> {
             'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
           );
         }
+        if (!kDebugMode) {
+          unawaited(Sentry.captureException(e, stackTrace: st));
+        }
         // Do not clear [chatRowInserted]: insert may have succeeded before a later step failed.
         gameLinkedToChat = false;
       }
@@ -2863,6 +2903,9 @@ class _LikesYouPageState extends State<LikesYouPage> {
           '${e is PostgrestException ? e.message : e}',
         );
       }
+      if (!kDebugMode) {
+        unawaited(Sentry.captureException(e, stackTrace: st));
+      }
     }
   }
 
@@ -3472,6 +3515,9 @@ class _SwipePageState extends State<SwipePage> {
     } catch (e, st) {
       debugPrint('[Swipe] error (non-blocking, no snackbar): $e');
       debugPrint('$st');
+      if (!kDebugMode) {
+        unawaited(Sentry.captureException(e, stackTrace: st));
+      }
     } finally {
       if (mounted) {
         final newIdx = _index + 1;
