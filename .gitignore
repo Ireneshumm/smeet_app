@@ -50,3 +50,8 @@ app.*.map.json
 
 # Vercel runs npm install for package.json (no deps committed)
 node_modules/
+
+# Android release signing (never commit)
+android/key.properties
+*.jks
+*.keystore
