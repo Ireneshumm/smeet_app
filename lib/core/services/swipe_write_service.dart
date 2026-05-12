@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Bulletproof swipe write — 优雅处理所有重复场景。
@@ -59,8 +62,11 @@ class SwipeWriteService {
               .eq('from_user', fromUserId)
               .eq('to_user', toUserId);
           return true;
-        } catch (e2) {
+        } catch (e2, st) {
           debugPrint('[SwipeWriteService] 最终 UPDATE fallback 失败: $e2');
+          if (!kDebugMode) {
+            unawaited(Sentry.captureException(e2, stackTrace: st));
+          }
           return false;
         }
       }

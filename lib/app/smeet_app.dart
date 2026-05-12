@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// One entry in the unified MVP debug launcher ([SmeetApp] — no feature imports).
 class MvpDebugLauncherItem {
@@ -190,6 +191,7 @@ class SmeetApp extends StatelessWidget {
 
     return MaterialApp(
       navigatorKey: SmeetApp.navigatorKey,
+      navigatorObservers: [SentryNavigatorObserver()],
       title: 'Smeet',
       debugShowCheckedModeBanner: false,
       theme: theme,
