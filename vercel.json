@@ -9,10 +9,14 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
         },
         {
           "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
           "value": "no-store"
         }
       ]
@@ -22,50 +26,32 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
         },
         {
           "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
           "value": "no-store"
         }
       ]
     },
     {
-      "source": "/flutter_bootstrap.js",
+      "source": "/(flutter_bootstrap\\.js|main\\.dart\\.js|flutter_service_worker\\.js)",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
         },
         {
           "key": "CDN-Cache-Control",
           "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/flutter_service_worker.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
         },
         {
-          "key": "CDN-Cache-Control",
+          "key": "Vercel-CDN-Cache-Control",
           "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/main.dart.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=300, must-revalidate"
-        },
-        {
-          "key": "CDN-Cache-Control",
-          "value": "max-age=300, must-revalidate"
         }
       ]
     }
