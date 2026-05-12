@@ -1,7 +1,7 @@
 {
     "name": "smeet_app",
     "short_name": "smeet_app",
-    "version": "1778544356",
+    "version": "1778554329",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
