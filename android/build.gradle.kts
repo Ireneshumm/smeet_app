@@ -25,7 +25,7 @@ subprojects {
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_1_8)
             languageVersion.set(KotlinVersion.KOTLIN_1_8)
             apiVersion.set(KotlinVersion.KOTLIN_1_8)
         }
