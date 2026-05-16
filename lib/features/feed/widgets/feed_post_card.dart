@@ -180,10 +180,6 @@ class FeedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (item.postType == 'battle_report') {
-      return const SizedBox.shrink();
-    }
-
     final theme = Theme.of(context);
     final mediaUrl = _feedFirstMediaUrl(item);
     final hasCover = mediaUrl.isNotEmpty;
