@@ -29,7 +29,6 @@ class FeedItem {
     this.sport = '',
     this.caption = '',
     this.likesCount = 0,
-    this.postType,
   });
 
   final String id;
@@ -83,9 +82,6 @@ class FeedItem {
 
   /// Denormalized like count from `posts.likes_count` when present.
   final int likesCount;
-
-  /// `posts.post_type` when this row came from the posts table (games: null).
-  final String? postType;
 
   bool get isGameContent => type == FeedContentType.game;
 
