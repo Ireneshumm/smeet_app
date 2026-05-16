@@ -64,6 +64,7 @@ import 'package:smeet_app/features/profile/widgets/sport_achievement_wall.dart';
 import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
 import 'package:smeet_app/features/profile/profile.dart';
 import 'package:smeet_app/features/explore/presentation/explore_page.dart';
+import 'package:smeet_app/features/explore/widgets/swipe_deck_controls.dart';
 
 part 'app/shell/smeet_shell.dart';
 
@@ -4058,71 +4059,12 @@ class _SwipePageState extends State<SwipePage> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            '← Skip   Play →',
-            style: TextStyle(
-              color: cs.onSurface.withValues(alpha: 0.4),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Material(
-                color: Colors.white,
-                elevation: 2,
-                shadowColor: Colors.black.withValues(alpha: 0.12),
-                shape: const CircleBorder(),
-                child: Tooltip(
-                  message: 'Skip',
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: _loading ? null : () => _swipe('skip'),
-                    child: SizedBox(
-                      width: 58,
-                      height: 58,
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 30,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 40),
-              Material(
-                color: Colors.white,
-                elevation: 6,
-                shadowColor: cs.primary.withValues(alpha: 0.28),
-                shape: const CircleBorder(),
-                child: Tooltip(
-                  message: 'Play',
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: _loading ? null : () => _swipe('play'),
-                    child: SizedBox(
-                      width: 66,
-                      height: 66,
-                      child: Icon(
-                        Icons.sports_tennis,
-                        size: 34,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Showing ${_index + 1} / ${_candidates.length}',
-            style: TextStyle(
-              color: cs.onSurface.withValues(alpha: 0.55),
-              fontSize: 12,
-            ),
+          SwipeDeckControls(
+            loading: _loading,
+            onSkip: () => _swipe('skip'),
+            onPlay: () => _swipe('play'),
+            currentIndex: _index,
+            totalCount: _candidates.length,
           ),
         ],
       ),
