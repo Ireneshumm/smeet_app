@@ -23,9 +23,29 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 
+    afterEvaluate {
+        // Java 17 for all Android subprojects (align with Kotlin jvmTarget).
+        plugins.withId("com.android.application") {
+            extensions.findByType<com.android.build.gradle.AppExtension>()?.apply {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+        plugins.withId("com.android.library") {
+            extensions.findByType<com.android.build.gradle.LibraryExtension>()?.apply {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
+
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_1_8)
+            jvmTarget.set(JvmTarget.JVM_17)
             languageVersion.set(KotlinVersion.KOTLIN_1_8)
             apiVersion.set(KotlinVersion.KOTLIN_1_8)
         }
