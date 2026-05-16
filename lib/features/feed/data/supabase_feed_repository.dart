@@ -16,6 +16,9 @@ class SupabaseFeedRepository implements FeedRepository {
   static const int _gameLimit = 50;
   static const int _postLimit = 40;
 
+  /// Battle Report posts use this caption prefix (no `post_type` column in DB).
+  static const String _battleReportCaptionMarker = '🏆 Battle report';
+
   @override
   Future<List<FeedItem>> fetchFeed({
     double? userLat,
@@ -128,6 +131,7 @@ class SupabaseFeedRepository implements FeedRepository {
       }
 
       final caption = (row['caption'] ?? '').toString().trim();
+      if (caption.contains(_battleReportCaptionMarker)) return null;
       final title = caption.isEmpty ? 'Post' : caption;
 
       final mediaUrlsRaw = row['media_urls'];
