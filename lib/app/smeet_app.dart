@@ -88,6 +88,15 @@ class SmeetApp extends StatelessWidget {
   static const Color smeetCanvas = Color(0xFFF8F7F4);
   static const Color smeetNavBorder = Color(0xFFF0EEE8);
 
+  static const Color smeetMintLight = Color(0xFFDCFFF1);
+  static const Color smeetMintFaint = Color(0xFFFAFCFB);
+  static const Color smeetGrey = Color(0xFF6E7874);
+  static const Color smeetGreyLight = Color(0xFFE5F4EE);
+  static const Color smeetCoral = Color(0xFFE07A5F);
+  static const Color smeetCoralLight = Color(0xFFFFE5DC);
+  static const Color smeetIndigo = Color(0xFF5B6CFF);
+  static const Color smeetIndigoLight = Color(0xFFE8E9FF);
+
   @override
   Widget build(BuildContext context) {
     final baseScheme = ColorScheme.fromSeed(

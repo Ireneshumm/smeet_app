@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smeet_app/app/smeet_app.dart';
 
 /// Skip / Play controls below the swipe card (Explore → Smeet).
 class SwipeDeckControls extends StatelessWidget {
@@ -19,103 +20,152 @@ class SwipeDeckControls extends StatelessWidget {
   final int currentIndex;
   final int totalCount;
 
-  static const Color _skipBorder = Color(0xFFD6D6D6);
-  static const Color _skipIcon = Color(0xFFE53935);
-  static const Color _playTeal = Color(0xFF14B8A6);
+  static const double _buttonSize = 64;
+  static const double _buttonGap = 48;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    Widget circleButton({
-      required double diameter,
-      required String tooltip,
-      required Widget child,
-      required Color borderColor,
-      required VoidCallback? onTap,
-    }) {
-      return Tooltip(
-        message: tooltip,
-        child: Container(
-          width: diameter,
-          height: diameter,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            border: Border.all(color: borderColor, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onTap,
-              child: SizedBox(
-                width: diameter,
-                height: diameter,
-                child: Center(child: child),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '← Skip     Play →',
-          style: TextStyle(
-            color: cs.onSurface.withValues(alpha: 0.35),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            circleButton(
-              diameter: 48,
+            _SwipeCircleButton(
               tooltip: 'Skip',
-              onTap: loading ? null : onSkip,
-              borderColor: _skipBorder,
+              enabled: !loading,
+              borderColor: SmeetApp.smeetGreyLight,
+              pressedBorderColor: SmeetApp.smeetMint,
+              pressedBackgroundColor: SmeetApp.smeetMintLight,
+              pressScale: 0.92,
+              glowOnPress: false,
+              onPressed: onSkip,
               child: const Icon(
                 Icons.close_rounded,
-                size: 22,
-                color: _skipIcon,
+                size: 28,
+                color: SmeetApp.smeetGrey,
               ),
             ),
-            const SizedBox(width: 28),
-            circleButton(
-              diameter: 52,
+            const SizedBox(width: _buttonGap),
+            _SwipeCircleButton(
               tooltip: 'Play',
-              onTap: loading ? null : onPlay,
-              borderColor: _playTeal.withValues(alpha: 0.42),
-              child: const Text(
-                '🎾',
-                style: TextStyle(fontSize: 21, height: 1),
+              enabled: !loading,
+              borderColor: SmeetApp.smeetMint,
+              pressedBorderColor: SmeetApp.smeetMint,
+              pressedBackgroundColor: Colors.white,
+              pressScale: 1.08,
+              glowOnPress: true,
+              onPressed: onPlay,
+              child: const Icon(
+                Icons.sports_tennis_rounded,
+                size: 28,
+                color: SmeetApp.smeetMint,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        Text(
-          'Showing ${currentIndex + 1} / $totalCount',
-          style: TextStyle(
-            color: cs.onSurface.withValues(alpha: 0.36),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(
+            'Showing ${currentIndex + 1} / $totalCount',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: SmeetApp.smeetGrey,
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SwipeCircleButton extends StatefulWidget {
+  const _SwipeCircleButton({
+    required this.tooltip,
+    required this.enabled,
+    required this.borderColor,
+    required this.pressedBorderColor,
+    required this.pressedBackgroundColor,
+    required this.pressScale,
+    required this.glowOnPress,
+    required this.onPressed,
+    required this.child,
+  });
+
+  final String tooltip;
+  final bool enabled;
+  final Color borderColor;
+  final Color pressedBorderColor;
+  final Color pressedBackgroundColor;
+  final double pressScale;
+  final bool glowOnPress;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  @override
+  State<_SwipeCircleButton> createState() => _SwipeCircleButtonState();
+}
+
+class _SwipeCircleButtonState extends State<_SwipeCircleButton> {
+  bool _pressed = false;
+
+  static const _duration = Duration(milliseconds: 100);
+
+  void _setPressed(bool value) {
+    if (!widget.enabled) return;
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final border = _pressed ? widget.pressedBorderColor : widget.borderColor;
+    final bg = _pressed ? widget.pressedBackgroundColor : Colors.white;
+    final scale = _pressed ? widget.pressScale : 1.0;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: GestureDetector(
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) {
+          _setPressed(false);
+          if (widget.enabled) widget.onPressed();
+        },
+        onTapCancel: () => _setPressed(false),
+        child: AnimatedScale(
+          scale: scale,
+          duration: _duration,
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: _duration,
+            curve: Curves.easeOut,
+            width: SwipeDeckControls._buttonSize,
+            height: SwipeDeckControls._buttonSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: bg,
+              border: Border.all(color: border, width: 2),
+              boxShadow: [
+                if (_pressed && widget.glowOnPress)
+                  BoxShadow(
+                    color: SmeetApp.smeetMint.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  )
+                else
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+              ],
+            ),
+            child: Center(child: widget.child),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -3082,10 +3082,27 @@ class _SwipePageState extends State<SwipePage> {
         )
         .limit(50);
 
-    _candidates = (raw as List).cast<Map<String, dynamic>>();
-    await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(
-      _candidates,
-    );
+    var list = (raw as List).cast<Map<String, dynamic>>();
+    await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(list);
+    _candidates = _filterCompleteSwipeProfiles(list);
+  }
+
+  /// Drop incomplete profiles (no avatar, city, or display name).
+  bool _isCompleteSwipeProfile(Map<String, dynamic> p) {
+    final avatar = (p['avatar_url'] ?? '').toString().trim();
+    final city = (p['city'] ?? '').toString().trim();
+    final name = (p['display_name'] ?? '').toString().trim();
+    final avatarOk = avatar.isNotEmpty;
+    final cityOk =
+        city.isNotEmpty && !city.toLowerCase().contains('not set');
+    final nameOk = name.length >= 2;
+    return avatarOk && cityOk && nameOk;
+  }
+
+  List<Map<String, dynamic>> _filterCompleteSwipeProfiles(
+    List<Map<String, dynamic>> list,
+  ) {
+    return list.where(_isCompleteSwipeProfile).toList();
   }
 
   /// Whether [other] shares a sport with the viewer. If we have no profile
@@ -3185,7 +3202,7 @@ class _SwipePageState extends State<SwipePage> {
         return 0;
       });
 
-      _candidates = list;
+      _candidates = _filterCompleteSwipeProfiles(list);
     } catch (e, st) {
       debugPrint('[Swipe] _loadCandidates failed: $e');
       debugPrint('[Swipe] stack: $st');
@@ -3232,6 +3249,7 @@ class _SwipePageState extends State<SwipePage> {
       }).toList();
 
       await SwipeCandidateMediaService(supabase).mergeResolvedVideoUrls(list);
+      list = _filterCompleteSwipeProfiles(list);
       list.shuffle(Random());
       if (!mounted) return false;
       setState(() {
@@ -3651,14 +3669,47 @@ class _SwipePageState extends State<SwipePage> {
 
     final cur = _current;
     if (cur == null) {
-      return AppEmptyState(
-        icon: Icons.people_outline,
-        title: 'No one new to show right now',
-        subtitle: _user == null
-            ? 'Sign in and finish your profile to see people you can connect with.'
-            : 'Add a sport in Profile or pull to refresh — new people may appear later.',
-        actionLabel: 'Refresh',
-        onAction: _bootstrap,
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.people_outline_rounded,
+                size: 64,
+                color: SmeetApp.smeetMint,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No new players right now — check back soon!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: SmeetApp.smeetInk,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _user == null
+                    ? 'Sign in and finish your profile to see people you can connect with.'
+                    : 'Or invite friends from Brisbane to join Smeet',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: SmeetApp.smeetGrey,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: _bootstrap,
+                child: const Text('Refresh'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -3673,13 +3724,9 @@ class _SwipePageState extends State<SwipePage> {
     final sportChips = _sportOverlayChips(cur);
 
     final theme = Theme.of(context);
-    final gradientHeight =
-        (MediaQuery.sizeOf(context).height * 0.22).clamp(200.0, 320.0);
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
+    return Column(
+      children: [
           if (_user != null)
             ValueListenableBuilder<int>(
               valueListenable: smeetIncomingLikesCount,
@@ -3771,25 +3818,29 @@ class _SwipePageState extends State<SwipePage> {
               ),
             ),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final cardW = constraints.maxWidth;
-                final cardH = constraints.maxHeight;
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardW = constraints.maxWidth;
+                  final cardH = constraints.maxHeight;
+                  final gradientH = cardH * 0.4;
+                  final infoH = cardH * 0.3;
 
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                        color: Colors.black.withValues(alpha: 0.10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: GestureDetector(
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                          color: Colors.black.withValues(alpha: 0.10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onPanStart: _loading
                           ? null
@@ -3855,16 +3906,18 @@ class _SwipePageState extends State<SwipePage> {
                               left: 0,
                               right: 0,
                               bottom: 0,
-                              height: gradientHeight,
-                              child: DecoratedBox(
+                              height: gradientH,
+                              child: const DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
                                       Colors.transparent,
-                                      Colors.black.withValues(alpha: 0.78),
+                                      Colors.transparent,
+                                      Color(0xB3000000),
                                     ],
+                                    stops: [0.0, 0.55, 1.0],
                                   ),
                                 ),
                               ),
@@ -3872,11 +3925,14 @@ class _SwipePageState extends State<SwipePage> {
                             Positioned(
                               left: 16,
                               right: 16,
-                              bottom: 20,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                              bottom: 0,
+                              height: infoH,
+                              child: Align(
+                                alignment: Alignment.bottomLeft,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
                                   Text(
                                     name,
                                     maxLines: 2,
@@ -3945,10 +4001,16 @@ class _SwipePageState extends State<SwipePage> {
                                       overlap,
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color: cs.secondaryContainer
-                                            .withValues(alpha: 0.95),
+                                        color: Colors.white
+                                            .withValues(alpha: 0.92),
                                         fontWeight: FontWeight.w700,
                                         height: 1.35,
+                                        shadows: const [
+                                          Shadow(
+                                            blurRadius: 8,
+                                            color: Colors.black45,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -3972,7 +4034,8 @@ class _SwipePageState extends State<SwipePage> {
                                       ),
                                     ),
                                   ],
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                             if (_dragDx > 20)
@@ -4055,19 +4118,21 @@ class _SwipePageState extends State<SwipePage> {
                     ),
                   ),
                 );
-              },
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          SwipeDeckControls(
-            loading: _loading,
-            onSkip: () => _swipe('skip'),
-            onPlay: () => _swipe('play'),
-            currentIndex: _index,
-            totalCount: _candidates.length,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: SwipeDeckControls(
+              loading: _loading,
+              onSkip: () => _swipe('skip'),
+              onPlay: () => _swipe('play'),
+              currentIndex: _index,
+              totalCount: _candidates.length,
+            ),
           ),
         ],
-      ),
     );
   }
 }
