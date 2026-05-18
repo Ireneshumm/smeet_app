@@ -1,6 +1,57 @@
 import 'package:flutter/material.dart';
 
+import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/services/profile_identity_service.dart';
+
+/// Shared white section card for profile tab sections.
+class ProfileSectionCard extends StatelessWidget {
+  const ProfileSectionCard({
+    super.key,
+    this.title,
+    required this.child,
+  });
+
+  final String? title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SmeetApp.smeetGreyLight),
+        boxShadow: [
+          BoxShadow(
+            color: SmeetApp.smeetMint.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null) ...[
+            Text(
+              title!,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: SmeetApp.smeetInk,
+                decoration: TextDecoration.none,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}
 
 /// Stats + badge chips from [get_identity_stats] RPC.
 class ProfileIdentitySection extends StatelessWidget {
@@ -15,16 +66,13 @@ class ProfileIdentitySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final svc = ProfileIdentityService();
 
     return FutureBuilder<Map<String, dynamic>?>(
       future: svc.fetchStats(userId),
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+          return const ProfileSectionCard(
             child: LinearProgressIndicator(minHeight: 2),
           );
         }
@@ -39,59 +87,81 @@ class ProfileIdentitySection extends StatelessWidget {
         final matches = (stats['match_count'] as num?)?.toInt() ?? 0;
         final month = (stats['this_month_sessions'] as num?)?.toInt() ?? 0;
 
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-          ),
+        return ProfileSectionCard(
+          title: heading,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                heading,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
+              Row(
                 children: [
-                  _statChip(theme, 'Joined', '$joined'),
-                  _statChip(theme, 'Hosted', '$hosted'),
-                  _statChip(theme, 'Players met', '$met'),
-                  _statChip(theme, 'Matches', '$matches'),
-                  _statChip(theme, 'This month', '$month'),
+                  Expanded(child: _statBox('$joined', 'Joined')),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statBox('$hosted', 'Hosted')),
                 ],
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _statBox('$met', 'Players met')),
+                  const SizedBox(width: 12),
+                  Expanded(child: _statBox('$matches', 'Matches')),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: SmeetApp.smeetMintFaint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.trending_up_rounded,
+                      size: 16,
+                      color: SmeetApp.smeetMint,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'This month: ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: SmeetApp.smeetGrey,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    Text(
+                      '$month',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: SmeetApp.smeetInk,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (badges.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
+                const SizedBox(height: 16),
+                const Text(
                   'Badges',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.onSurfaceVariant,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: SmeetApp.smeetInk,
+                    decoration: TextDecoration.none,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 12),
                 Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: badges
-                      .map(
-                        (b) => Chip(
-                          label: Text(b),
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor:
-                              cs.primaryContainer.withValues(alpha: 0.6),
-                        ),
-                      )
-                      .toList(),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: badges.map(_badgeChip).toList(),
                 ),
               ],
             ],
@@ -101,30 +171,55 @@ class ProfileIdentitySection extends StatelessWidget {
     );
   }
 
-  static Widget _statChip(ThemeData theme, String k, String v) {
+  static Widget _statBox(String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        color: SmeetApp.smeetMintFaint,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            k,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            value,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              color: SmeetApp.smeetInk,
+              decoration: TextDecoration.none,
             ),
           ),
+          const SizedBox(height: 4),
           Text(
-            v,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: SmeetApp.smeetGrey,
+              fontWeight: FontWeight.w500,
+              decoration: TextDecoration.none,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  static Widget _badgeChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: SmeetApp.smeetMintLight,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: SmeetApp.smeetDeep,
+          decoration: TextDecoration.none,
+        ),
       ),
     );
   }

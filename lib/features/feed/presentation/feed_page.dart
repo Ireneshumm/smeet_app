@@ -13,7 +13,8 @@ import 'package:smeet_app/core/services/app_notification_badges.dart';
 import 'package:smeet_app/features/feed/presentation/feed_detail_page.dart';
 import 'package:smeet_app/features/feed/widgets/activity_banner.dart';
 import 'package:smeet_app/features/feed/widgets/feed_game_card.dart';
-import 'package:smeet_app/features/feed/widgets/feed_post_card.dart';
+import 'package:smeet_app/app/smeet_app.dart';
+import 'package:smeet_app/features/feed/widgets/feed_masonry_card.dart';
 import 'package:smeet_app/features/notifications/notifications.dart';
 import 'package:smeet_app/widgets/app_page_states.dart';
 
@@ -155,8 +156,8 @@ class _FeedPageState extends State<FeedPage> {
     }
   }
 
-  Widget _feedPost(ThemeData theme, FeedItem item) {
-    return FeedPostCard(
+  Widget _feedMasonryCard(FeedItem item) {
+    return FeedMasonryCard(
       item: item,
       onTap: () => _openDetail(item),
     );
@@ -175,7 +176,7 @@ class _FeedPageState extends State<FeedPage> {
         },
       );
     }
-    return _feedPost(theme, item);
+    return _feedMasonryCard(item);
   }
 
   /// Sports present in the current feed payload (posts + games).
@@ -284,8 +285,8 @@ class _FeedPageState extends State<FeedPage> {
   /// Games full-width; posts in 2-column masonry (variable row heights).
   void _appendFeedBodySlivers(
     List<Widget> slivers,
-    ThemeData theme,
     List<FeedItem> items,
+    int crossAxisCount,
   ) {
     var i = 0;
     var segmentIndex = 0;
@@ -323,14 +324,13 @@ class _FeedPageState extends State<FeedPage> {
         final isLast = i >= items.length;
         slivers.add(
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(12, top, 12, isLast ? 80 : 8),
+            padding: EdgeInsets.fromLTRB(8, top, 8, isLast ? 100 : 8),
             sliver: SliverMasonryGrid.count(
-              crossAxisCount: 2,
+              crossAxisCount: crossAxisCount,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               childCount: chunk.length,
-              itemBuilder: (context, index) =>
-                  _buildFeedEntry(theme, chunk[index]),
+              itemBuilder: (context, index) => _feedMasonryCard(chunk[index]),
             ),
           ),
         );
@@ -504,18 +504,13 @@ class _FeedPageState extends State<FeedPage> {
               slivers.add(
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: AppEmptyState(
-                    icon: Icons.dynamic_feed_outlined,
-                    title: 'No posts yet',
-                    subtitle:
-                        'Be the first to share a sports moment.',
-                    actionLabel: 'Share a moment',
-                    onAction: _shareMoment,
-                  ),
+                  child: _FeedEmptyState(onShare: _shareMoment),
                 ),
               );
             } else {
-              _appendFeedBodySlivers(slivers, theme, items);
+              final crossAxisCount =
+                  MediaQuery.sizeOf(context).width > 600 ? 3 : 2;
+              _appendFeedBodySlivers(slivers, items, crossAxisCount);
             }
 
             return CustomScrollView(
@@ -529,6 +524,57 @@ class _FeedPageState extends State<FeedPage> {
               slivers: slivers,
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedEmptyState extends StatelessWidget {
+  const _FeedEmptyState({required this.onShare});
+
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.photo_library_outlined,
+              size: 64,
+              color: SmeetApp.smeetMint,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Be the first to post!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: SmeetApp.smeetInk,
+                decoration: TextDecoration.none,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Share a court, a game, or your latest tennis moment',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: SmeetApp.smeetGrey,
+                decoration: TextDecoration.none,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onShare,
+              child: const Text('Share a moment'),
+            ),
+          ],
         ),
       ),
     );

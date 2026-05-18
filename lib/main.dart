@@ -1417,7 +1417,380 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_autoDetectLocation());
     });
+    _applyCreateGameDefaults();
     unawaited(_loadGameLevelOptions(_sport));
+  }
+
+  DateTime _nextSaturday() {
+    final now = DateTime.now();
+    final daysUntilSat = (DateTime.saturday - now.weekday + 7) % 7;
+    final addDays = daysUntilSat == 0 ? 7 : daysUntilSat;
+    return DateTime(now.year, now.month, now.day).add(Duration(days: addDays));
+  }
+
+  void _applyCreateGameDefaults() {
+    if (_gameDate == null) {
+      _gameDate = _nextSaturday();
+    }
+    _startTime ??= const TimeOfDay(hour: 18, minute: 0);
+    _endTime ??= const TimeOfDay(hour: 20, minute: 0);
+    if (_players < 2) {
+      _players = 4;
+    }
+    if (_courtFeeCtrl.text.trim().isEmpty) {
+      _courtFeeCtrl.text = '20';
+    }
+  }
+
+  String _formatGameDateLabel() {
+    if (_gameDate == null) return 'Tap to pick a date';
+    return DateFormat('EEE, d MMM yyyy').format(_gameDate!);
+  }
+
+  String _formatTimeLabel(TimeOfDay? time) {
+    if (time == null) return 'Tap to set';
+    final dt = DateTime(2020, 1, 1, time.hour, time.minute);
+    return DateFormat.jm().format(dt);
+  }
+
+  Future<void> _openSportPickerSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final bottom = MediaQuery.paddingOf(ctx).bottom;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: SmeetApp.smeetGreyLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select a sport',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: SmeetApp.smeetInk,
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: kSupportedSports.length,
+                  itemBuilder: (context, i) {
+                    final sport = kSupportedSports[i];
+                    final isSelected = sport.$1 == _sport;
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() => _sport = sport.$1);
+                        unawaited(_loadGameLevelOptions(sport.$1));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        color: isSelected
+                            ? SmeetApp.smeetMintLight
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            Text(
+                              sport.$2,
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                sport.$3,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isSelected
+                                      ? SmeetApp.smeetDeep
+                                      : SmeetApp.smeetInk,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(
+                                Icons.check_rounded,
+                                color: SmeetApp.smeetMint,
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: 16 + bottom),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openGameLevelPickerSheet() async {
+    if (_gameLevelOptions.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final bottom = MediaQuery.paddingOf(ctx).bottom;
+        final options = _gameLevelOptions;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: SmeetApp.smeetGreyLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select game level',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: SmeetApp.smeetInk,
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, i) {
+                    final level = options[i];
+                    final isSelected = level.levelKey == _gameLevel;
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() => _gameLevel = level.levelKey);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        color: isSelected
+                            ? SmeetApp.smeetMintLight
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            const Text(
+                              '🎯',
+                              style: TextStyle(fontSize: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                level.levelDescription != null &&
+                                        level.levelDescription!.isNotEmpty
+                                    ? '${level.levelLabel} — ${level.levelDescription}'
+                                    : level.levelLabel,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isSelected
+                                      ? SmeetApp.smeetDeep
+                                      : SmeetApp.smeetInk,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(
+                                Icons.check_rounded,
+                                color: SmeetApp.smeetMint,
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: 16 + bottom),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPickerTrigger({
+    required VoidCallback? onTap,
+    required String emoji,
+    required String value,
+    bool enabled = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: enabled ? SmeetApp.smeetInk : SmeetApp.smeetGrey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.expand_more_rounded,
+                color: enabled ? SmeetApp.smeetGrey : SmeetApp.smeetGreyLight,
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _selectedGameLevelLabel() {
+    if (_gameLevelOptions.isEmpty) return 'Loading levels…';
+    for (final l in _gameLevelOptions) {
+      if (l.levelKey == _gameLevel) return l.levelLabel;
+    }
+    return 'Select level';
+  }
+
+  Widget _buildPlayersStepper() {
+    Widget circleBtn({
+      required IconData icon,
+      required VoidCallback? onPressed,
+    }) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: SmeetApp.smeetMint, width: 1.5),
+            ),
+            child: Icon(icon, size: 20, color: SmeetApp.smeetMint),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Players',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: SmeetApp.smeetInk,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            circleBtn(
+              icon: Icons.remove,
+              onPressed: _players <= 2
+                  ? null
+                  : () => setState(() => _players--),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 40),
+                child: Text(
+                  '$_players',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: SmeetApp.smeetInk,
+                  ),
+                ),
+              ),
+            ),
+            circleBtn(
+              icon: Icons.add,
+              onPressed: _players >= 16
+                  ? null
+                  : () => setState(() => _players++),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Center(
+          child: Text(
+            'How many players total',
+            style: TextStyle(
+              fontSize: 12,
+              color: SmeetApp.smeetGrey,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _loadGameLevelOptions(String sport) async {
@@ -1425,12 +1798,19 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     setState(() {
       _gameLevelOptions = levels;
-      if (levels.isNotEmpty &&
-          !levels.any((l) => l.levelKey == _gameLevel)) {
-        _gameLevel = levels.first.levelKey;
-      }
       if (levels.isEmpty) {
         _gameLevel = '';
+      } else if (_gameLevel.isEmpty ||
+          !levels.any((l) => l.levelKey == _gameLevel)) {
+        SportLevelDefinition? preferred;
+        for (final l in levels) {
+          if (l.levelKey.toLowerCase() == 'intermediate' ||
+              l.levelLabel.toLowerCase().contains('intermediate')) {
+            preferred = l;
+            break;
+          }
+        }
+        _gameLevel = preferred?.levelKey ?? levels.first.levelKey;
       }
     });
   }
@@ -1577,7 +1957,7 @@ class _HomePageState extends State<HomePage> {
     if (_computeGameSchedule() == null) {
       return 'End time must be after start time.';
     }
-    if (_players < 2 || _players > 12) {
+    if (_players < 2 || _players > 16) {
       return 'Please choose a valid number of players.';
     }
     final feeRaw = _courtFeeCtrl.text.trim();
@@ -1815,6 +2195,7 @@ class _HomePageState extends State<HomePage> {
         _players = 4;
         _selectedLocation = null;
         _courtFeeCtrl.text = '20';
+        _applyCreateGameDefaults();
       });
       unawaited(_loadGameLevelOptions('Tennis'));
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1921,10 +2302,10 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    String startLabel =
-        _startTime == null ? 'Select start time' : _startTime!.format(context);
-    String endLabel =
-        _endTime == null ? 'Select end time' : _endTime!.format(context);
+    final startLabel = _formatTimeLabel(_startTime);
+    final endLabel = _formatTimeLabel(_endTime);
+    final locationReady = _selectedLocation != null;
+    final canSubmitCreate = locationReady && !_createGameSubmitting;
 
     return SingleChildScrollView(
       controller: _scrollCtrl,
@@ -1967,71 +2348,27 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(height: 14),
 
-            // Sport
-            _SectionCard(
-              child: DropdownButtonFormField<String>(
-                initialValue: _sport,
-                decoration: const InputDecoration(
-                  labelText: 'Sport',
-                  border: OutlineInputBorder(),
-                ),
-                items: kSupportedSports
-                    .map(
-                      (s) => DropdownMenuItem(
-                        value: s.$1,
-                        child: Text('${s.$2} ${s.$3}'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  setState(() => _sport = v ?? 'Tennis');
-                  unawaited(_loadGameLevelOptions(v ?? 'Tennis'));
-                },
+            _CreateGameFieldCard(
+              label: 'Sport',
+              child: _buildPickerTrigger(
+                emoji: sportEmojiForKey(_sport),
+                value: sportLabelForKey(_sport),
+                onTap: _openSportPickerSheet,
               ),
             ),
 
-            // Game level (sport-specific keys from sport_level_definitions)
-            _SectionCard(
-              child: DropdownButtonFormField<String>(
-                value: _gameLevelOptions.isEmpty
-                    ? 'loading'
-                    : (_gameLevelOptions.any((l) => l.levelKey == _gameLevel)
-                        ? _gameLevel
-                        : null),
-                decoration: const InputDecoration(
-                  labelText: 'Game level (target for this session)',
-                  border: OutlineInputBorder(),
-                ),
-                items: _gameLevelOptions.isEmpty
-                    ? const [
-                        DropdownMenuItem(
-                          value: 'loading',
-                          child: Text('Loading...'),
-                        ),
-                      ]
-                    : _gameLevelOptions
-                        .map(
-                          (l) => DropdownMenuItem(
-                            value: l.levelKey,
-                            child: Text(
-                              '${l.levelLabel} — ${l.levelDescription ?? ''}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                onChanged: _gameLevelOptions.isEmpty
-                    ? null
-                    : (v) {
-                        if (v != null && v != 'loading') {
-                          setState(() => _gameLevel = v);
-                        }
-                      },
+            _CreateGameFieldCard(
+              label: 'Game level',
+              child: _buildPickerTrigger(
+                emoji: '🎯',
+                value: _selectedGameLevelLabel(),
+                enabled: _gameLevelOptions.isNotEmpty,
+                onTap: _openGameLevelPickerSheet,
               ),
             ),
 
             // When: date + start/end (single block)
-            _SectionCard(
+            _CreateGameFieldCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -2105,15 +2442,19 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  _gameDate == null
-                                      ? 'Select date'
-                                      : DateFormat(
-                                          'EEE, MMM d',
-                                        ).format(_gameDate!),
+                                  _formatGameDateLabel(),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyLarge
-                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: _gameDate == null
+                                            ? SmeetApp.smeetGrey
+                                            : SmeetApp.smeetInk,
+                                        fontStyle: _gameDate == null
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                      ),
                                 ),
                               ],
                             ),
@@ -2163,7 +2504,15 @@ class _HomePageState extends State<HomePage> {
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: _startTime == null
+                                            ? SmeetApp.smeetGrey
+                                            : SmeetApp.smeetInk,
+                                        fontStyle: _startTime == null
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                      ),
                                 ),
                               ],
                             ),
@@ -2204,7 +2553,15 @@ class _HomePageState extends State<HomePage> {
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: _endTime == null
+                                            ? SmeetApp.smeetGrey
+                                            : SmeetApp.smeetInk,
+                                        fontStyle: _endTime == null
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                      ),
                                 ),
                               ],
                             ),
@@ -2217,12 +2574,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // Location
-            _SectionCard(
+            _CreateGameFieldCard(
+              label: 'Location',
               child: LocationSearchField(
                 supabase: Supabase.instance.client,
                 labelText: 'Location',
-                hintText: 'Search a court, suburb, or full address',
+                hintText: 'Search Brisbane venues...',
                 initialValue: _selectedLocation,
                 onChanged: (value) {
                   setState(() => _selectedLocation = value);
@@ -2230,48 +2587,30 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // Players + fee
-            _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Players
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Players',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _players <= 2
-                            ? null
-                            : () => setState(() => _players--),
-                        icon: const Icon(Icons.remove_circle_outline),
-                      ),
-                      Text('$_players', style: const TextStyle(fontSize: 18)),
-                      IconButton(
-                        onPressed: _players >= 12
-                            ? null
-                            : () => setState(() => _players++),
-                        icon: const Icon(Icons.add_circle_outline),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+            _CreateGameFieldCard(
+              child: _buildPlayersStepper(),
+            ),
 
-                  // Court fee
+            _CreateGameFieldCard(
+              label: 'Court fee',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   TextFormField(
                     controller: _courtFeeCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Court fee (total)',
-                      prefixText: '\$ ',
-                      border: OutlineInputBorder(),
+                      hintText: 'Total court cost (will be split)',
+                      prefixText: 'AUD \$ ',
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: SmeetApp.smeetInk,
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (v) {
@@ -2282,27 +2621,34 @@ class _HomePageState extends State<HomePage> {
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 12),
-
-                  // Split preview
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.08),
+                      color: SmeetApp.smeetMintLight.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: cs.primary.withOpacity(0.18)),
+                      border: Border.all(
+                        color: SmeetApp.smeetMint.withValues(alpha: 0.25),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calculate_outlined),
+                        const Icon(
+                          Icons.calculate_outlined,
+                          color: SmeetApp.smeetDeep,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Per person: \$${_perPerson.toStringAsFixed(2)}/pp',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: SmeetApp.smeetInk,
+                                ),
                           ),
                         ),
                       ],
@@ -2314,23 +2660,40 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(height: 14),
 
-            // CTA
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _createGameSubmitting ? null : _createGame,
-                icon: _createGameSubmitting
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      )
-                    : const Icon(Icons.add),
-                label: Text(
-                  _createGameSubmitting ? 'Creating…' : 'Create Game',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 0),
+              child: Material(
+                color: canSubmitCreate
+                    ? SmeetApp.smeetMint
+                    : SmeetApp.smeetMintLight,
+                borderRadius: BorderRadius.circular(28),
+                child: InkWell(
+                  onTap: canSubmitCreate ? _createGame : null,
+                  borderRadius: BorderRadius.circular(28),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: _createGameSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Create Game',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: canSubmitCreate
+                                    ? Colors.white
+                                    : SmeetApp.smeetDeep,
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -2648,6 +3011,60 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Create Game form field — mint top accent + soft shadow.
+class _CreateGameFieldCard extends StatelessWidget {
+  const _CreateGameFieldCard({
+    required this.child,
+    this.label,
+  });
+
+  final Widget child;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: const Border(
+          top: BorderSide(color: SmeetApp.smeetMint, width: 2),
+          left: BorderSide(color: SmeetApp.smeetGreyLight, width: 1),
+          right: BorderSide(color: SmeetApp.smeetGreyLight, width: 1),
+          bottom: BorderSide(color: SmeetApp.smeetGreyLight, width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: SmeetApp.smeetMint.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (label != null) ...[
+            Text(
+              label!,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: SmeetApp.smeetGrey,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          child,
+        ],
       ),
     );
   }
@@ -3304,18 +3721,20 @@ class _SwipePageState extends State<SwipePage> {
                 child: child,
               );
             },
-            child: Text(
-              isPlay ? 'PLAY!' : 'SKIP',
-              style: TextStyle(
-                fontSize: 52,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: isPlay
-                    ? const Color(0xFF4ADE80).withValues(alpha: 0.92)
-                    : const Color(0xFFEF4444).withValues(alpha: 0.95),
-                shadows: const [
-                  Shadow(blurRadius: 16, color: Colors.black54),
-                ],
+            child: Material(
+              type: MaterialType.transparency,
+              child: Text(
+                isPlay ? 'PLAY!' : 'SKIP',
+                style: TextStyle(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  decoration: TextDecoration.none,
+                  color: isPlay ? SmeetApp.smeetMint : SmeetApp.smeetCoral,
+                  shadows: const [
+                    Shadow(blurRadius: 16, color: Colors.black54),
+                  ],
+                ),
               ),
             ),
           ),
@@ -4054,7 +4473,7 @@ class _SwipePageState extends State<SwipePage> {
                                       ),
                                       decoration: BoxDecoration(
                                         border: Border.all(
-                                          color: const Color(0xFF4ADE80),
+                                          color: SmeetApp.smeetMint,
                                           width: 3,
                                         ),
                                         borderRadius: BorderRadius.circular(8),
@@ -4062,10 +4481,11 @@ class _SwipePageState extends State<SwipePage> {
                                       child: const Text(
                                         'PLAY!',
                                         style: TextStyle(
-                                          color: Color(0xFF4ADE80),
+                                          color: SmeetApp.smeetMint,
                                           fontSize: 36,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 3,
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
@@ -4088,7 +4508,7 @@ class _SwipePageState extends State<SwipePage> {
                                       ),
                                       decoration: BoxDecoration(
                                         border: Border.all(
-                                          color: Color(0xFFEF4444),
+                                          color: SmeetApp.smeetCoral,
                                           width: 3,
                                         ),
                                         borderRadius: BorderRadius.circular(8),
@@ -4096,10 +4516,11 @@ class _SwipePageState extends State<SwipePage> {
                                       child: const Text(
                                         'SKIP',
                                         style: TextStyle(
-                                          color: Color(0xFFEF4444),
+                                          color: SmeetApp.smeetCoral,
                                           fontSize: 36,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 3,
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
@@ -6493,21 +6914,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
               // Top header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
-                  boxShadow: [
-                    BoxShadow(
-                      offset: const Offset(0, 2),
-                      blurRadius: 8,
-                      color: Colors.black.withValues(alpha: 0.06),
-                    ),
-                  ],
-                ),
+              ProfileSectionCard(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -6516,14 +6923,23 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          CircularNetworkAvatar(
-                            size: 80,
-                            imageUrl: _avatarUrl,
-                            backgroundColor: cs.primary.withValues(alpha: 0.12),
-                            placeholder: Icon(
-                              Icons.person,
-                              color: cs.primary,
-                              size: 36,
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: SmeetApp.smeetMint,
+                                width: 3,
+                              ),
+                            ),
+                            child: CircularNetworkAvatar(
+                              size: 80,
+                              imageUrl: _avatarUrl,
+                              backgroundColor: SmeetApp.smeetMintLight,
+                              placeholder: const Icon(
+                                Icons.person,
+                                color: SmeetApp.smeetMint,
+                                size: 36,
+                              ),
                             ),
                           ),
                           Positioned(
@@ -6558,32 +6974,45 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : _nameCtrl.text.trim(),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: SmeetApp.smeetInk,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _cityCtrl.text.trim().isEmpty
-                                ? 'City not set'
-                                : _cityCtrl.text.trim(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: 14,
-                                  color: cs.onSurface.withValues(alpha: 0.55),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.place_outlined,
+                                size: 16,
+                                color: SmeetApp.smeetMint,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _cityCtrl.text.trim().isEmpty
+                                      ? 'City not set'
+                                      : _cityCtrl.text.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: SmeetApp.smeetGrey,
+                                    decoration: TextDecoration.none,
+                                  ),
                                 ),
+                              ),
+                            ],
                           ),
                           if (_setupLoadedRow?['sport_levels'] is Map &&
                               (_setupLoadedRow!['sport_levels'] as Map)
                                   .isNotEmpty) ...[
                             const SizedBox(height: 10),
                             Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: (_setupLoadedRow!['sport_levels'] as Map)
                                   .entries
                                   .take(3)
@@ -6591,21 +7020,20 @@ class _ProfilePageState extends State<ProfilePage> {
                                     (e) => Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
-                                        vertical: 4,
+                                        vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: cs.primary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(100),
+                                        color: SmeetApp.smeetMintLight,
+                                        borderRadius: BorderRadius.circular(999),
                                       ),
                                       child: Text(
                                         '${sportEmojiForKey(e.key.toString())} ${e.key}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: cs.primary,
-                                            ),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: SmeetApp.smeetDeep,
+                                          decoration: TextDecoration.none,
+                                        ),
                                       ),
                                     ),
                                   )
@@ -6682,6 +7110,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     // ========== TAB 1: Profile ==========
                     SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 100),
                       child: Column(
                         children: [
                           if (identityUser != null) ...[

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/features/venues/models/venue.dart';
 import 'package:smeet_app/features/venues/presentation/venue_detail_page.dart';
@@ -237,18 +238,29 @@ class _VenuesTabState extends State<_VenuesTab>
               children: [
                 _CategoryRow(
                   title: 'Sport',
+                  accent: SmeetApp.smeetMint,
+                  selectedBg: SmeetApp.smeetMintLight,
+                  selectedText: SmeetApp.smeetDeep,
                   categories: _sportsCategories,
                   selected: _selectedCategory,
                   onSelect: _filter,
                 ),
+                const _VenueSectionDivider(),
                 _CategoryRow(
                   title: 'Health & Beauty',
+                  accent: SmeetApp.smeetCoral,
+                  selectedBg: SmeetApp.smeetCoralLight,
+                  selectedText: SmeetApp.smeetCoral,
                   categories: _wellnessCategories,
                   selected: _selectedCategory,
                   onSelect: _filter,
                 ),
+                const _VenueSectionDivider(),
                 _CategoryRow(
                   title: 'Shop',
+                  accent: SmeetApp.smeetIndigo,
+                  selectedBg: SmeetApp.smeetIndigoLight,
+                  selectedText: SmeetApp.smeetIndigo,
                   categories: _shopCategories,
                   selected: _selectedCategory,
                   onSelect: _filter,
@@ -280,6 +292,7 @@ class _VenuesTabState extends State<_VenuesTab>
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: cs.onSurface,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -287,6 +300,7 @@ class _VenuesTabState extends State<_VenuesTab>
                       'Check back soon',
                       style: TextStyle(
                         color: cs.onSurface.withValues(alpha: 0.5),
+                        decoration: TextDecoration.none,
                       ),
                     ),
                   ],
@@ -648,65 +662,101 @@ class _VenueCard extends StatelessWidget {
   }
 }
 
+class _VenueSectionDivider extends StatelessWidget {
+  const _VenueSectionDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      height: 1,
+      color: SmeetApp.smeetGreyLight,
+    );
+  }
+}
+
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({
     required this.title,
+    required this.accent,
+    required this.selectedBg,
+    required this.selectedText,
     required this.categories,
     required this.selected,
     required this.onSelect,
   });
 
   final String title;
+  final Color accent;
+  final Color selectedBg;
+  final Color selectedText;
   final List<(String, String)> categories;
   final String selected;
   final void Function(String) onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface.withValues(alpha: 0.45),
-              letterSpacing: 0.5,
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: SmeetApp.smeetInk,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
           ),
         ),
-        SizedBox(
-          height: 38,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
             children: categories.map((cat) {
               final isSelected = selected == cat.$1;
-              return GestureDetector(
-                onTap: () => onSelect(cat.$1),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? cs.primary
-                        : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    cat.$2,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : cs.onSurface,
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w500,
-                      fontSize: 13,
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => onSelect(cat.$1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? selectedBg : Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: isSelected
+                          ? null
+                          : Border.all(color: SmeetApp.smeetGreyLight),
+                    ),
+                    child: Text(
+                      cat.$2,
+                      style: TextStyle(
+                        color: isSelected
+                            ? selectedText
+                            : SmeetApp.smeetGrey,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 13,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ),
                 ),
