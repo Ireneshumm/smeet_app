@@ -58,7 +58,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!privacy-policy\\.html|terms-of-service\\.html|google8a45994ba2e2a952\\.html).*)",
+      "source": "/((?!privacy-policy\\.html|terms-of-service\\.html|child-safety\\.html|google8a45994ba2e2a952\\.html).*)",
       "destination": "/index.html"
     }
   ]
