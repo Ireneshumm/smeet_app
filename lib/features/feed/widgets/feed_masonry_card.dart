@@ -24,7 +24,7 @@ class FeedMasonryCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static double defaultAspectRatioFor(FeedItem item) {
-    if (item.isVideoContent) return 16 / 9;
+    if (item.isVideoContent) return 4 / 3;
     return 4 / 5;
   }
 
@@ -168,8 +168,9 @@ class _MasonryMediaState extends State<_MasonryMedia> {
 
   @override
   Widget build(BuildContext context) {
-    final ratio =
-        _resolvedRatio ?? FeedMasonryCard.defaultAspectRatioFor(widget.item);
+    final ratio = widget.isVideo
+        ? FeedMasonryCard.defaultAspectRatioFor(widget.item)
+        : (_resolvedRatio ?? FeedMasonryCard.defaultAspectRatioFor(widget.item));
 
     return AspectRatio(
       aspectRatio: ratio,

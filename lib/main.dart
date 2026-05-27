@@ -3979,7 +3979,7 @@ class _SwipePageState extends State<SwipePage> {
     final sl = p['sport_levels'];
     if (sl is! Map) return const [];
     final defs = _sportLevelDefsBySport;
-    return sl.entries.take(8).map((e) {
+    return sl.entries.map((e) {
       final sportKey = canonicalSportKey(e.key.toString());
       final stored = e.value.toString();
       final list = defs[sportKey];
@@ -3993,26 +3993,24 @@ class _SwipePageState extends State<SwipePage> {
         }
       }
       final emoji = sportEmojiForKey(sportKey);
-      return Padding(
-        padding: const EdgeInsets.only(right: 6, bottom: 6),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.35),
-            ),
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.35),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text(
-              '$emoji $label',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 12.5,
-                height: 1.2,
-              ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(
+            '$emoji $label',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              height: 1.15,
+              decoration: TextDecoration.none,
             ),
           ),
         ),
@@ -4241,12 +4239,30 @@ class _SwipePageState extends State<SwipePage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final cardW = constraints.maxWidth;
-                  final cardH = constraints.maxHeight;
-                  final gradientH = cardH * 0.4;
-                  final infoH = cardH * 0.3;
+                  const maxCardWidth = 440.0;
+                  const cardAspect = 3 / 4;
+                  final availW = constraints.maxWidth;
+                  final availH = constraints.maxHeight;
+                  var cardW = availW < maxCardWidth ? availW : maxCardWidth;
+                  var cardH = cardW / cardAspect;
+                  if (cardH > availH) {
+                    cardH = availH;
+                    cardW = cardH * cardAspect;
+                  }
+                  final chipRows = sportChips.isEmpty
+                      ? 0
+                      : (sportChips.length / 3).ceil();
+                  final gradientH = (cardH * 0.32 +
+                          chipRows * 26.0 +
+                          (overlap.isNotEmpty ? 32.0 : 0) +
+                          (intro.isNotEmpty ? 36.0 : 0))
+                      .clamp(cardH * 0.35, cardH * 0.72);
 
-                  return DecoratedBox(
+                  return Center(
+                    child: SizedBox(
+                      width: cardW,
+                      height: cardH,
+                      child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
@@ -4307,6 +4323,7 @@ class _SwipePageState extends State<SwipePage> {
                           ..rotateZ(_dragDx / cardW * 0.4),
                         child: Stack(
                           fit: StackFit.expand,
+                          clipBehavior: Clip.none,
                           children: [
                             ColoredBox(
                               color: cs.surfaceContainerHighest,
@@ -4329,14 +4346,12 @@ class _SwipePageState extends State<SwipePage> {
                               child: const DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
                                     colors: [
+                                      Colors.black87,
                                       Colors.transparent,
-                                      Colors.transparent,
-                                      Color(0xB3000000),
                                     ],
-                                    stops: [0.0, 0.55, 1.0],
                                   ),
                                 ),
                               ),
@@ -4344,11 +4359,8 @@ class _SwipePageState extends State<SwipePage> {
                             Positioned(
                               left: 16,
                               right: 16,
-                              bottom: 0,
-                              height: infoH,
-                              child: Align(
-                                alignment: Alignment.bottomLeft,
-                                child: Column(
+                              bottom: 16,
+                              child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -4356,7 +4368,9 @@ class _SwipePageState extends State<SwipePage> {
                                     name,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.headlineSmall
+                                    style: (sportChips.length > 5
+                                            ? theme.textTheme.titleLarge
+                                            : theme.textTheme.headlineSmall)
                                         ?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
@@ -4382,6 +4396,8 @@ class _SwipePageState extends State<SwipePage> {
                                       Expanded(
                                         child: Text(
                                           city.isEmpty ? 'City not set' : city,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: theme.textTheme.titleSmall
                                               ?.copyWith(
                                             color: Colors.white.withValues(
@@ -4400,24 +4416,32 @@ class _SwipePageState extends State<SwipePage> {
                                     ],
                                   ),
                                   if (sportChips.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Sports',
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75),
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.2,
+                                    const SizedBox(height: 8),
+                                    if (sportChips.length <= 6)
+                                      Text(
+                                        'Sports',
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.75),
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.2,
+                                        ),
                                       ),
+                                    if (sportChips.length <= 6)
+                                      const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: sportChips,
                                     ),
-                                    const SizedBox(height: 6),
-                                    Wrap(children: sportChips),
                                   ],
                                   if (overlap.isNotEmpty) ...[
                                     const SizedBox(height: 10),
                                     Text(
                                       overlap,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                         color: Colors.white
@@ -4434,10 +4458,10 @@ class _SwipePageState extends State<SwipePage> {
                                     ),
                                   ],
                                   if (intro.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 6),
                                     Text(
                                       intro,
-                                      maxLines: 3,
+                                      maxLines: sportChips.length > 5 ? 2 : 3,
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
@@ -4453,9 +4477,7 @@ class _SwipePageState extends State<SwipePage> {
                                       ),
                                     ),
                                   ],
-                                  ],
                                 ),
-                              ),
                             ),
                             if (_dragDx > 20)
                               Positioned(
@@ -4538,7 +4560,9 @@ class _SwipePageState extends State<SwipePage> {
                       ),
                     ),
                   ),
-                );
+                    ),
+                    ),
+                  );
                 },
               ),
             ),
@@ -6913,8 +6937,22 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              // Top header
-              ProfileSectionCard(
+              // Top header (compact)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: SmeetApp.smeetGreyLight),
+                  boxShadow: [
+                    BoxShadow(
+                      color: SmeetApp.smeetMint.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -6928,17 +6966,17 @@ class _ProfilePageState extends State<ProfilePage> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: SmeetApp.smeetMint,
-                                width: 3,
+                                width: 2.5,
                               ),
                             ),
                             child: CircularNetworkAvatar(
-                              size: 80,
+                              size: 56,
                               imageUrl: _avatarUrl,
                               backgroundColor: SmeetApp.smeetMintLight,
                               placeholder: const Icon(
                                 Icons.person,
                                 color: SmeetApp.smeetMint,
-                                size: 36,
+                                size: 26,
                               ),
                             ),
                           ),
@@ -6946,8 +6984,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             bottom: 0,
                             right: 0,
                             child: Container(
-                              width: 26,
-                              height: 26,
+                              width: 22,
+                              height: 22,
                               decoration: BoxDecoration(
                                 color: cs.primary,
                                 shape: BoxShape.circle,
@@ -6955,7 +6993,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               child: const Icon(
                                 Icons.camera_alt,
-                                size: 14,
+                                size: 12,
                                 color: Colors.white,
                               ),
                             ),
@@ -6963,7 +7001,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6975,18 +7013,18 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 22,
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                               color: SmeetApp.smeetInk,
                               decoration: TextDecoration.none,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
                               const Icon(
                                 Icons.place_outlined,
-                                size: 16,
+                                size: 14,
                                 color: SmeetApp.smeetMint,
                               ),
                               const SizedBox(width: 4),
@@ -6998,7 +7036,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     color: SmeetApp.smeetGrey,
                                     decoration: TextDecoration.none,
                                   ),
@@ -7061,7 +7099,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
               // Identity scrolls inside the Profile tab (not here) so it cannot
               // sit fixed above TabBarView and cover content on small viewports.
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
 
               Container(
                 decoration: BoxDecoration(
@@ -7076,18 +7114,20 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                 ),
                 child: TabBar(
+                  tabHeight: 36,
                   indicatorColor: cs.primary,
-                  indicatorWeight: 3,
+                  indicatorWeight: 2.5,
                   labelColor: cs.primary,
                   unselectedLabelColor:
                       cs.onSurface.withValues(alpha: 0.45),
+                  labelPadding: const EdgeInsets.symmetric(vertical: 2),
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 13,
                   ),
                   unselectedLabelStyle: const TextStyle(
                     fontWeight: FontWeight.w500,
-                    fontSize: 15,
+                    fontSize: 13,
                   ),
                   onTap: (i) {
                     if (i == 1 && _myPostsFuture == null) {
@@ -7103,7 +7143,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
               Expanded(
                 child: TabBarView(
