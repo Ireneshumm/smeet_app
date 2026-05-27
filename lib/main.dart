@@ -7113,8 +7113,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ],
                 ),
-                child: TabBar(
-                  tabHeight: 36,
+                child: SizedBox(
+                  height: 36,
+                  child: TabBar(
                   indicatorColor: cs.primary,
                   indicatorWeight: 2.5,
                   labelColor: cs.primary,
@@ -7140,6 +7141,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Tab(text: 'Profile'),
                     Tab(text: 'Posts'),
                   ],
+                  ),
                 ),
               ),
 
