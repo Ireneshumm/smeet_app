@@ -147,14 +147,14 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                       Row(
                         children: [
                           Expanded(
-                            child: ProfileIdentitySection._statBox(
+                            child: _statBox(
                               '$joined',
                               'Joined',
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: ProfileIdentitySection._statBox(
+                            child: _statBox(
                               '$hosted',
                               'Hosted',
                             ),
@@ -165,14 +165,14 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                       Row(
                         children: [
                           Expanded(
-                            child: ProfileIdentitySection._statBox(
+                            child: _statBox(
                               '$met',
                               'Players met',
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: ProfileIdentitySection._statBox(
+                            child: _statBox(
                               '$matches',
                               'Matches',
                             ),
@@ -235,8 +235,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children:
-                              badges.map(ProfileIdentitySection._badgeChip).toList(),
+                          children: badges.map(_badgeChip).toList(),
                         ),
                       ],
                     ],

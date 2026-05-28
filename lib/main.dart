@@ -4477,7 +4477,8 @@ class _SwipePageState extends State<SwipePage> {
                                       ),
                                     ),
                                   ],
-                                ),
+                                ],
+                              ),
                             ),
                             if (_dragDx > 20)
                               Positioned(
