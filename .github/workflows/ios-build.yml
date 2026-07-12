@@ -64,7 +64,11 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
-          echo "Using bundle ID: $IOS_BUNDLE_ID"
+
+          # Secrets often include trailing newlines from paste; strip them.
+          CLEAN_BUNDLE_ID="$(printf '%s' "$IOS_BUNDLE_ID" | tr -d '\n\r\t ')"
+          echo "IOS_BUNDLE_ID=$CLEAN_BUNDLE_ID" >> "$GITHUB_ENV"
+          echo "Using bundle ID: $CLEAN_BUNDLE_ID"
 
       - name: Resolve temp paths
         run: |
@@ -179,42 +183,6 @@ jobs:
           if [ "$PROFILE_BUNDLE_ID" != "$IOS_BUNDLE_ID" ] && [ "$PROFILE_BUNDLE_ID" != "*" ]; then
             echo "::warning::Provisioning profile bundle ID ($PROFILE_BUNDLE_ID) does not match IOS_BUNDLE_ID ($IOS_BUNDLE_ID)"
           fi
-
-      - name: Set iOS bundle identifier
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os
-          import pathlib
-          import re
-
-          bundle_id = os.environ["IOS_BUNDLE_ID"]
-          path = pathlib.Path("ios/Runner.xcodeproj/project.pbxproj")
-          text = path.read_text()
-
-          def replace_bundle_id(match: re.Match[str]) -> str:
-              block = match.group(0)
-              if "TEST_HOST" in block:
-                  return re.sub(
-                      r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
-                      f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id}.RunnerTests;",
-                      block,
-                  )
-              return re.sub(
-                  r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
-                  f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};",
-                  block,
-              )
-
-          updated = re.sub(
-              r"buildSettings = \{.*?\n\t\t\t\};",
-              replace_bundle_id,
-              text,
-              flags=re.S,
-          )
-          path.write_text(updated)
-          print(f"Set app PRODUCT_BUNDLE_IDENTIFIER to {bundle_id}")
-          PY
 
       - name: Create ExportOptions.plist
         run: |
