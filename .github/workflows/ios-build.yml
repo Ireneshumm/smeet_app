@@ -112,35 +112,79 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys" "./private_keys"
-          KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          RAW="$APP_STORE_CONNECT_API_KEY"
+          export KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
 
-          # Normalize: literal \n → real newlines, strip CR.
-          RAW="$(printf '%s' "$RAW" | sed 's/\r//g; s/\\n/\n/g')"
+          python3 - <<'PY'
+          import base64
+          import os
+          import re
+          import textwrap
+          from pathlib import Path
 
-          if printf '%s' "$RAW" | grep -q "BEGIN PRIVATE KEY"; then
-            printf '%s\n' "$RAW" > "$KEY_PATH"
-          else
-            # Assume base64-encoded .p8 contents.
-            printf '%s' "$RAW" | tr -d '\n\t ' | base64 --decode > "$KEY_PATH"
-          fi
+          raw = os.environ.get("APP_STORE_CONNECT_API_KEY", "")
+          key_path = Path(os.environ["KEY_PATH"])
 
-          # Ensure trailing newline (required by some altool builds).
-          if [ -n "$(tail -c1 "$KEY_PATH" | tr -d '\n')" ]; then
-            printf '\n' >> "$KEY_PATH"
-          fi
+          raw = raw.replace("\r\n", "\n").replace("\r", "\n").strip()
+          raw = raw.replace("\\n", "\n")
 
-          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
-            echo "::error::APP_STORE_CONNECT_API_KEY is not a valid .p8 PEM. Paste the AuthKey_*.p8 file contents (including BEGIN/END lines), or base64 of that file."
-            echo "Key file size: $(wc -c < "$KEY_PATH") bytes"
-            exit 1
-          fi
+          def is_pem(text: str) -> bool:
+              return "BEGIN PRIVATE KEY" in text and "END PRIVATE KEY" in text
+
+          def as_pem(text: str) -> str:
+              return text if text.endswith("\n") else text + "\n"
+
+          def wrap_der_as_pem(der: bytes) -> str:
+              body = base64.b64encode(der).decode("ascii")
+              return (
+                  "-----BEGIN PRIVATE KEY-----\n"
+                  + "\n".join(textwrap.wrap(body, 64))
+                  + "\n-----END PRIVATE KEY-----\n"
+              )
+
+          if is_pem(raw):
+              content = as_pem(raw)
+              mode = "pem"
+          else:
+              compact = re.sub(r"\s+", "", raw)
+              try:
+                  decoded = base64.b64decode(compact, validate=False)
+              except Exception as exc:
+                  raise SystemExit(
+                      f"Failed to base64-decode APP_STORE_CONNECT_API_KEY: {exc}"
+                  ) from exc
+
+              try:
+                  text = decoded.decode("utf-8")
+              except UnicodeDecodeError:
+                  text = ""
+
+              if text and is_pem(text):
+                  content = as_pem(text)
+                  mode = "base64-pem"
+              elif decoded.startswith(b"\x30"):
+                  # Common when secret is base64 of raw key bytes (~120-160 bytes).
+                  content = wrap_der_as_pem(decoded)
+                  mode = "base64-der-wrapped"
+              else:
+                  print("::error::APP_STORE_CONNECT_API_KEY is not a valid AuthKey .p8")
+                  print(f"Secret length: {len(raw)} chars; decoded: {len(decoded)} bytes")
+                  print("Set the secret to either:")
+                  print("  1) Full PEM text including BEGIN/END PRIVATE KEY lines")
+                  print("  2) Output of: base64 -i AuthKey_XXX.p8 | pbcopy")
+                  raise SystemExit(1)
+
+          if not is_pem(content):
+              print("::error::Normalized key still missing BEGIN/END PRIVATE KEY markers")
+              raise SystemExit(1)
+
+          key_path.write_text(content, encoding="utf-8")
+          print(f"Staged ASC API key via {mode} ({key_path.stat().st_size} bytes)")
+          PY
 
           chmod 600 "$KEY_PATH"
           cp "$KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           cp "$KEY_PATH" "./private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-          echo "Staged ASC API key ($(wc -c < "$KEY_PATH") bytes)"
 
       - name: Raise iOS deployment target to 15.0
         run: |
@@ -169,7 +213,7 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           PROFILE_PATH="$RUNNER_TEMP/Smeet_AppStore.mobileprovision"
           PROFILE_PLIST="$RUNNER_TEMP/Smeet_profile.plist"
-          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | tr -d '\n\r\t ' | base64 --decode > "$PROFILE_PATH"
+          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | LC_ALL=C tr -d '\n\r\t ' | base64 --decode > "$PROFILE_PATH"
           security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
 
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")
