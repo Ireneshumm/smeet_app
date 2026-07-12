@@ -1,3 +1,4 @@
+# iOS deploy — FlutterGo-style archive/export, mapped to this repo's secrets.
 name: iOS Build
 
 on:
@@ -17,19 +18,18 @@ on:
         required: true
         default: true
         type: boolean
+      build_name:
+        description: 'Marketing version (e.g. 1.0.0)'
+        required: false
+      build_number:
+        description: 'Build number'
+        required: false
 
 jobs:
   build:
     name: Build & Deploy iOS IPA
     runs-on: macos-latest
     timeout-minutes: 90
-
-    env:
-      IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-      IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
 
     steps:
       - name: Checkout
@@ -38,13 +38,33 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
 
-      - name: Validate required secrets
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build version args
+        id: ver
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.build_name }}" ]; then
+            ARGS="$ARGS --build-name=${{ github.event.inputs.build_name }}"
+          fi
+          if [ -n "${{ github.event.inputs.build_number }}" ]; then
+            ARGS="$ARGS --build-number=${{ github.event.inputs.build_number }}"
+          fi
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Normalize secrets
         env:
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
           IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
           missing=0
@@ -65,84 +85,34 @@ jobs:
             exit 1
           fi
 
-          # Secrets often include trailing newlines from paste; strip them.
-          CLEAN_BUNDLE_ID="$(printf '%s' "$IOS_BUNDLE_ID" | tr -d '\n\r\t ')"
-          echo "IOS_BUNDLE_ID=$CLEAN_BUNDLE_ID" >> "$GITHUB_ENV"
-          echo "Using bundle ID: $CLEAN_BUNDLE_ID"
+          # Strip paste whitespace/newlines from secrets.
+          echo "IOS_BUNDLE_ID=$(printf '%s' "$IOS_BUNDLE_ID" | tr -d '\n\r\t ')" >> "$GITHUB_ENV"
+          echo "APP_STORE_CONNECT_KEY_ID=$(printf '%s' "$APP_STORE_CONNECT_KEY_ID" | tr -d '\n\r\t ')" >> "$GITHUB_ENV"
+          echo "APP_STORE_CONNECT_ISSUER_ID=$(printf '%s' "$APP_STORE_CONNECT_ISSUER_ID" | tr -d '\n\r\t ')" >> "$GITHUB_ENV"
+          echo "Using bundle ID: $(printf '%s' "$IOS_BUNDLE_ID" | tr -d '\n\r\t ')"
 
-      - name: Resolve temp paths
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: Verify Distribution certificate
         run: |
-          echo "PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision" >> "$GITHUB_ENV"
-          echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist" >> "$GITHUB_ENV"
-          echo "ASC_KEY_DIR=$HOME/.appstoreconnect/private_keys" >> "$GITHUB_ENV"
-          echo "P12_PATH=$RUNNER_TEMP/dist.p12" >> "$GITHUB_ENV"
+          set -euo pipefail
+          security find-identity -v -p codesigning
+          if ! security find-identity -v -p codesigning | grep -Eq "Apple Distribution|iPhone Distribution"; then
+            echo "::error::Apple Distribution certificate not found. Upload an Apple Distribution .p12 (not Development)."
+            exit 1
+          fi
 
-      - name: Decode, verify, and import distribution certificate
+      - name: Stage App Store Connect API key
         env:
-          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
-          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
-
-          # Strip whitespace/newlines that often break GitHub secret pastes.
-          CERT_B64="$(printf '%s' "$IOS_DIST_CERT_P12_BASE64" | tr -d '\n\r\t ')"
-          CERT_PASS="$(printf '%s' "$IOS_DIST_CERT_PASSWORD" | tr -d '\r')"
-
-          printf '%s' "$CERT_B64" | base64 --decode > "$P12_PATH"
-          FILE_SIZE="$(wc -c < "$P12_PATH" | tr -d ' ')"
-          echo "Decoded .p12 size: ${FILE_SIZE} bytes"
-
-          if [ "$FILE_SIZE" -lt 100 ]; then
-            echo "::error::Decoded .p12 is too small (${FILE_SIZE} bytes). Re-encode IOS_DIST_CERT_P12_BASE64 with: base64 -i YourCert.p12 | pbcopy"
-            exit 1
-          fi
-
-          # Verify password against the .p12 before keychain import.
-          if ! openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:${CERT_PASS}" 2>/dev/null \
-            && ! openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:${CERT_PASS}" -legacy 2>/dev/null; then
-            echo "::error::IOS_DIST_CERT_PASSWORD does not unlock the .p12 (or the base64 is corrupt)."
-            echo "::error::Re-export Apple Distribution cert from Keychain Access as .p12, set that export password as IOS_DIST_CERT_PASSWORD, then: base64 -i cert.p12 | pbcopy → IOS_DIST_CERT_P12_BASE64"
-            exit 1
-          fi
-
-          echo "Certificate password verified successfully"
-
-          KEYCHAIN_PATH="$RUNNER_TEMP/smeet-signing.keychain-db"
-          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed -e 's/"//g')
-
-          security import "$P12_PATH" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$CERT_PASS" \
-            -A \
-            -t cert \
-            -f pkcs12 \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security \
-            -T /usr/bin/xcodebuild
-
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -Eq "Apple Distribution|iPhone Distribution"; then
-            echo "::error::No Apple Distribution identity found after certificate import"
-            exit 1
-          fi
-
-      - name: Install App Store Connect API key
-        run: |
-          set -euo pipefail
-          mkdir -p "$ASC_KEY_DIR"
-          KEY_PATH="$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          mkdir -p "$HOME/private_keys"
+          KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
 
           if printf '%s' "$APP_STORE_CONNECT_API_KEY" | grep -q "BEGIN PRIVATE KEY"; then
             printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
@@ -150,121 +120,161 @@ jobs:
             printf '%s' "$APP_STORE_CONNECT_API_KEY" | tr -d '\n\r\t ' | base64 --decode > "$KEY_PATH"
           fi
 
+          test -s "$KEY_PATH"
           chmod 600 "$KEY_PATH"
-          echo "Installed App Store Connect API key"
+          # altool looks here for --apiKey / --apiIssuer
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          cp "$KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Install provisioning profile
-        id: profile
+      - name: Raise iOS deployment target to 15.0
         run: |
           set -euo pipefail
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILE_DIR"
+          if [ -f ios/Podfile ]; then
+            if grep -qE "platform :ios" ios/Podfile; then
+              sed -i.bak -E "s/platform :ios, *'[0-9.]+'/platform :ios, '15.0'/" ios/Podfile || true
+            else
+              { echo "platform :ios, '15.0'"; cat ios/Podfile; } > ios/Podfile.tmp && mv ios/Podfile.tmp ios/Podfile
+            fi
+          fi
+          if [ -f ios/Runner.xcodeproj/project.pbxproj ]; then
+            sed -i.bak 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' \
+              ios/Runner.xcodeproj/project.pbxproj
+          fi
 
+      - name: Build iOS IPA (xcodebuild + manual App Store profile)
+        env:
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          # Compile unsigned first — avoids Pods/SPM Development signing conflicts.
+          flutter build ios --release --no-codesign ${{ steps.ver.outputs.args }}
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PATH="$RUNNER_TEMP/Smeet_AppStore.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/Smeet_profile.plist"
           printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | tr -d '\n\r\t ' | base64 --decode > "$PROFILE_PATH"
-          security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
 
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$RUNNER_TEMP/profile.plist")
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$RUNNER_TEMP/profile.plist")
-          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" "$RUNNER_TEMP/profile.plist")
-          PROFILE_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print Entitlements:application-identifier" "$RUNNER_TEMP/profile.plist" | sed "s/^${TEAM_ID}\.//")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST")
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PROFILE_PLIST")
+          PROFILE_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print Entitlements:application-identifier' "$PROFILE_PLIST" | sed "s/^${TEAM_ID}\.//")
+          PROFILE_GET_TASK_ALLOW=$(/usr/libexec/PlistBuddy -c 'Print Entitlements:get-task-allow' "$PROFILE_PLIST" 2>/dev/null || echo false)
 
-          cp "$PROFILE_PATH" "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+          if [ "$PROFILE_GET_TASK_ALLOW" = "true" ]; then
+            echo "::error::Uploaded profile is Development (get-task-allow=true). Use an App Store distribution profile for $IOS_BUNDLE_ID."
+            exit 1
+          fi
 
-          echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
-          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
-          echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
-          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
-
-          echo "Installed profile: $PROFILE_NAME ($PROFILE_UUID)"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          echo "Installed App Store profile: $PROFILE_NAME ($PROFILE_UUID)"
           echo "Team ID: $TEAM_ID"
           echo "Profile bundle ID: $PROFILE_BUNDLE_ID"
           echo "Workflow bundle ID: $IOS_BUNDLE_ID"
 
           if [ "$PROFILE_BUNDLE_ID" != "$IOS_BUNDLE_ID" ] && [ "$PROFILE_BUNDLE_ID" != "*" ]; then
-            echo "::warning::Provisioning profile bundle ID ($PROFILE_BUNDLE_ID) does not match IOS_BUNDLE_ID ($IOS_BUNDLE_ID)"
-          fi
-
-      - name: Create ExportOptions.plist
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os
-          import plistlib
-
-          payload = {
-              "method": "app-store",
-              "signingStyle": "manual",
-              "teamID": os.environ["TEAM_ID"],
-              "stripSwiftSymbols": True,
-              "compileBitcode": False,
-              "destination": "export",
-              "manageAppVersionAndBuildNumber": False,
-              "provisioningProfiles": {
-                  os.environ["IOS_BUNDLE_ID"]: os.environ["PROFILE_NAME"],
-              },
-          }
-
-          path = os.environ["EXPORT_OPTIONS_PATH"]
-          with open(path, "wb") as handle:
-              plistlib.dump(payload, handle)
-          print(f"Wrote {path}")
-          PY
-          plutil -p "$EXPORT_OPTIONS_PATH"
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Install CocoaPods
-        working-directory: ios
-        run: pod install
-
-      - name: Build IPA
-        run: |
-          set -euo pipefail
-          flutter build ipa --release \
-            --export-options-plist="$EXPORT_OPTIONS_PATH" \
-            -- \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
-
-      - name: Resolve IPA path
-        id: ipa
-        run: |
-          set -euo pipefail
-          IPA_PATH="$(find build/ios/ipa -maxdepth 2 -name '*.ipa' -print -quit)"
-          if [ -z "$IPA_PATH" ]; then
-            echo "::error::No .ipa found under build/ios/ipa"
-            ls -laR build/ios || true
+            echo "::error::Provisioning profile bundle ID ($PROFILE_BUNDLE_ID) does not match IOS_BUNDLE_ID ($IOS_BUNDLE_ID)"
             exit 1
           fi
-          echo "path=$IPA_PATH" >> "$GITHUB_OUTPUT"
-          ls -la "$IPA_PATH"
+
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          echo "Manual archive signing with App Store profile"
+
+          # Ensure Runner uses Manual + Distribution + this profile.
+          sed -i.bak 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBX"
+          sed -i.bak "s/DEVELOPMENT_TEAM = [A-Z0-9]*/DEVELOPMENT_TEAM = $TEAM_ID/g" "$PBX"
+          sed -i.bak 's/CODE_SIGN_IDENTITY = "iPhone Developer"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBX"
+          sed -i.bak 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = "Apple Distribution"/g' "$PBX"
+          sed -i.bak 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$PBX"
+          sed -i.bak 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "Apple Development"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"/g' "$PBX"
+          sed -i.bak "s/PRODUCT_BUNDLE_IDENTIFIER = com\.smeet\.smeetapp;/PRODUCT_BUNDLE_IDENTIFIER = $IOS_BUNDLE_ID;/g" "$PBX"
+          sed -i.bak "s/PRODUCT_BUNDLE_IDENTIFIER = com\.smeet\.smeetapp\.RunnerTests;/PRODUCT_BUNDLE_IDENTIFIER = ${IOS_BUNDLE_ID}.RunnerTests;/g" "$PBX"
+
+          # Inject signing keys into Runner build settings if missing.
+          if ! grep -q 'PROVISIONING_PROFILE_SPECIFIER' "$PBX"; then
+            perl -i.bak2 -0777 -pe "s/(INFOPLIST_FILE = Runner\/Info\.plist;\n)/\$1\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = $TEAM_ID;\n\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";\n\t\t\t\t\"CODE_SIGN_IDENTITY[sdk=iphoneos*]\" = \"Apple Distribution\";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";\n\t\t\t\tPROVISIONING_PROFILE = \"$PROFILE_UUID\";\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = $IOS_BUNDLE_ID;\n/g" "$PBX"
+          else
+            sed -i.bak "s/PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\"/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\"/g" "$PBX"
+            sed -i.bak "s/PROVISIONING_PROFILE = \"[^\"]*\"/PROVISIONING_PROFILE = \"$PROFILE_UUID\"/g" "$PBX"
+          fi
+
+          ARCHIVE_PATH="$PWD/build/ios/archive/Runner.xcarchive"
+          EXPORT_PATH="$PWD/build/ios/ipa"
+          mkdir -p "$(dirname "$ARCHIVE_PATH")" "$EXPORT_PATH"
+
+          # Do NOT pass CODE_SIGN_IDENTITY globally — conflicts with Pods auto-signing.
+          # Do NOT use -allowProvisioningUpdates with a local App Store profile.
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            archive
+
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+            echo '<plist version="1.0"><dict>'
+            echo '  <key>method</key><string>app-store-connect</string>'
+            echo '  <key>signingStyle</key><string>manual</string>'
+            echo "  <key>teamID</key><string>$TEAM_ID</string>"
+            echo '  <key>signingCertificate</key><string>Apple Distribution</string>'
+            echo '  <key>provisioningProfiles</key><dict>'
+            echo "    <key>$IOS_BUNDLE_ID</key><string>$PROFILE_NAME</string>"
+            echo '  </dict>'
+            echo '  <key>uploadSymbols</key><true/>'
+            echo '  <key>manageAppVersionAndBuildNumber</key><false/>'
+            echo '</dict></plist>'
+          } > ios/ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath "$EXPORT_PATH"
+
+          shopt -s nullglob
+          ipa_files=("$EXPORT_PATH"/*.ipa)
+          if [ ${#ipa_files[@]} -eq 0 ]; then
+            echo "::error::xcodebuild export produced no .ipa in $EXPORT_PATH"
+            ls -la "$EXPORT_PATH" || true
+            exit 1
+          fi
+          ls -la "${ipa_files[@]}"
+          echo "IPA_PATH=${ipa_files[0]}" >> "$GITHUB_ENV"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: smeet-release-ipa
-          path: ${{ steps.ipa.outputs.path }}
+          path: build/ios/ipa/*.ipa
           retention-days: 30
 
-      - name: Upload to App Store Connect
+      - name: Upload to TestFlight / App Store
         if: ${{ github.event_name == 'push' || github.event.inputs.upload_to_testflight == 'true' }}
         run: |
           set -euo pipefail
-          xcrun altool --upload-app \
-            --type ios \
-            --file "${{ steps.ipa.outputs.path }}" \
+          shopt -s nullglob
+          ipa_files=(build/ios/ipa/*.ipa)
+          if [ ${#ipa_files[@]} -eq 0 ]; then
+            echo "::error::No IPA found under build/ios/ipa/"
+            exit 1
+          fi
+          IPA="${ipa_files[0]}"
+          echo "Uploading $IPA to TestFlight…"
+          xcrun altool --upload-app -f "$IPA" --type ios \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
 
-      - name: Cleanup signing materials
+      - name: Cleanup
         if: always()
         run: |
           set +e
-          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null
-          rm -f "$P12_PATH" "$PROFILE_PATH"
-          rm -f "$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          rm -f "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          rm -f ios/ExportOptions.plist
