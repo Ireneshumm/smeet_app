@@ -111,21 +111,36 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/private_keys"
+          mkdir -p "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys" "./private_keys"
           KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          RAW="$APP_STORE_CONNECT_API_KEY"
 
-          if printf '%s' "$APP_STORE_CONNECT_API_KEY" | grep -q "BEGIN PRIVATE KEY"; then
-            printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
+          # Normalize: literal \n → real newlines, strip CR.
+          RAW="$(printf '%s' "$RAW" | sed 's/\r//g; s/\\n/\n/g')"
+
+          if printf '%s' "$RAW" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$RAW" > "$KEY_PATH"
           else
-            printf '%s' "$APP_STORE_CONNECT_API_KEY" | tr -d '\n\r\t ' | base64 --decode > "$KEY_PATH"
+            # Assume base64-encoded .p8 contents.
+            printf '%s' "$RAW" | tr -d '\n\t ' | base64 --decode > "$KEY_PATH"
           fi
 
-          test -s "$KEY_PATH"
+          # Ensure trailing newline (required by some altool builds).
+          if [ -n "$(tail -c1 "$KEY_PATH" | tr -d '\n')" ]; then
+            printf '\n' >> "$KEY_PATH"
+          fi
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "::error::APP_STORE_CONNECT_API_KEY is not a valid .p8 PEM. Paste the AuthKey_*.p8 file contents (including BEGIN/END lines), or base64 of that file."
+            echo "Key file size: $(wc -c < "$KEY_PATH") bytes"
+            exit 1
+          fi
+
           chmod 600 "$KEY_PATH"
-          # altool looks here for --apiKey / --apiIssuer
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
           cp "$KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          cp "$KEY_PATH" "./private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          echo "Staged ASC API key ($(wc -c < "$KEY_PATH") bytes)"
 
       - name: Raise iOS deployment target to 15.0
         run: |
@@ -257,6 +272,8 @@ jobs:
 
       - name: Upload to TestFlight / App Store
         if: ${{ github.event_name == 'push' || github.event.inputs.upload_to_testflight == 'true' }}
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -266,10 +283,33 @@ jobs:
             exit 1
           fi
           IPA="${ipa_files[0]}"
-          echo "Uploading $IPA to TestFlight…"
-          xcrun altool --upload-app -f "$IPA" --type ios \
-            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          echo "IPA size: $(wc -c < "$IPA") bytes"
+          file "$IPA" || true
+          unzip -t "$IPA" >/dev/null
+
+          # Rebuild API key next to the IPA (altool searches several private_keys dirs).
+          KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          if [ ! -s "$KEY_PATH" ] || ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "::error::ASC API key missing/invalid at $KEY_PATH"
+            exit 1
+          fi
+          mkdir -p "$PWD/private_keys" "$HOME/.appstoreconnect/private_keys"
+          cp "$KEY_PATH" "$PWD/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          cp "$KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+          echo "Uploading $IPA to TestFlight with apiKey=$APP_STORE_CONNECT_KEY_ID …"
+          # Prefer iTMSTransporter when available; fall back to altool.
+          if xcrun --find iTMSTransporter >/dev/null 2>&1; then
+            xcrun iTMSTransporter -m upload -assetFile "$IPA" \
+              -apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+              -v informational
+          else
+            xcrun altool --upload-app -f "$IPA" --type ios \
+              --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+              --verbose
+          fi
 
       - name: Cleanup
         if: always()
@@ -277,4 +317,5 @@ jobs:
           set +e
           rm -f "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          rm -f "./private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           rm -f ios/ExportOptions.plist
