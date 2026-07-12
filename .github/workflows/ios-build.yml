@@ -29,8 +29,6 @@ jobs:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-      IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
-      IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
       IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
 
     steps:
@@ -44,6 +42,9 @@ jobs:
           cache: true
 
       - name: Validate required secrets
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
         run: |
           set -euo pipefail
           missing=0
@@ -67,33 +68,44 @@ jobs:
 
       - name: Resolve temp paths
         run: |
-          echo "KEYCHAIN_PATH=$RUNNER_TEMP/smeet-signing.keychain-db" >> "$GITHUB_ENV"
-          echo "KEYCHAIN_PASSWORD=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
-          echo "P12_PATH=$RUNNER_TEMP/dist.p12" >> "$GITHUB_ENV"
           echo "PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision" >> "$GITHUB_ENV"
           echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist" >> "$GITHUB_ENV"
           echo "ASC_KEY_DIR=$HOME/.appstoreconnect/private_keys" >> "$GITHUB_ENV"
+          echo "P12_PATH=$RUNNER_TEMP/dist.p12" >> "$GITHUB_ENV"
 
-      - name: Install App Store Connect API key
+      - name: Decode, verify, and import distribution certificate
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p "$ASC_KEY_DIR"
-          KEY_PATH="$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
 
-          # Accept raw .p8 PEM content or base64-encoded .p8 contents.
-          if printf '%s' "$APP_STORE_CONNECT_API_KEY" | grep -q "BEGIN PRIVATE KEY"; then
-            printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
-          else
-            echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > "$KEY_PATH"
+          # Strip whitespace/newlines that often break GitHub secret pastes.
+          CERT_B64="$(printf '%s' "$IOS_DIST_CERT_P12_BASE64" | tr -d '\n\r\t ')"
+          CERT_PASS="$(printf '%s' "$IOS_DIST_CERT_PASSWORD" | tr -d '\r')"
+
+          printf '%s' "$CERT_B64" | base64 --decode > "$P12_PATH"
+          FILE_SIZE="$(wc -c < "$P12_PATH" | tr -d ' ')"
+          echo "Decoded .p12 size: ${FILE_SIZE} bytes"
+
+          if [ "$FILE_SIZE" -lt 100 ]; then
+            echo "::error::Decoded .p12 is too small (${FILE_SIZE} bytes). Re-encode IOS_DIST_CERT_P12_BASE64 with: base64 -i YourCert.p12 | pbcopy"
+            exit 1
           fi
 
-          chmod 600 "$KEY_PATH"
-          echo "Installed App Store Connect API key"
+          # Verify password against the .p12 before keychain import.
+          if ! openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:${CERT_PASS}" 2>/dev/null \
+            && ! openssl pkcs12 -in "$P12_PATH" -noout -passin "pass:${CERT_PASS}" -legacy 2>/dev/null; then
+            echo "::error::IOS_DIST_CERT_PASSWORD does not unlock the .p12 (or the base64 is corrupt)."
+            echo "::error::Re-export Apple Distribution cert from Keychain Access as .p12, set that export password as IOS_DIST_CERT_PASSWORD, then: base64 -i cert.p12 | pbcopy → IOS_DIST_CERT_P12_BASE64"
+            exit 1
+          fi
 
-      - name: Import distribution certificate
-        run: |
-          set -euo pipefail
-          echo "$IOS_DIST_CERT_P12_BASE64" | base64 --decode > "$P12_PATH"
+          echo "Certificate password verified successfully"
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/smeet-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -102,7 +114,7 @@ jobs:
 
           security import "$P12_PATH" \
             -k "$KEYCHAIN_PATH" \
-            -P "$IOS_DIST_CERT_PASSWORD" \
+            -P "$CERT_PASS" \
             -A \
             -t cert \
             -f pkcs12 \
@@ -117,6 +129,25 @@ jobs:
             "$KEYCHAIN_PATH"
 
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -Eq "Apple Distribution|iPhone Distribution"; then
+            echo "::error::No Apple Distribution identity found after certificate import"
+            exit 1
+          fi
+
+      - name: Install App Store Connect API key
+        run: |
+          set -euo pipefail
+          mkdir -p "$ASC_KEY_DIR"
+          KEY_PATH="$ASC_KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+          if printf '%s' "$APP_STORE_CONNECT_API_KEY" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
+          else
+            printf '%s' "$APP_STORE_CONNECT_API_KEY" | tr -d '\n\r\t ' | base64 --decode > "$KEY_PATH"
+          fi
+
+          chmod 600 "$KEY_PATH"
+          echo "Installed App Store Connect API key"
 
       - name: Install provisioning profile
         id: profile
@@ -125,7 +156,7 @@ jobs:
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
 
-          echo "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | tr -d '\n\r\t ' | base64 --decode > "$PROFILE_PATH"
           security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
 
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$RUNNER_TEMP/profile.plist")
