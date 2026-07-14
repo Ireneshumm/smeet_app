@@ -316,8 +316,6 @@ jobs:
 
       - name: Upload to TestFlight / App Store
         if: ${{ github.event_name == 'push' || github.event.inputs.upload_to_testflight == 'true' }}
-        env:
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -331,7 +329,7 @@ jobs:
           file "$IPA" || true
           unzip -t "$IPA" >/dev/null
 
-          # Rebuild API key next to the IPA (altool searches several private_keys dirs).
+          # altool looks for AuthKey_<KEY_ID>.p8 in these directories.
           KEY_PATH="$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           if [ ! -s "$KEY_PATH" ] || ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
             echo "::error::ASC API key missing/invalid at $KEY_PATH"
@@ -342,18 +340,13 @@ jobs:
           cp "$KEY_PATH" "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
 
           echo "Uploading $IPA to TestFlight with apiKey=$APP_STORE_CONNECT_KEY_ID …"
-          # Prefer iTMSTransporter when available; fall back to altool.
-          if xcrun --find iTMSTransporter >/dev/null 2>&1; then
-            xcrun iTMSTransporter -m upload -assetFile "$IPA" \
-              -apiKey "$APP_STORE_CONNECT_KEY_ID" \
-              -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-              -v informational
-          else
-            xcrun altool --upload-app -f "$IPA" --type ios \
-              --apiKey "$APP_STORE_CONNECT_KEY_ID" \
-              --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-              --verbose
-          fi
+          # iTMSTransporter is no longer usable on GitHub-hosted runners
+          # (moved to Mac App Store Transporter). Use altool instead.
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
 
       - name: Cleanup
         if: always()
