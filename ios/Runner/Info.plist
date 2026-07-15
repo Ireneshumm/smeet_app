@@ -51,6 +51,8 @@
 	<string>Smeet uses your location to find nearby games and players.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Smeet uses your location to find nearby sports activities.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Smeet uses your location to find nearby games, venues, and sports players near you.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
