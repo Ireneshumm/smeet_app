@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// One entry in the unified MVP debug launcher ([SmeetApp] — no feature imports).
 class MvpDebugLauncherItem {
   const MvpDebugLauncherItem({
@@ -80,22 +82,23 @@ class SmeetApp extends StatelessWidget {
   /// Targets for the MVP debug menu — labels, [Navigator.pushNamed] routes, icons.
   final List<MvpDebugLauncherItem> mvpDebugLauncherItems;
 
-  // Brand colors (from your logo)
-  static const Color smeetMint = Color(0xFF56CDBE);
-  static const Color smeetDeep = Color(0xFF0B8F85);
-  static const Color smeetInk = Color(0xFF0F2D2A);
+  // Brand colors — now sourced from [AppColors] (single source of truth).
+  // These aliases keep existing `SmeetApp.smeetXxx` call sites working.
+  static const Color smeetMint = AppColors.mint;
+  static const Color smeetDeep = AppColors.deep;
+  static const Color smeetInk = AppColors.ink;
   /// Warm canvas (抖音/小红书式暖白底)
-  static const Color smeetCanvas = Color(0xFFF8F7F4);
-  static const Color smeetNavBorder = Color(0xFFF0EEE8);
+  static const Color smeetCanvas = AppColors.canvas;
+  static const Color smeetNavBorder = AppColors.navBorder;
 
-  static const Color smeetMintLight = Color(0xFFDCFFF1);
-  static const Color smeetMintFaint = Color(0xFFFAFCFB);
-  static const Color smeetGrey = Color(0xFF6E7874);
-  static const Color smeetGreyLight = Color(0xFFE5F4EE);
-  static const Color smeetCoral = Color(0xFFE07A5F);
-  static const Color smeetCoralLight = Color(0xFFFFE5DC);
-  static const Color smeetIndigo = Color(0xFF5B6CFF);
-  static const Color smeetIndigoLight = Color(0xFFE8E9FF);
+  static const Color smeetMintLight = AppColors.mintLight;
+  static const Color smeetMintFaint = AppColors.mintFaint;
+  static const Color smeetGrey = AppColors.grey;
+  static const Color smeetGreyLight = AppColors.greyLight;
+  static const Color smeetCoral = AppColors.coral;
+  static const Color smeetCoralLight = AppColors.coralLight;
+  static const Color smeetIndigo = AppColors.indigo;
+  static const Color smeetIndigoLight = AppColors.indigoLight;
 
   @override
   Widget build(BuildContext context) {
@@ -117,37 +120,14 @@ class SmeetApp extends StatelessWidget {
         onSurface: smeetInk,
       ),
 
-      textTheme: Typography.blackMountainView.copyWith(
-        displaySmall: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          height: 1.2,
-          color: smeetInk,
-        ),
-        titleLarge: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          height: 1.25,
-          color: smeetInk,
-        ),
-        titleMedium: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          height: 1.3,
-          color: smeetInk,
-        ),
-        bodyLarge: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          height: 1.4,
-          color: smeetInk,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          height: 1.35,
-          color: smeetInk.withValues(alpha: 0.55),
-        ),
+      // Full type ramp from the design system (see core/theme/app_text_theme).
+      textTheme: buildSmeetTextTheme(),
+
+      // Default icon size — anchors ad-hoc sizes onto the token scale.
+      // (Color intentionally omitted so Material components keep their own
+      // contextual icon colors; onSurface already resolves to brand ink.)
+      iconTheme: const IconThemeData(
+        size: AppIconSize.md,
       ),
 
       appBarTheme: const AppBarTheme(
