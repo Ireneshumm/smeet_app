@@ -40,6 +40,7 @@ import 'package:smeet_app/core/services/swipe_write_service.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/widgets/swipe_card_hero_media.dart';
 import 'package:smeet_app/app/smeet_app.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/core/services/sport_definitions_service.dart';

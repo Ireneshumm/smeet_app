@@ -507,7 +507,7 @@ class _SmeetShellState extends State<SmeetShell> {
       final selected = _index == index;
       final iconC = selected ? cs.primary : greyIcon;
       final labelC = selected ? cs.primary : greyLabel;
-      final iconSz = selected ? 26.0 : 24.0;
+      const iconSz = AppIconSize.md;
       return Expanded(
         child: Material(
           color: Colors.transparent,
@@ -535,11 +535,10 @@ class _SmeetShellState extends State<SmeetShell> {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: labelC,
-                  ),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: labelC,
+                      ),
                 ),
               ],
             ),
@@ -552,7 +551,7 @@ class _SmeetShellState extends State<SmeetShell> {
       final selected = _index == 3;
       final iconC = selected ? cs.primary : greyIcon;
       final labelC = selected ? cs.primary : greyLabel;
-      final iconSz = selected ? 26.0 : 24.0;
+      const iconSz = AppIconSize.md;
       return Expanded(
         child: ValueListenableBuilder<int>(
           valueListenable: smeetChatTabUnreadTotal,
@@ -587,7 +586,7 @@ class _SmeetShellState extends State<SmeetShell> {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.error,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: AppRadius.smAll,
                               ),
                               constraints: const BoxConstraints(minWidth: 16),
                               child: Text(
@@ -608,11 +607,10 @@ class _SmeetShellState extends State<SmeetShell> {
                       'Messages',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: labelC,
-                      ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            color: labelC,
+                          ),
                     ),
                   ],
                 ),
@@ -673,7 +671,7 @@ class _SmeetShellState extends State<SmeetShell> {
                         child: const Icon(
                           Icons.add_rounded,
                           color: Colors.white,
-                          size: 28,
+                          size: AppIconSize.lg,
                         ),
                       ),
                     ),
