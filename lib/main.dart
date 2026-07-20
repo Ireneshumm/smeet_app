@@ -1084,6 +1084,85 @@ class _AuthPageState extends State<AuthPage> {
                 ],
               ),
             ),
+            // Social sign-in first: one tap, no password to remember.
+            SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: _loading ? null : _signInWithGoogle,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text(
+                      'G',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF4285F4),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Continue with Google'),
+                  ],
+                ),
+              ),
+            ),
+            if (defaultTargetPlatform == TargetPlatform.iOS ||
+                defaultTargetPlatform == TargetPlatform.macOS) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                    shape: const StadiumBorder(),
+                    foregroundColor: cs.onSurface,
+                  ),
+                  onPressed: _loading ? null : _signInWithApple,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.apple, size: 22, color: Colors.black),
+                      SizedBox(width: 10),
+                      Text('Continue with Apple'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'or continue with email',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                          fontSize: 12,
+                        ),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             if (_isLogin) ...[
               _authGuidanceLine(context, '1', 'Sign up for an account'),
               const SizedBox(height: 8),
@@ -1201,84 +1280,6 @@ class _AuthPageState extends State<AuthPage> {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    color: cs.outline.withValues(alpha: 0.35),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'or continue with',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: cs.outline.withValues(alpha: 0.35),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              width: double.infinity,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
-                  shape: const StadiumBorder(),
-                ),
-                onPressed: _loading ? null : _signInWithGoogle,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
-                      'G',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF4285F4),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Continue with Google'),
-                  ],
-                ),
-              ),
-            ),
-            if (defaultTargetPlatform == TargetPlatform.iOS ||
-                defaultTargetPlatform == TargetPlatform.macOS) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
-                    shape: const StadiumBorder(),
-                    foregroundColor: cs.onSurface,
-                  ),
-                  onPressed: _loading ? null : _signInWithApple,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.apple, size: 22, color: Colors.black),
-                      SizedBox(width: 10),
-                      Text('Continue with Apple'),
-                    ],
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 24),
           ],
         ),
