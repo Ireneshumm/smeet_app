@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// Shared loading UI for tab pages (Material 3 friendly, minimal).
 class AppLoadingState extends StatelessWidget {
   const AppLoadingState({
@@ -128,7 +130,7 @@ class AppErrorState extends StatelessWidget {
           children: [
             Icon(
               Icons.cloud_off_outlined,
-              size: 52,
+              size: AppIconSize.xxl,
               color: cs.error.withValues(alpha: 0.88),
             ),
             const SizedBox(height: 12),
