@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart' show WebHtmlElementStrategy;
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// Width fills the parent; height follows the image’s intrinsic aspect ratio.
 class AdaptiveNetworkImage extends StatefulWidget {
   const AdaptiveNetworkImage({
@@ -161,7 +163,7 @@ class _AdaptiveNetworkImageState extends State<AdaptiveNetworkImage> {
       child: Icon(
         Icons.broken_image_outlined,
         color: Colors.grey.shade600,
-        size: 40,
+        size: AppIconSize.xl,
       ),
     );
   }
@@ -282,7 +284,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                           child: Icon(
                             Icons.videocam_rounded,
                             color: Colors.white54,
-                            size: 32,
+                            size: AppIconSize.lg,
                           ),
                         ),
                       ),
@@ -297,7 +299,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                           child: Icon(
                             Icons.videocam_rounded,
                             color: Colors.white54,
-                            size: 32,
+                            size: AppIconSize.lg,
                           ),
                         ),
                       ),
@@ -307,7 +309,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                           child: Icon(
                             Icons.videocam_rounded,
                             color: Colors.white54,
-                            size: 32,
+                            size: AppIconSize.lg,
                           ),
                         ),
                       ),
@@ -318,7 +320,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                     child: Icon(
                       Icons.videocam_rounded,
                       color: Colors.white54,
-                      size: 32,
+                      size: AppIconSize.lg,
                     ),
                   ),
                 ),
@@ -340,7 +342,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
             child: Icon(
               Icons.play_circle_filled_rounded,
               color: Colors.white,
-              size: 52,
+              size: AppIconSize.xxl,
             ),
           ),
           Positioned(
