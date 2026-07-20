@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/data/mock_profile_repository.dart';
 import 'package:smeet_app/features/profile/data/profile_repository.dart';
 import 'package:smeet_app/features/profile/data/supabase_profile_hosted_repository.dart';
@@ -239,7 +240,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                     ),
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.mdAll,
                     ),
                     child: Text(
                       s.sportsSummary,
@@ -358,7 +359,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           loggedIn
                               ? Icons.post_add_outlined
                               : Icons.lock_outline,
-                          size: 48,
+                          size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
                         const SizedBox(height: 12),
@@ -479,7 +480,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           loggedIn
                               ? Icons.sports_outlined
                               : Icons.lock_outline,
-                          size: 48,
+                          size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
                         const SizedBox(height: 12),
@@ -600,7 +601,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           loggedIn
                               ? Icons.add_location_alt_outlined
                               : Icons.lock_outline,
-                          size: 48,
+                          size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
                         const SizedBox(height: 12),
@@ -696,11 +697,11 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _open(item),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lgAll,
         child: Container(
           decoration: BoxDecoration(
             color: cs.surface,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadius.lgAll,
             border: Border.all(color: cs.primary.withValues(alpha: 0.10)),
           ),
           child: ListTile(
