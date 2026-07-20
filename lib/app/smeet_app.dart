@@ -144,7 +144,7 @@ class SmeetApp extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.black.withValues(alpha: 0.06),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.lgAll,
         ),
         margin: EdgeInsets.zero,
       ),
