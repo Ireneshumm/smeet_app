@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/sport_definitions_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/data/profile_setup_repository.dart';
 import 'package:smeet_app/features/profile/widgets/availability_picker.dart';
 
@@ -462,7 +463,7 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
               hintText: 'Search sports',
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.mdAll,
               ),
             ),
             onChanged: (v) => setState(() => _query = v),
@@ -590,7 +591,7 @@ class _ProfileSetupCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lgAll,
         border: Border.all(color: cs.primary.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
