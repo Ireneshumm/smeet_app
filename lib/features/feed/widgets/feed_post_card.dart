@@ -5,6 +5,7 @@ import 'package:flutter/painting.dart' show WebHtmlElementStrategy;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
 import 'package:smeet_app/widgets/circular_network_avatar.dart';
 import 'package:smeet_app/other_profile_page.dart';
@@ -206,7 +207,7 @@ class FeedPostCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.lgAll,
           boxShadow: [
             BoxShadow(
               offset: const Offset(0, 2),
@@ -237,7 +238,7 @@ class FeedPostCard extends StatelessWidget {
                       Text(
                         caption,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
                         ),
@@ -302,7 +303,7 @@ class FeedPostCard extends StatelessWidget {
       child: const ColoredBox(
         color: Color(0xFFE8E8E8),
         child: Center(
-          child: Icon(Icons.image_not_supported_outlined, size: 40),
+          child: Icon(Icons.image_not_supported_outlined, size: AppIconSize.xl),
         ),
       ),
     );
@@ -362,7 +363,7 @@ class FeedPostCard extends StatelessWidget {
             child: Icon(
               Icons.play_circle_filled_rounded,
               color: Colors.white,
-              size: 52,
+              size: AppIconSize.xxl,
             ),
           ),
           Positioned(
@@ -377,7 +378,7 @@ class FeedPostCard extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.smAll,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
