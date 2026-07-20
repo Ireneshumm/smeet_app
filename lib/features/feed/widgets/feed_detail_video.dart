@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// Inline autoplay for feed detail — aspect ratio follows the file; optional immersive fullscreen.
 class FeedDetailVideo extends StatefulWidget {
   const FeedDetailVideo({super.key, required this.url});
@@ -148,7 +150,7 @@ class _FeedDetailVideoState extends State<FeedDetailVideo> {
                   child: const Icon(
                     Icons.fullscreen_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: AppIconSize.md,
                   ),
                 ),
               ),
