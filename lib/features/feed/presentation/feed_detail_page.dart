@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
 import 'package:smeet_app/features/feed/widgets/feed_detail_video.dart';
 import 'package:smeet_app/widgets/adaptive_media.dart';
@@ -311,7 +312,7 @@ class _FeedDetailCoverBanner extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.smAll,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -409,7 +410,7 @@ class _FdTypeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: AppRadius.smAll,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         child: Text(
