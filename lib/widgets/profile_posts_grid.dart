@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/widgets/adaptive_media.dart';
 
 /// Two-column masonry grid for profile posts: intrinsic image/video aspect per cell.
@@ -53,7 +54,7 @@ class ProfilePostsGrid extends StatelessWidget {
 
         return Material(
           color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.mdAll,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => onOpenPost(p),
@@ -66,12 +67,12 @@ class ProfilePostsGrid extends StatelessWidget {
                   if (isVideo)
                     AdaptiveVideoCover(
                       coverUrl: url,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.mdAll,
                     )
                   else if (url.isNotEmpty)
                     AdaptiveNetworkImage(
                       imageUrl: url,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.mdAll,
                     )
                   else
                     AspectRatio(
@@ -81,7 +82,7 @@ class ProfilePostsGrid extends StatelessWidget {
                           color: cs.surfaceContainerHighest.withValues(
                             alpha: 0.5,
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.mdAll,
                         ),
                         child: Icon(
                           Icons.image_not_supported_outlined,
