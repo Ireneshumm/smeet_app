@@ -347,7 +347,11 @@ const List<MvpDebugLauncherItem> _kMvpDebugLauncherItems = [
 ];
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Use Sentry's binding so the binding and runApp share one zone.
+  // Plain WidgetsFlutterBinding.ensureInitialized() here runs in the root
+  // zone while runApp runs inside SentryFlutter.init's guarded zone, which
+  // triggers Flutter's "Zone mismatch" warning at startup.
+  SentryWidgetsFlutterBinding.ensureInitialized();
 
   final cfg = resolveSupabaseConfig();
   // supabase package defaults to AuthFlowType.pkce; no need to pass authOptions.
