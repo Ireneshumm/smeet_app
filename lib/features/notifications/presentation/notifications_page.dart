@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/services/app_notification_badges.dart';
 import 'package:smeet_app/core/services/user_notifications_repository.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/notifications/data/mock_notifications_repository.dart';
 import 'package:smeet_app/features/notifications/models/notification_item.dart';
 import 'package:smeet_app/features/notifications/presentation/notification_detail_page.dart';
@@ -158,9 +159,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           .withValues(alpha: 0.4)
                       : theme.colorScheme.primaryContainer
                           .withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.mdAll,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.mdAll,
                     onTap: () async {
                       await _liveRepo.markRead(id);
                       if (mounted) {
@@ -277,9 +278,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ? theme.colorScheme.primaryContainer.withValues(alpha: 0.35)
                     : theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.mdAll,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.mdAll,
                   onTap: () {
                     Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
