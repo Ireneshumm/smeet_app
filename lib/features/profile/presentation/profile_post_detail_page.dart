@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
 import 'package:smeet_app/widgets/post_media_display.dart';
 
@@ -148,7 +149,7 @@ class ProfilePostDetailBody extends StatelessWidget {
             elevation: 0,
             color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppRadius.mdAll,
               side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Padding(
