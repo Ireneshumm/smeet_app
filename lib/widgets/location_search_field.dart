@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// Matches `SmeetApp.smeetMint` in `app/smeet_app.dart` (avoid importing `main.dart`).
 const Color kSmeetMint = Color(0xFF56CDBE);
 
@@ -483,7 +485,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
                 clipBehavior: Clip.antiAlias,
                 color: Theme.of(context).colorScheme.surface,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.mdAll,
                   side: const BorderSide(color: kSmeetMint, width: 1),
                 ),
                 child: ConstrainedBox(
