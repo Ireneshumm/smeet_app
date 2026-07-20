@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 import 'delete_account_flow.dart';
 
 const _kPrivacyPolicyUrl = 'https://smeet.com.au/privacy-policy.html';
@@ -108,7 +110,7 @@ class LegalSectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lgAll,
         border: Border.all(color: cs.primary.withValues(alpha: 0.10)),
       ),
       child: Column(
