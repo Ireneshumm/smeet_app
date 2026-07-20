@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/activity_summary_service.dart';
 import 'package:smeet_app/core/services/location_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/feed/data/feed_repository.dart';
 import 'package:smeet_app/features/feed/data/supabase_feed_repository.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
@@ -241,7 +242,7 @@ class _FeedPageState extends State<FeedPage> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => widget.onOpenHome?.call(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.mdAll,
         child: Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -252,7 +253,7 @@ class _FeedPageState extends State<FeedPage> {
                 cs.primary.withValues(alpha: 0.7),
               ],
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadius.mdAll,
           ),
           child: Row(
             children: [
@@ -266,14 +267,14 @@ class _FeedPageState extends State<FeedPage> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
               ),
               const Icon(
                 Icons.chevron_right_rounded,
                 color: Colors.white,
-                size: 20,
+                size: AppIconSize.sm,
               ),
             ],
           ),
@@ -603,7 +604,7 @@ class _SportFilterChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
             color: selected ? cs.primary : cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -611,7 +612,7 @@ class _SportFilterChip extends StatelessWidget {
             style: TextStyle(
               color: selected ? Colors.white : cs.onSurface,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
         ),
