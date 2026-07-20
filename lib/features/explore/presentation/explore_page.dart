@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/services/location_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/venues/models/venue.dart';
 import 'package:smeet_app/features/venues/presentation/venue_detail_page.dart';
 import 'package:smeet_app/geo_utils.dart';
@@ -56,11 +57,11 @@ class _ExplorePageState extends State<ExplorePage>
             unselectedLabelColor: Colors.grey.shade400,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 15,
+              fontSize: 14,
             ),
             unselectedLabelStyle: const TextStyle(
               fontWeight: FontWeight.w500,
-              fontSize: 15,
+              fontSize: 14,
             ),
             tabs: const [
               Tab(text: '🤝 Smeet'),
@@ -399,7 +400,7 @@ class _FeaturedVenueCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.lgAll,
           boxShadow: [
             BoxShadow(
               offset: const Offset(0, 2),
@@ -483,7 +484,7 @@ class _FeaturedVenueCard extends StatelessWidget {
                         child: Text(
                           '${venue.categoryEmoji} ${venue.categoryLabel}',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: cs.primary,
                           ),
@@ -530,7 +531,7 @@ class _VenueCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: AppRadius.lgAll,
           boxShadow: [
             BoxShadow(
               offset: const Offset(0, 2),
@@ -577,7 +578,7 @@ class _VenueCard extends StatelessWidget {
                           child: Text(
                             venue.name,
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
                             maxLines: 1,
@@ -605,7 +606,7 @@ class _VenueCard extends StatelessWidget {
                       child: Text(
                         '${venue.categoryEmoji} ${venue.categoryLabel}',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: cs.primary,
                         ),
@@ -741,7 +742,7 @@ class _CategoryRow extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isSelected ? selectedBg : Colors.white,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       border: isSelected
                           ? null
                           : Border.all(color: SmeetApp.smeetGreyLight),
@@ -754,7 +755,7 @@ class _CategoryRow extends StatelessWidget {
                             : SmeetApp.smeetGrey,
                         fontWeight:
                             isSelected ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 13,
+                        fontSize: 12,
                         decoration: TextDecoration.none,
                       ),
                     ),
