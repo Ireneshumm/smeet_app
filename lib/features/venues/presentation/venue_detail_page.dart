@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/venues/models/venue.dart';
 import 'package:smeet_app/geo_utils.dart';
 
@@ -114,7 +115,7 @@ class VenueDetailPage extends StatelessWidget {
                           const Icon(
                             Icons.verified_rounded,
                             color: Colors.white,
-                            size: 24,
+                            size: AppIconSize.md,
                           ),
                       ],
                     ),
@@ -138,14 +139,14 @@ class VenueDetailPage extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: cs.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(100),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
                         child: Text(
                           '${venue.categoryEmoji} ${venue.categoryLabel}',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: cs.primary,
-                            fontSize: 13,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -153,14 +154,14 @@ class VenueDetailPage extends StatelessWidget {
                         const SizedBox(width: 10),
                         Icon(
                           Icons.location_on_outlined,
-                          size: 16,
+                          size: AppIconSize.xs,
                           color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           formatDistanceKm(venue.distanceKm!),
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
@@ -194,7 +195,7 @@ class VenueDetailPage extends StatelessWidget {
                             '${venue.rating.toStringAsFixed(1)} '
                             '(${venue.reviewCount} reviews)',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: cs.onSurface.withValues(alpha: 0.65),
                             ),
                           ),
@@ -208,7 +209,7 @@ class VenueDetailPage extends StatelessWidget {
                     Text(
                       '${venue.priceRange} ${venue.priceDisplay}',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: cs.onSurface.withValues(alpha: 0.7),
                       ),
@@ -244,7 +245,7 @@ class VenueDetailPage extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.access_time_rounded,
-                          size: 16,
+                          size: AppIconSize.xs,
                           color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                         const SizedBox(width: 6),
@@ -252,7 +253,7 @@ class VenueDetailPage extends StatelessWidget {
                           child: Text(
                             venue.openingHours!,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: cs.onSurface.withValues(alpha: 0.7),
                               height: 1.35,
                             ),
@@ -274,7 +275,7 @@ class VenueDetailPage extends StatelessWidget {
                     Text(
                       venue.description!,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         color: cs.onSurface.withValues(alpha: 0.75),
                         height: 1.6,
                       ),
@@ -302,12 +303,14 @@ class VenueDetailPage extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(100),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.pill,
+                                ),
                               ),
                               child: Text(
                                 s,
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -351,7 +354,7 @@ class VenueDetailPage extends StatelessWidget {
                         onPressed: () => launchVenueExternalUrl(venue.bookingUrl!),
                         icon: const Icon(
                           Icons.calendar_month_rounded,
-                          size: 20,
+                          size: AppIconSize.sm,
                         ),
                         label: const Text(
                           'Book Now',
@@ -380,7 +383,7 @@ class VenueDetailPage extends StatelessWidget {
                         icon: const Icon(Icons.language_rounded),
                         label: const Text(
                           'Visit Website',
-                          style: TextStyle(fontSize: 15),
+                          style: TextStyle(fontSize: 14),
                         ),
                       ),
                     ),
@@ -398,7 +401,7 @@ class VenueDetailPage extends StatelessWidget {
                         icon: const Icon(Icons.phone_rounded),
                         label: const Text(
                           'Call',
-                          style: TextStyle(fontSize: 15),
+                          style: TextStyle(fontSize: 14),
                         ),
                       ),
                     ),
