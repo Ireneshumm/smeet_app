@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/widgets/circular_network_avatar.dart';
 
 /// Copy and widgets shared by standalone [MatchesPage] and Inbox **Matches** tab.
@@ -56,11 +57,11 @@ class MatchRelationshipCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.lgAll,
           child: Ink(
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppRadius.lgAll,
               border: Border.all(
                 color: cs.tertiary.withValues(alpha: 0.32),
               ),
@@ -83,7 +84,7 @@ class MatchRelationshipCard extends StatelessWidget {
                     backgroundColor: cs.tertiary.withValues(alpha: 0.2),
                     placeholder: Icon(
                       Icons.favorite_rounded,
-                      size: 32,
+                      size: AppIconSize.lg,
                       color: cs.tertiary,
                     ),
                   ),
@@ -101,7 +102,7 @@ class MatchRelationshipCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.tertiary.withValues(alpha: 0.22),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: AppRadius.smAll,
                               ),
                               child: Text(
                                 'MATCH',
@@ -109,7 +110,6 @@ class MatchRelationshipCard extends StatelessWidget {
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.6,
                                   color: cs.tertiary,
-                                  fontSize: 10,
                                 ),
                               ),
                             ),
@@ -142,7 +142,7 @@ class MatchRelationshipCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.place_outlined,
-                              size: 16,
+                              size: AppIconSize.xs,
                               color: cs.onSurfaceVariant.withValues(alpha: 0.9),
                             ),
                             const SizedBox(width: 4),
@@ -203,7 +203,7 @@ Future<void> showMatchRelationshipNoChatDialog(
     builder: (ctx) {
       return AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: AppRadius.xlAll,
         ),
         titlePadding: EdgeInsets.zero,
         title: Padding(
@@ -214,7 +214,7 @@ Future<void> showMatchRelationshipNoChatDialog(
                 size: 80,
                 imageUrl: av.isEmpty ? null : av,
                 backgroundColor: cs.tertiary.withValues(alpha: 0.2),
-                placeholder: Icon(Icons.favorite_rounded, color: cs.tertiary, size: 36),
+                placeholder: Icon(Icons.favorite_rounded, color: cs.tertiary, size: AppIconSize.lg),
               ),
               const SizedBox(height: 12),
               Text(
