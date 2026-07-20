@@ -347,37 +347,10 @@ const List<MvpDebugLauncherItem> _kMvpDebugLauncherItems = [
 ];
 
 Future<void> main() async {
-  // Use Sentry's binding so the binding and runApp share one zone.
-  // Plain WidgetsFlutterBinding.ensureInitialized() here runs in the root
-  // zone while runApp runs inside SentryFlutter.init's guarded zone, which
+  // Everything that touches the Flutter binding — including runApp — must run
+  // inside SentryFlutter.init's guarded zone. Initializing the binding in the
+  // root zone (before init) while runApp runs in the guarded zone is what
   // triggers Flutter's "Zone mismatch" warning at startup.
-  SentryWidgetsFlutterBinding.ensureInitialized();
-
-  final cfg = resolveSupabaseConfig();
-  // supabase package defaults to AuthFlowType.pkce; no need to pass authOptions.
-  await Supabase.initialize(
-    url: cfg.url,
-    anonKey: cfg.anonKey,
-  );
-
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp();
-      _bindSmeetPushHandlers();
-      PushTokenService(Supabase.instance.client).listenTokenRefresh();
-      final u = Supabase.instance.client.auth.currentUser;
-      if (u != null) {
-        unawaited(
-          PushTokenService(Supabase.instance.client).registerCurrentToken(),
-        );
-      }
-    } catch (e) {
-      debugPrint('[Push] Firebase setup skipped/failed: $e');
-    }
-  }
-
-  final namedRoutes = _smeetNamedRoutesForNonRelease();
-
   await SentryFlutter.init(
     (options) {
       options.dsn = const String.fromEnvironment(
@@ -410,18 +383,46 @@ Future<void> main() async {
         return event;
       };
     },
-    appRunner: () => runApp(
-      SentryUserInteractionWidget(
-        child: SmeetApp(
-          home: const SmeetShell(),
-          routes: namedRoutes,
-          showMvpDebugLauncher: kDebugMode,
-          mvpDebugLauncherItems: kReleaseMode
-              ? const <MvpDebugLauncherItem>[]
-              : _kMvpDebugLauncherItems,
+    appRunner: () async {
+      // Runs in the same (Sentry-guarded) zone as runApp below, so ensure the
+      // binding here rather than in the root zone.
+      WidgetsFlutterBinding.ensureInitialized();
+
+      final cfg = resolveSupabaseConfig();
+      // supabase package defaults to AuthFlowType.pkce; no authOptions needed.
+      await Supabase.initialize(url: cfg.url, anonKey: cfg.anonKey);
+
+      if (!kIsWeb) {
+        try {
+          await Firebase.initializeApp();
+          _bindSmeetPushHandlers();
+          PushTokenService(Supabase.instance.client).listenTokenRefresh();
+          final u = Supabase.instance.client.auth.currentUser;
+          if (u != null) {
+            unawaited(
+              PushTokenService(Supabase.instance.client).registerCurrentToken(),
+            );
+          }
+        } catch (e) {
+          debugPrint('[Push] Firebase setup skipped/failed: $e');
+        }
+      }
+
+      final namedRoutes = _smeetNamedRoutesForNonRelease();
+
+      runApp(
+        SentryUserInteractionWidget(
+          child: SmeetApp(
+            home: const SmeetShell(),
+            routes: namedRoutes,
+            showMvpDebugLauncher: kDebugMode,
+            mvpDebugLauncherItems: kReleaseMode
+                ? const <MvpDebugLauncherItem>[]
+                : _kMvpDebugLauncherItems,
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
