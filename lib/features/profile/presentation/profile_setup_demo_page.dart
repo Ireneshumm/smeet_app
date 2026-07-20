@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/data/profile_setup_repository.dart';
 import 'package:smeet_app/features/profile/presentation/legacy_profile_setup_section.dart';
 
@@ -126,7 +127,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.engineering_outlined,
-                        size: 48, color: theme.colorScheme.outline),
+                        size: AppIconSize.xxl, color: theme.colorScheme.outline),
                     const SizedBox(height: 16),
                     Text(
                       'Sign in to try this demo.',
