@@ -4299,9 +4299,19 @@ class _SwipePageState extends State<SwipePage> {
                           ? null
                           : (details) async {
                               final threshold = cardW * 0.35;
-                              if (_dragDx > threshold) {
+                              final dx = _dragDx;
+                              // Horizontal flick speed (px/s). A quick flick
+                              // commits even when the drag distance is short,
+                              // so fast swipes feel responsive.
+                              final vx = details.velocity.pixelsPerSecond.dx;
+                              const flingV = 800.0;
+                              final goPlay =
+                                  dx > threshold || (vx > flingV && dx > 0);
+                              final goSkip =
+                                  dx < -threshold || (vx < -flingV && dx < 0);
+                              if (goPlay) {
                                 await _swipe('play');
-                              } else if (_dragDx < -threshold) {
+                              } else if (goSkip) {
                                 await _swipe('skip');
                               }
                               if (!mounted) return;
