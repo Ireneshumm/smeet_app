@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
 
 String badgeLabel(String raw) {
@@ -235,13 +236,13 @@ class _SportAchievementCell extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
         child: Ink(
           decoration: BoxDecoration(
             color: locked
                 ? SmeetApp.smeetGreyLight.withValues(alpha: 0.35)
                 : SmeetApp.smeetMintFaint,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.lgAll,
             border: Border.all(
               color: locked
                   ? SmeetApp.smeetGreyLight

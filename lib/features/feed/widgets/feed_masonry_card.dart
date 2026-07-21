@@ -5,6 +5,7 @@ import 'package:flutter/painting.dart' show WebHtmlElementStrategy;
 
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
 import 'package:smeet_app/other_profile_page.dart';
 import 'package:smeet_app/widgets/circular_network_avatar.dart';
@@ -41,11 +42,11 @@ class FeedMasonryCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.lgAll,
             boxShadow: [
               BoxShadow(
                 color: SmeetApp.smeetMint.withValues(alpha: 0.06),
@@ -269,7 +270,7 @@ class _MasonryMediaState extends State<_MasonryMedia> {
         ),
         child: const Icon(
           Icons.play_arrow_rounded,
-          size: 36,
+          size: AppIconSize.lg,
           color: SmeetApp.smeetMint,
         ),
       ),
@@ -340,7 +341,7 @@ class _AuthorRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: SmeetApp.smeetInk,
                 decoration: TextDecoration.none,
@@ -350,7 +351,7 @@ class _AuthorRow extends StatelessWidget {
         ),
         Icon(
           Icons.favorite_rounded,
-          size: 16,
+          size: AppIconSize.xs,
           color: SmeetApp.smeetGrey.withValues(alpha: 0.7),
         ),
         const SizedBox(width: 2),

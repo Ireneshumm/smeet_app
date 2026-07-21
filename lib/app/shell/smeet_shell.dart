@@ -507,7 +507,7 @@ class _SmeetShellState extends State<SmeetShell> {
       final selected = _index == index;
       final iconC = selected ? cs.primary : greyIcon;
       final labelC = selected ? cs.primary : greyLabel;
-      final iconSz = selected ? 26.0 : 24.0;
+      const iconSz = AppIconSize.md;
       return Expanded(
         child: Material(
           color: Colors.transparent,
@@ -535,11 +535,10 @@ class _SmeetShellState extends State<SmeetShell> {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: labelC,
-                  ),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: labelC,
+                      ),
                 ),
               ],
             ),
@@ -552,7 +551,7 @@ class _SmeetShellState extends State<SmeetShell> {
       final selected = _index == 3;
       final iconC = selected ? cs.primary : greyIcon;
       final labelC = selected ? cs.primary : greyLabel;
-      final iconSz = selected ? 26.0 : 24.0;
+      const iconSz = AppIconSize.md;
       return Expanded(
         child: ValueListenableBuilder<int>(
           valueListenable: smeetChatTabUnreadTotal,
@@ -587,7 +586,7 @@ class _SmeetShellState extends State<SmeetShell> {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.error,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: AppRadius.smAll,
                               ),
                               constraints: const BoxConstraints(minWidth: 16),
                               child: Text(
@@ -608,11 +607,10 @@ class _SmeetShellState extends State<SmeetShell> {
                       'Messages',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: labelC,
-                      ),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            color: labelC,
+                          ),
                     ),
                   ],
                 ),
@@ -673,7 +671,7 @@ class _SmeetShellState extends State<SmeetShell> {
                         child: const Icon(
                           Icons.add_rounded,
                           color: Colors.white,
-                          size: 28,
+                          size: AppIconSize.lg,
                         ),
                       ),
                     ),
@@ -826,7 +824,7 @@ class _CreateActionSheet extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xlAll,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -844,7 +842,7 @@ class _CreateActionSheet extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'Create',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ),
           const Divider(height: 1),
@@ -909,13 +907,13 @@ class _CreateItem extends StatelessWidget {
         height: 48,
         decoration: BoxDecoration(
           color: iconColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.mdAll,
         ),
-        child: Icon(icon, color: iconColor, size: 24),
+        child: Icon(icon, color: iconColor, size: AppIconSize.md),
       ),
       title: Text(
         label,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
       subtitle: Text(
         subtitle,
@@ -924,7 +922,7 @@ class _CreateItem extends StatelessWidget {
       trailing: Icon(
         Icons.chevron_right_rounded,
         color: Colors.grey.shade400,
-        size: 20,
+        size: AppIconSize.sm,
       ),
     );
   }
@@ -943,7 +941,7 @@ class _MediaSourceSheet extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xlAll,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -961,7 +959,7 @@ class _MediaSourceSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               title,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ),
           const Divider(height: 1),
@@ -975,9 +973,9 @@ class _MediaSourceSheet extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 color: cs.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.mdAll,
               ),
-              child: Icon(icon, color: cs.primary, size: 24),
+              child: Icon(icon, color: cs.primary, size: AppIconSize.md),
             ),
             title: const Text(
               'Take a photo / video',
@@ -997,12 +995,12 @@ class _MediaSourceSheet extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 color: Colors.purple.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.mdAll,
               ),
               child: const Icon(
                 Icons.photo_library_rounded,
                 color: Colors.purple,
-                size: 24,
+                size: AppIconSize.md,
               ),
             ),
             title: const Text(
@@ -1187,7 +1185,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
               GestureDetector(
                 onTap: _pickCover,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadius.lgAll,
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: _coverBytes != null
@@ -1208,7 +1206,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: AppRadius.smAll,
                                   ),
                                   child: const Text(
                                     '✏️ Change cover',
@@ -1230,7 +1228,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                 const Icon(
                                   Icons.add_photo_alternate_rounded,
                                   color: Colors.white54,
-                                  size: 48,
+                                  size: AppIconSize.xxl,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
@@ -1264,17 +1262,17 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                 ),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.smAll,
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.videocam_rounded, size: 18, color: cs.primary),
+                    Icon(Icons.videocam_rounded, size: AppIconSize.xs, color: cs.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Video selected ✓',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -1285,7 +1283,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
             ] else ...[
               if (_previewBytes != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadius.lgAll,
                   child: Image.memory(
                     _previewBytes!,
                     width: double.infinity,
@@ -1310,7 +1308,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
               decoration: InputDecoration(
                 hintText: 'Write a caption...',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: AppRadius.mdAll,
                 ),
                 filled: true,
                 fillColor: Colors.white,
@@ -1423,7 +1421,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
             Text(
               'Sport tag (optional)',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w600,
               ),
@@ -1446,14 +1444,14 @@ class _WriteNotePageState extends State<_WriteNotePage> {
                       ),
                       decoration: BoxDecoration(
                         color: sel ? cs.primary : cs.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(100),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(
                         sport,
                         style: TextStyle(
                           color: sel ? Colors.white : cs.onSurface,
                           fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ),

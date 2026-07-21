@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/services/media_upload_service.dart';
 import 'package:smeet_app/core/services/posts_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Post-game battle report: rating + caption + optional image → posts + achievement RPC.
 class BattleReportSheet extends StatefulWidget {
@@ -161,7 +162,7 @@ class _BattleReportSheetState extends State<BattleReportSheet> {
                 onPressed: _busy ? null : () => setState(() => _rating = n),
                 icon: Icon(
                   Icons.sports_tennis,
-                  size: 32,
+                  size: AppIconSize.lg,
                   color: on ? cs.primary : cs.outlineVariant,
                 ),
               );

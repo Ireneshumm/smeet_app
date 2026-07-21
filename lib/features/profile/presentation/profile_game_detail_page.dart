@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:smeet_app/core/services/game_detail_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
 
 String _mvpGameSourceLabel(ProfileContentTab tab) {
@@ -130,7 +131,7 @@ class _GameDetailBody extends StatelessWidget {
         elevation: 0,
         color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.lgAll,
           side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.55)),
         ),
         child: Padding(

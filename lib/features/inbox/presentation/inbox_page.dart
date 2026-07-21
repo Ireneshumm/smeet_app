@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/widgets/circular_network_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -326,7 +327,7 @@ class _InboxPageState extends State<InboxPage>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.smAll,
         border: Border.all(color: cs.error.withValues(alpha: 0.35)),
       ),
       child: Text(
@@ -367,7 +368,7 @@ class _InboxPageState extends State<InboxPage>
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: AppRadius.lgAll,
                       border: Border.all(
                         color: cs.primary.withValues(alpha: 0.10),
                       ),
@@ -392,7 +393,7 @@ class _InboxPageState extends State<InboxPage>
                             child: Text(
                               'GROUP',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 color: cs.secondary,
                               ),
@@ -436,7 +437,7 @@ class _InboxPageState extends State<InboxPage>
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: AppRadius.lgAll,
                     border: Border.all(
                       color: cs.primary.withValues(alpha: 0.10),
                     ),

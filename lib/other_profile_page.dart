@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/posts_service.dart';
 import 'package:smeet_app/core/services/sport_definitions_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/presentation/profile_post_detail_page.dart';
 import 'package:smeet_app/services/block_service.dart';
 import 'package:smeet_app/widgets/block_user_confirm_dialog.dart';
@@ -243,7 +244,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: cs.errorContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.mdAll,
                       border: Border.all(
                         color: cs.error.withValues(alpha: 0.35),
                       ),
@@ -290,7 +291,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                       backgroundColor: cs.primary.withValues(alpha: 0.1),
                       placeholder: Icon(
                         Icons.person,
-                        size: 48,
+                        size: AppIconSize.xxl,
                         color: cs.primary,
                       ),
                     ),

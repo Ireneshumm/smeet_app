@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/feed/models/feed_item.dart';
 import 'package:smeet_app/geo_utils.dart';
 
@@ -125,13 +126,13 @@ class _FeedGameCardState extends State<FeedGameCard> {
       color: Colors.transparent,
       child: InkWell(
         onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
         child: Container(
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.lgAll,
             border: Border.all(
               color: cs.primary.withValues(alpha: 0.15),
             ),
@@ -153,7 +154,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                   height: 52,
                   decoration: BoxDecoration(
                     color: cs.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: AppRadius.mdAll,
                   ),
                   child: Center(
                     child: Text(
@@ -195,7 +196,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                               child: Text(
                                 'Last spot!',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.red.shade600,
                                 ),
@@ -259,13 +260,13 @@ class _FeedGameCardState extends State<FeedGameCard> {
                         ),
                         decoration: BoxDecoration(
                           color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: AppRadius.lgAll,
                           border: Border.all(color: Colors.green.shade200),
                         ),
                         child: Text(
                           'Joined ✓',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: Colors.green.shade700,
                           ),
@@ -294,7 +295,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                             : const Text(
                                 'Join',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/widgets/adaptive_media.dart';
 
 /// Shared radii / border language for post images & video across Profile surfaces.
@@ -180,7 +181,7 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon ?? Icons.broken_image_outlined,
-                size: 40, color: cs.onSurfaceVariant),
+                size: AppIconSize.xl, color: cs.onSurfaceVariant),
             if (label != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -202,7 +203,7 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
       child: Icon(
         Icons.play_circle_filled_rounded,
         color: Colors.white.withValues(alpha: 0.92),
-        size: 40,
+        size: AppIconSize.xl,
         shadows: const [
           Shadow(blurRadius: 8, color: Colors.black45),
         ],
@@ -231,7 +232,7 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
             child: Icon(
               playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: Colors.white,
-              size: 36,
+              size: AppIconSize.lg,
             ),
           ),
         ),
@@ -395,7 +396,7 @@ class PostMediaDetailImages extends StatelessWidget {
                     color: _postMediaBackdrop(cs),
                     child: Icon(
                       Icons.broken_image_outlined,
-                      size: 52,
+                      size: AppIconSize.xxl,
                       color: cs.onSurfaceVariant,
                     ),
                   ),
@@ -476,7 +477,7 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 48, color: cs.onSurfaceVariant),
+              Icon(icon, size: AppIconSize.xxl, color: cs.onSurfaceVariant),
               const SizedBox(height: 8),
               Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
             ],
@@ -573,7 +574,7 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
                         child: Icon(
                           Icons.play_circle_filled_rounded,
                           color: Colors.white.withValues(alpha: 0.92),
-                          size: 44,
+                          size: AppIconSize.xl,
                           shadows: const [
                             Shadow(blurRadius: 10, color: Colors.black54),
                           ],
@@ -601,7 +602,7 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
                               color: Colors.white,
-                              size: 40,
+                              size: AppIconSize.xl,
                             ),
                           ),
                         ),

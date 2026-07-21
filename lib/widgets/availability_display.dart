@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Read-only availability: one row per day that has slots; hidden days omitted.
 class AvailabilityDisplayWidget extends StatelessWidget {
@@ -19,7 +20,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
         'No availability set',
         style: TextStyle(
           color: Colors.grey.shade400,
-          fontSize: 13,
+          fontSize: 12,
           fontStyle: FontStyle.italic,
         ),
       );
@@ -33,7 +34,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
         'No availability set',
         style: TextStyle(
           color: Colors.grey.shade400,
-          fontSize: 13,
+          fontSize: 12,
           fontStyle: FontStyle.italic,
         ),
       );
@@ -54,7 +55,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
                 child: Text(
                   day,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -75,7 +76,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: slotColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: AppRadius.lgAll,
                         border: Border.all(
                           color: slotColor.withValues(alpha: 0.3),
                         ),

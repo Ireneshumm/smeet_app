@@ -40,6 +40,7 @@ import 'package:smeet_app/core/services/swipe_write_service.dart';
 import 'package:smeet_app/widgets/profile_identity_section.dart';
 import 'package:smeet_app/widgets/swipe_card_hero_media.dart';
 import 'package:smeet_app/app/smeet_app.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/core/constants/sports.dart';
 import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/core/services/sport_definitions_service.dart';
@@ -534,7 +535,7 @@ Widget _authGuidanceLine(BuildContext context, String index, String text) {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: cs.primary.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.smAll,
         ),
         child: Text(
           index,
@@ -1083,6 +1084,85 @@ class _AuthPageState extends State<AuthPage> {
                 ],
               ),
             ),
+            // Social sign-in first: one tap, no password to remember.
+            SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: _loading ? null : _signInWithGoogle,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text(
+                      'G',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF4285F4),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Continue with Google'),
+                  ],
+                ),
+              ),
+            ),
+            if (defaultTargetPlatform == TargetPlatform.iOS ||
+                defaultTargetPlatform == TargetPlatform.macOS) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
+                    shape: const StadiumBorder(),
+                    foregroundColor: cs.onSurface,
+                  ),
+                  onPressed: _loading ? null : _signInWithApple,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.apple, size: 22, color: Colors.black),
+                      SizedBox(width: 10),
+                      Text('Continue with Apple'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'or continue with email',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                          fontSize: 12,
+                        ),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             if (_isLogin) ...[
               _authGuidanceLine(context, '1', 'Sign up for an account'),
               const SizedBox(height: 8),
@@ -1200,84 +1280,6 @@ class _AuthPageState extends State<AuthPage> {
                 style: const TextStyle(fontSize: 14),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    color: cs.outline.withValues(alpha: 0.35),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'or continue with',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: cs.outline.withValues(alpha: 0.35),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              width: double.infinity,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
-                  shape: const StadiumBorder(),
-                ),
-                onPressed: _loading ? null : _signInWithGoogle,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
-                      'G',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF4285F4),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Continue with Google'),
-                  ],
-                ),
-              ),
-            ),
-            if (defaultTargetPlatform == TargetPlatform.iOS ||
-                defaultTargetPlatform == TargetPlatform.macOS) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 52,
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: cs.outline.withValues(alpha: 0.45)),
-                    shape: const StadiumBorder(),
-                    foregroundColor: cs.onSurface,
-                  ),
-                  onPressed: _loading ? null : _signInWithApple,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.apple, size: 22, color: Colors.black),
-                      SizedBox(width: 10),
-                      Text('Continue with Apple'),
-                    ],
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 24),
           ],
         ),
@@ -1675,7 +1677,7 @@ class _HomePageState extends State<HomePage> {
       color: Colors.transparent,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.mdAll,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
@@ -1695,7 +1697,7 @@ class _HomePageState extends State<HomePage> {
               Icon(
                 Icons.expand_more_rounded,
                 color: enabled ? SmeetApp.smeetGrey : SmeetApp.smeetGreyLight,
-                size: 24,
+                size: AppIconSize.md,
               ),
             ],
           ),
@@ -1730,7 +1732,7 @@ class _HomePageState extends State<HomePage> {
               color: Colors.white,
               border: Border.all(color: SmeetApp.smeetMint, width: 1.5),
             ),
-            child: Icon(icon, size: 20, color: SmeetApp.smeetMint),
+            child: Icon(icon, size: AppIconSize.sm, color: SmeetApp.smeetMint),
           ),
         ),
       );
@@ -2320,7 +2322,7 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: AppRadius.lgAll,
                 border: Border.all(color: cs.primary.withOpacity(0.15)),
               ),
               child: Column(
@@ -2388,7 +2390,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       decoration: BoxDecoration(
                         color: cs.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.mdAll,
                         border: Border.all(color: cs.primary.withOpacity(0.2)),
                       ),
                       child: Row(
@@ -2413,7 +2415,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                   InkWell(
                     onTap: _pickGameDate,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.mdAll,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
@@ -2423,7 +2425,7 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Icon(
                             Icons.calendar_today_outlined,
-                            size: 20,
+                            size: AppIconSize.sm,
                             color: cs.primary,
                           ),
                           const SizedBox(width: 10),
@@ -2474,7 +2476,7 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: InkWell(
                           onTap: _pickStartTime,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.mdAll,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -2484,7 +2486,7 @@ class _HomePageState extends State<HomePage> {
                               border: Border.all(
                                 color: cs.outline.withOpacity(0.35),
                               ),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.mdAll,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2523,7 +2525,7 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: InkWell(
                           onTap: _pickEndTime,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.mdAll,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -2533,7 +2535,7 @@ class _HomePageState extends State<HomePage> {
                               border: Border.all(
                                 color: cs.outline.withOpacity(0.35),
                               ),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.mdAll,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2627,7 +2629,7 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: SmeetApp.smeetMintLight.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.mdAll,
                       border: Border.all(
                         color: SmeetApp.smeetMint.withValues(alpha: 0.25),
                       ),
@@ -2794,7 +2796,10 @@ class _HomePageState extends State<HomePage> {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () => unawaited(_autoDetectLocation()),
-                      icon: const Icon(Icons.near_me_outlined, size: 20),
+                      icon: const Icon(
+                        Icons.near_me_outlined,
+                        size: AppIconSize.sm,
+                      ),
                       label: const Text('Use my location'),
                     ),
                   ),
@@ -2903,7 +2908,7 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: AppRadius.lgAll,
                         border: Border.all(
                           color: Theme.of(context)
                               .colorScheme
@@ -2997,7 +3002,7 @@ class _HomePageState extends State<HomePage> {
                                 vertical: 10,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: AppRadius.lgAll,
                               ),
                             ),
                             child: Text(isJoined ? 'Joined' : 'Join'),
@@ -3034,7 +3039,7 @@ class _CreateGameFieldCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
         border: const Border(
           top: BorderSide(color: SmeetApp.smeetMint, width: 2),
           left: BorderSide(color: SmeetApp.smeetGreyLight, width: 1),
@@ -3056,7 +3061,7 @@ class _CreateGameFieldCard extends StatelessWidget {
             Text(
               label!,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: SmeetApp.smeetGrey,
               ),
@@ -3083,7 +3088,7 @@ class _SectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lgAll,
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -3762,7 +3767,7 @@ class _SwipePageState extends State<SwipePage> {
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: AppRadius.xlAll,
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
@@ -3798,7 +3803,7 @@ class _SwipePageState extends State<SwipePage> {
                       child: Icon(
                         Icons.sports_rounded,
                         color: cs.primary,
-                        size: 32,
+                        size: AppIconSize.lg,
                       ),
                     ),
                     _SwipeMatchAvatar(
@@ -3996,7 +4001,7 @@ class _SwipePageState extends State<SwipePage> {
       return DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadius.lgAll,
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.35),
           ),
@@ -4154,7 +4159,7 @@ class _SwipePageState extends State<SwipePage> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.mdAll,
                       onTap: () {
                         Navigator.of(context).push<void>(
                           MaterialPageRoute<void>(
@@ -4174,7 +4179,7 @@ class _SwipePageState extends State<SwipePage> {
                               cs.primary.withValues(alpha: 0.06),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: AppRadius.mdAll,
                           border: Border.all(
                             color: cs.primary.withValues(alpha: 0.2),
                           ),
@@ -4184,7 +4189,7 @@ class _SwipePageState extends State<SwipePage> {
                             Icon(
                               Icons.sports_rounded,
                               color: cs.primary,
-                              size: 20,
+                              size: AppIconSize.sm,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -4210,7 +4215,7 @@ class _SwipePageState extends State<SwipePage> {
               padding: const EdgeInsets.only(bottom: 10),
               child: Material(
                 color: cs.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -4218,7 +4223,11 @@ class _SwipePageState extends State<SwipePage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 20, color: cs.primary),
+                      Icon(
+                        Icons.info_outline,
+                        size: AppIconSize.sm,
+                        color: cs.primary,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -4264,7 +4273,7 @@ class _SwipePageState extends State<SwipePage> {
                       height: cardH,
                       child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: AppRadius.xlAll,
                       boxShadow: [
                         BoxShadow(
                           blurRadius: 24,
@@ -4274,7 +4283,7 @@ class _SwipePageState extends State<SwipePage> {
                       ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: AppRadius.xlAll,
                       child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onPanStart: _loading
@@ -4298,9 +4307,19 @@ class _SwipePageState extends State<SwipePage> {
                           ? null
                           : (details) async {
                               final threshold = cardW * 0.35;
-                              if (_dragDx > threshold) {
+                              final dx = _dragDx;
+                              // Horizontal flick speed (px/s). A quick flick
+                              // commits even when the drag distance is short,
+                              // so fast swipes feel responsive.
+                              final vx = details.velocity.pixelsPerSecond.dx;
+                              const flingV = 800.0;
+                              final goPlay =
+                                  dx > threshold || (vx > flingV && dx > 0);
+                              final goSkip =
+                                  dx < -threshold || (vx < -flingV && dx < 0);
+                              if (goPlay) {
                                 await _swipe('play');
-                              } else if (_dragDx < -threshold) {
+                              } else if (goSkip) {
                                 await _swipe('skip');
                               }
                               if (!mounted) return;
@@ -4499,7 +4518,7 @@ class _SwipePageState extends State<SwipePage> {
                                           color: SmeetApp.smeetMint,
                                           width: 3,
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: AppRadius.smAll,
                                       ),
                                       child: const Text(
                                         'PLAY!',
@@ -4534,7 +4553,7 @@ class _SwipePageState extends State<SwipePage> {
                                           color: SmeetApp.smeetCoral,
                                           width: 3,
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: AppRadius.smAll,
                                       ),
                                       child: const Text(
                                         'SKIP',
@@ -4779,7 +4798,11 @@ class _MyGamePageState extends State<MyGamePage> {
                   size: 32,
                   imageUrl: av,
                   backgroundColor: cs.primary.withValues(alpha: 0.12),
-                  placeholder: Icon(Icons.person, size: 16, color: cs.primary),
+                  placeholder: Icon(
+                    Icons.person,
+                    size: AppIconSize.xs,
+                    color: cs.primary,
+                  ),
                 ),
               ),
             );
@@ -4841,7 +4864,7 @@ class _MyGamePageState extends State<MyGamePage> {
               leading: CircularNetworkAvatar(
                 size: 40,
                 imageUrl: avatar,
-                placeholder: const Icon(Icons.person, size: 20),
+                placeholder: const Icon(Icons.person, size: AppIconSize.sm),
               ),
               title: Text(
                 host ? '$name 👑' : name,
@@ -4964,7 +4987,7 @@ class _MyGamePageState extends State<MyGamePage> {
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: AppRadius.lgAll,
                 boxShadow: [
                   BoxShadow(
                     offset: const Offset(0, 4),
@@ -5015,7 +5038,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                   gameLevel,
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 13,
+                                    fontSize: 12,
                                   ),
                                 ),
                             ],
@@ -5029,7 +5052,7 @@ class _MyGamePageState extends State<MyGamePage> {
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.lgAll,
                               border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.4),
                               ),
@@ -5055,7 +5078,7 @@ class _MyGamePageState extends State<MyGamePage> {
                           children: [
                             Icon(
                               Icons.calendar_today_outlined,
-                              size: 16,
+                              size: AppIconSize.xs,
                               color: cs.primary,
                             ),
                             const SizedBox(width: 8),
@@ -5073,14 +5096,14 @@ class _MyGamePageState extends State<MyGamePage> {
                           children: [
                             Icon(
                               Icons.access_time_rounded,
-                              size: 16,
+                              size: AppIconSize.xs,
                               color: cs.onSurface.withValues(alpha: 0.5),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               '$startLine  →  $endLine',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
@@ -5093,7 +5116,7 @@ class _MyGamePageState extends State<MyGamePage> {
                             children: [
                               Icon(
                                 Icons.location_on_outlined,
-                                size: 16,
+                                size: AppIconSize.xs,
                                 color: cs.onSurface.withValues(alpha: 0.5),
                               ),
                               const SizedBox(width: 8),
@@ -5101,7 +5124,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 child: Text(
                                   loc,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     color: cs.onSurface.withValues(alpha: 0.7),
                                     decoration: TextDecoration.none,
                                   ),
@@ -5122,7 +5145,7 @@ class _MyGamePageState extends State<MyGamePage> {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: AppRadius.lgAll,
                               ),
                               child: Text(
                                 '$joinedC / ${g['players'] ?? '?'} players',
@@ -5142,7 +5165,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: AppRadius.lgAll,
                                 ),
                                 child: Text(
                                   '\$${perPerson.toStringAsFixed(2)}/pp',
@@ -5178,7 +5201,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 ),
                                 Icon(
                                   Icons.chevron_right_rounded,
-                                  size: 16,
+                                  size: AppIconSize.xs,
                                   color: cs.primary,
                                 ),
                               ],
@@ -5449,7 +5472,7 @@ class _ChatPageState extends State<ChatPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.smAll,
         border: Border.all(color: cs.error.withValues(alpha: 0.35)),
       ),
       child: Text(
@@ -5541,7 +5564,7 @@ class _ChatPageState extends State<ChatPage> {
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: AppRadius.lgAll,
                         border: Border.all(
                           color: cs.primary.withOpacity(0.10),
                         ),
@@ -5566,7 +5589,7 @@ class _ChatPageState extends State<ChatPage> {
                               child: Text(
                                 'GROUP',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w900,
                                   color: cs.secondary,
                                 ),
@@ -5615,7 +5638,7 @@ class _ChatPageState extends State<ChatPage> {
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: AppRadius.lgAll,
                       border: Border.all(color: cs.primary.withOpacity(0.10)),
                     ),
                     child: ListTile(
@@ -6079,13 +6102,13 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   Widget _directChatBlockBanner(BuildContext context, ColorScheme cs) {
     return Material(
       color: cs.errorContainer.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadius.mdAll,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.block, size: 20, color: cs.onErrorContainer),
+            Icon(Icons.block, size: AppIconSize.sm, color: cs.onErrorContainer),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -6155,7 +6178,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         title: widget.chatKind == 'game'
             ? InkWell(
                 onTap: () => _showGameMembers(context),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -6176,7 +6199,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
-                                fontSize: 17,
+                                fontSize: 16,
                               ),
                             ),
                             Text(
@@ -6211,7 +6234,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           await _refreshDirectBlockStateForPeer(id);
                         }
                       },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -6229,7 +6252,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 17,
+                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -6287,7 +6310,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           children: [
                             Icon(
                               Icons.cloud_off_outlined,
-                              size: 48,
+                              size: AppIconSize.xxl,
                               color: cs.outline,
                             ),
                             const SizedBox(height: 12),
@@ -6331,7 +6354,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                               children: [
                                 Icon(
                                   Icons.chat_bubble_outline,
-                                  size: 44,
+                                  size: AppIconSize.xl,
                                   color: cs.outline,
                                 ),
                                 const SizedBox(height: 12),
@@ -6438,7 +6461,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         color: isMe
                             ? cs.primary.withOpacity(0.18)
                             : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.lgAll,
                         border: Border.all(
                           color: pending
                               ? cs.outline.withOpacity(0.35)
@@ -6944,7 +6967,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: AppRadius.lgAll,
                   border: Border.all(color: SmeetApp.smeetGreyLight),
                   boxShadow: [
                     BoxShadow(
@@ -7037,7 +7060,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     color: SmeetApp.smeetGrey,
                                     decoration: TextDecoration.none,
                                   ),
@@ -7063,7 +7086,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: SmeetApp.smeetMintLight,
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.pill,
+                                        ),
                                       ),
                                       child: Text(
                                         '${sportEmojiForKey(e.key.toString())} ${e.key}',
@@ -7105,7 +7130,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.lgAll,
                   boxShadow: [
                     BoxShadow(
                       offset: const Offset(0, 2),
@@ -7125,11 +7150,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   labelPadding: const EdgeInsets.symmetric(vertical: 2),
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                   unselectedLabelStyle: const TextStyle(
                     fontWeight: FontWeight.w500,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                   onTap: (i) {
                     if (i == 1 && _myPostsFuture == null) {

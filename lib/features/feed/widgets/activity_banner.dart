@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 class ActivityBanner extends StatelessWidget {
   final int incomingLikes;
   final int todayGames;
@@ -42,7 +44,7 @@ class ActivityBanner extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: AppRadius.lgAll,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +62,7 @@ class ActivityBanner extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 13,
+                            fontSize: 12,
                             height: 1.3,
                           ),
                         ),
@@ -96,7 +98,7 @@ class ActivityBanner extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: AppRadius.lgAll,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +116,7 @@ class ActivityBanner extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 13,
+                            fontSize: 12,
                             height: 1.3,
                           ),
                         ),

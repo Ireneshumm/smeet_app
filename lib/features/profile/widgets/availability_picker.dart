@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:smeet_app/core/constants/sports.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Weekly availability editor: one row per day, three slot chips (Morning / Afternoon / Evening).
 class AvailabilityPickerWidget extends StatefulWidget {
@@ -101,7 +102,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                 child: Text(
                   dayShort,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: isWeekend ? cs.primary : cs.onSurface,
                   ),
@@ -126,7 +127,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                             color: selected
                                 ? slotColor.withValues(alpha: 0.15)
                                 : cs.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: AppRadius.smAll,
                             border: Border.all(
                               color:
                                   selected ? slotColor : Colors.transparent,
@@ -147,7 +148,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                               Text(
                                 availabilitySlotShort(slot),
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: selected
                                       ? FontWeight.w700
                                       : FontWeight.w500,

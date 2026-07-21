@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/services/profile_identity_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Shared white section card for profile tab sections.
 class ProfileSectionCard extends StatelessWidget {
@@ -21,7 +22,7 @@ class ProfileSectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lgAll,
         border: Border.all(color: SmeetApp.smeetGreyLight),
         boxShadow: [
           BoxShadow(
@@ -100,7 +101,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
             children: [
               InkWell(
                 onTap: () => setState(() => _expanded = !_expanded),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -188,21 +189,21 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                         ),
                         decoration: BoxDecoration(
                           color: SmeetApp.smeetMintFaint,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadius.mdAll,
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(
                               Icons.trending_up_rounded,
-                              size: 16,
+                              size: AppIconSize.xs,
                               color: SmeetApp.smeetMint,
                             ),
                             const SizedBox(width: 8),
                             const Text(
                               'This month: ',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 color: SmeetApp.smeetGrey,
                                 fontWeight: FontWeight.w500,
                                 decoration: TextDecoration.none,
@@ -211,7 +212,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                             Text(
                               '$month',
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: 12,
                                 color: SmeetApp.smeetInk,
                                 fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.none,
@@ -253,7 +254,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: SmeetApp.smeetMintFaint,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgAll,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,12 +288,12 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: SmeetApp.smeetMintLight,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
           color: SmeetApp.smeetDeep,
           decoration: TextDecoration.none,

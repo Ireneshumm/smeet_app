@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:smeet_app/core/theme/theme.dart';
+
 /// Slot urgency from [players] capacity and [joinedCount].
 Widget? buildGameUrgencyChip({
   required int players,
@@ -29,7 +31,7 @@ Widget? buildGameUrgencyChip({
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
       color: bg,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.smAll,
     ),
     child: Text(
       label,
