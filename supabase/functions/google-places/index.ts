@@ -183,6 +183,17 @@ Deno.serve(async (req: Request) => {
     url.searchParams.set("key", apiKey);
     if (sessionToken) url.searchParams.set("sessiontoken", sessionToken);
 
+    // Optional location bias (user's lat/lng). Without this, Google biases by the
+    // Edge Function server's IP, so users outside that region get poor local
+    // results. A radius bias (no strictbounds) keeps results global — it only
+    // prioritizes nearby matches, so far-away searches still work.
+    const biasLat = Number(payload.lat);
+    const biasLng = Number(payload.lng);
+    if (Number.isFinite(biasLat) && Number.isFinite(biasLng)) {
+      url.searchParams.set("location", `${biasLat},${biasLng}`);
+      url.searchParams.set("radius", "30000");
+    }
+
     const res = await fetch(url.toString());
     const data = await res.json();
     return new Response(JSON.stringify(data), {

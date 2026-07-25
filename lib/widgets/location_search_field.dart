@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/core/theme/theme.dart';
 
 /// Matches `SmeetApp.smeetMint` in `app/smeet_app.dart` (avoid importing `main.dart`).
@@ -53,6 +54,13 @@ class LocationSearchField extends StatefulWidget {
   final void Function(String address, double lat, double lng)? onLocationSelected;
   final LocationResult? initialValue;
 
+  /// Optional location bias for autocomplete (user's lat/lng). When omitted, the
+  /// field tries to resolve the device location itself. Biasing makes results
+  /// locally relevant for users anywhere in the world — without it, Google
+  /// biases by the Supabase server's IP, so non-local users get poor results.
+  final double? biasLat;
+  final double? biasLng;
+
   const LocationSearchField({
     super.key,
     required this.supabase,
@@ -62,6 +70,8 @@ class LocationSearchField extends StatefulWidget {
     this.enabled = true,
     this.initialValue,
     this.onLocationSelected,
+    this.biasLat,
+    this.biasLng,
   });
 
   @override
@@ -78,6 +88,10 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
   String? _error;
   String _sessionToken = '';
   LocationResult? _selected;
+
+  /// Resolved autocomplete bias (from [widget.biasLat]/[biasLng] or device GPS).
+  double? _biasLat;
+  double? _biasLng;
 
   /// True while resolving place details after user picks an option (skips duplicate searches).
   bool _resolvingPick = false;
@@ -127,6 +141,22 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
         (initialAddr != null && initialAddr.isNotEmpty) ? initialAddr : null;
     _controller.text = widget.initialValue?.address ?? '';
     _controller.addListener(_onControllerChanged);
+    _resolveBiasLocation();
+  }
+
+  /// Prefer an explicit bias from the parent; otherwise best-effort device GPS.
+  /// Fully silent — if unavailable (web, denied permission, timeout), autocomplete
+  /// simply runs unbiased, exactly as before.
+  Future<void> _resolveBiasLocation() async {
+    if (widget.biasLat != null && widget.biasLng != null) {
+      _biasLat = widget.biasLat;
+      _biasLng = widget.biasLng;
+      return;
+    }
+    final pos = await SmeetLocationService.getCurrentPosition();
+    if (!mounted || pos == null) return;
+    _biasLat = pos.lat;
+    _biasLng = pos.lng;
   }
 
   @override
@@ -303,6 +333,11 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
           'action': 'autocomplete',
           'input': q,
           'sessionToken': _sessionToken,
+          // Bias results toward the user so global users get local addresses.
+          if (_biasLat != null && _biasLng != null) ...{
+            'lat': _biasLat,
+            'lng': _biasLng,
+          },
         },
       );
 
