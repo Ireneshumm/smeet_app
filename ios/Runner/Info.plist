@@ -40,6 +40,10 @@
 	<string>Smeet uses your location to find nearby games and players.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Smeet uses your photo library so you can choose a profile picture and select photos or videos to share in your posts.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Smeet uses your camera so you can take a photo or record a video to share in your posts and profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Smeet uses your microphone so you can record audio when you capture a video to share.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
