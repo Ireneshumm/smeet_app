@@ -55,6 +55,8 @@
 	<string>Smeet uses your camera so you can take a photo or record a video to share in your posts and profile.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Smeet uses your microphone so you can record audio when you capture a video to share.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
