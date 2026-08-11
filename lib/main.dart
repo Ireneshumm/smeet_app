@@ -6957,14 +6957,14 @@ class _ProfilePageState extends State<ProfilePage> {
           child: DefaultTabController(
             length: 2,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
               // Top header (compact)
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: AppRadius.lgAll,
@@ -6994,13 +6994,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             ),
                             child: CircularNetworkAvatar(
-                              size: 56,
+                              size: 48,
                               imageUrl: _avatarUrl,
                               backgroundColor: SmeetApp.smeetMintLight,
                               placeholder: const Icon(
                                 Icons.person,
                                 color: SmeetApp.smeetMint,
-                                size: 26,
+                                size: AppIconSize.md,
                               ),
                             ),
                           ),
@@ -7071,10 +7071,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (_setupLoadedRow?['sport_levels'] is Map &&
                               (_setupLoadedRow!['sport_levels'] as Map)
                                   .isNotEmpty) ...[
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 6),
                             Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                              spacing: 6,
+                              runSpacing: 6,
                               children: (_setupLoadedRow!['sport_levels'] as Map)
                                   .entries
                                   .take(3)
@@ -7082,7 +7082,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     (e) => Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
-                                        vertical: 6,
+                                        vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
                                         color: SmeetApp.smeetMintLight,
