@@ -6961,22 +6961,10 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              // Top header (compact)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppRadius.lgAll,
-                  border: Border.all(color: SmeetApp.smeetGreyLight),
-                  boxShadow: [
-                    BoxShadow(
-                      color: SmeetApp.smeetMint.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
+              // Top header — XHS-style: flat on the canvas (no boxed card),
+              // large avatar, bold name, muted meta.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 0, 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -6994,13 +6982,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             ),
                             child: CircularNetworkAvatar(
-                              size: 48,
+                              size: 64,
                               imageUrl: _avatarUrl,
                               backgroundColor: SmeetApp.smeetMintLight,
                               placeholder: const Icon(
                                 Icons.person,
                                 color: SmeetApp.smeetMint,
-                                size: AppIconSize.md,
+                                size: AppIconSize.lg,
                               ),
                             ),
                           ),
@@ -7025,7 +7013,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -7037,8 +7025,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
                               color: SmeetApp.smeetInk,
                               decoration: TextDecoration.none,
                             ),
@@ -7085,7 +7074,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: SmeetApp.smeetMintLight,
+                                        // XHS-style muted chip: light grey pill,
+                                        // quiet grey text.
+                                        color: Colors.black
+                                            .withValues(alpha: 0.045),
                                         borderRadius: BorderRadius.circular(
                                           AppRadius.pill,
                                         ),
@@ -7093,9 +7085,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       child: Text(
                                         '${sportEmojiForKey(e.key.toString())} ${e.key}',
                                         style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w500,
                                           fontSize: 12,
-                                          color: SmeetApp.smeetDeep,
+                                          color: SmeetApp.smeetGrey,
                                           decoration: TextDecoration.none,
                                         ),
                                       ),
@@ -7127,34 +7119,37 @@ class _ProfilePageState extends State<ProfilePage> {
               // sit fixed above TabBarView and cover content on small viewports.
               const SizedBox(height: 6),
 
-              Container(
+              // XHS-style tab bar: centered compact tabs on the canvas, short
+              // label-width indicator, hairline divider underneath.
+              DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppRadius.lgAll,
-                  boxShadow: [
-                    BoxShadow(
-                      offset: const Offset(0, 2),
-                      blurRadius: 8,
+                  border: Border(
+                    bottom: BorderSide(
                       color: Colors.black.withValues(alpha: 0.06),
                     ),
-                  ],
+                  ),
                 ),
                 child: SizedBox(
-                  height: 36,
+                  height: 38,
                   child: TabBar(
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.center,
+                  dividerColor: Colors.transparent,
+                  indicatorSize: TabBarIndicatorSize.label,
                   indicatorColor: cs.primary,
-                  indicatorWeight: 2.5,
-                  labelColor: cs.primary,
+                  indicatorWeight: 3,
+                  labelColor: SmeetApp.smeetInk,
                   unselectedLabelColor:
-                      cs.onSurface.withValues(alpha: 0.45),
-                  labelPadding: const EdgeInsets.symmetric(vertical: 2),
+                      cs.onSurface.withValues(alpha: 0.4),
+                  labelPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                   unselectedLabelStyle: const TextStyle(
                     fontWeight: FontWeight.w500,
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                   onTap: (i) {
                     if (i == 1 && _myPostsFuture == null) {
