@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smeet_app/app/smeet_app.dart';
 import 'package:smeet_app/core/services/location_service.dart';
 import 'package:smeet_app/core/theme/theme.dart';
+import 'package:smeet_app/core/services/places_nearby_service.dart';
 import 'package:smeet_app/features/venues/models/venue.dart';
 import 'package:smeet_app/features/venues/presentation/venue_detail_page.dart';
 import 'package:smeet_app/geo_utils.dart';
@@ -125,6 +126,12 @@ class _VenuesTabState extends State<_VenuesTab>
   String _selectedCategory = 'all';
   ({double lat, double lng})? _userPos;
 
+  /// Live worldwide venues from Google Places, per category chip. Fetched
+  /// lazily on selection and kept for the session (server also caches).
+  final PlacesNearbyService _nearbyService =
+      PlacesNearbyService(Supabase.instance.client);
+  final Map<String, List<Venue>> _nearbyByCategory = {};
+
   static const _sportsCategories = <(String, String)>[
     ('all', '🏃 All'),
     ('sports_court', '🏟️ Courts'),
@@ -192,6 +199,7 @@ class _VenuesTabState extends State<_VenuesTab>
           _filtered = list;
           _loading = false;
         });
+        _fetchNearby(_selectedCategory);
       }
     } catch (e) {
       debugPrint('[VenuesTab] load failed: $e');
@@ -212,6 +220,22 @@ class _VenuesTabState extends State<_VenuesTab>
           ? List<Venue>.from(_venues)
           : _venues.where((v) => v.category == cat).toList();
     });
+    _fetchNearby(cat);
+  }
+
+  /// Fetch live worldwide venues for [cat] (once per category per session).
+  /// Silent no-op without a user location — the curated list still shows.
+  Future<void> _fetchNearby(String cat) async {
+    final pos = _userPos;
+    if (pos == null || _nearbyByCategory.containsKey(cat)) return;
+    _nearbyByCategory[cat] = const []; // guard against duplicate fetches
+    final list = await _nearbyService.fetchNearby(
+      lat: pos.lat,
+      lng: pos.lng,
+      category: cat,
+    );
+    if (!mounted || list.isEmpty) return;
+    setState(() => _nearbyByCategory[cat] = list);
   }
 
   void _openDetail(Venue venue) {
@@ -226,7 +250,20 @@ class _VenuesTabState extends State<_VenuesTab>
   Widget build(BuildContext context) {
     super.build(context);
     final cs = Theme.of(context).colorScheme;
-    final nonFeatured = _filtered.where((v) => !v.isFeatured).toList();
+
+    // Curated partner venues + live Google Places results for the selected
+    // category, deduped by name and sorted nearest-first.
+    final curatedNames =
+        _filtered.map((v) => v.name.toLowerCase().trim()).toSet();
+    final nearby = (_nearbyByCategory[_selectedCategory] ?? const <Venue>[])
+        .where((v) => !curatedNames.contains(v.name.toLowerCase().trim()));
+    final nonFeatured = [
+      ..._filtered.where((v) => !v.isFeatured),
+      ...nearby,
+    ]..sort(
+        (a, b) => (a.distanceKm ?? double.infinity)
+            .compareTo(b.distanceKm ?? double.infinity),
+      );
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -279,7 +316,7 @@ class _VenuesTabState extends State<_VenuesTab>
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_filtered.isEmpty)
+          else if (_filtered.isEmpty && nonFeatured.isEmpty)
             SliverFillRemaining(
               child: Center(
                 child: Column(
@@ -636,6 +673,56 @@ class _VenueCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        ],
+                      ),
+                    ],
+                    if (venue.rating > 0 ||
+                        venue.priceRange != null ||
+                        venue.openingHours == 'Open now') ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (venue.rating > 0) ...[
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: Color(0xFFF5A623),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              venue.reviewCount > 0
+                                  ? '${venue.rating.toStringAsFixed(1)} '
+                                      '(${venue.reviewCount})'
+                                  : venue.rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                          if (venue.priceRange != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              venue.priceRange!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface.withValues(alpha: 0.55),
+                              ),
+                            ),
+                          ],
+                          if (venue.openingHours == 'Open now') ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '· Open now',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],

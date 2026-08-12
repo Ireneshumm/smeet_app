@@ -17,6 +17,11 @@ const GOOGLE_AUTOCOMPLETE =
   "https://maps.googleapis.com/maps/api/place/autocomplete/json";
 const GOOGLE_DETAILS =
   "https://maps.googleapis.com/maps/api/place/details/json";
+const GOOGLE_NEARBY =
+  "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+
+/** Cache TTL for nearby searches (Google bills per request; results are stable). */
+const NEARBY_CACHE_HOURS = 72;
 
 function json(
   body: unknown,
@@ -196,6 +201,104 @@ Deno.serve(async (req: Request) => {
 
     const res = await fetch(url.toString());
     const data = await res.json();
+    return new Response(JSON.stringify(data), {
+      status: res.ok ? 200 : res.status,
+      headers: { ...ch, "Content-Type": "application/json" },
+    });
+  }
+
+  if (action === "nearby") {
+    // Nearby venue discovery (Explore > Venues). Params: lat, lng (required),
+    // radius (m, default 10000, max 50000), type and/or keyword (optional).
+    // Results are cached in `places_nearby_cache` for NEARBY_CACHE_HOURS on a
+    // ~1km location grid so repeat browsing doesn't re-bill Google.
+    const lat = Number(payload.lat);
+    const lng = Number(payload.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return json({ error: "lat and lng are required" }, 400, ch);
+    }
+    const radius = Math.min(
+      Math.max(Number(payload.radius) || 10000, 500),
+      50000,
+    );
+    const type = String(payload.type ?? "").trim();
+    const keyword = String(payload.keyword ?? "").trim();
+
+    const cacheKey = [
+      "v1",
+      type || "-",
+      keyword || "-",
+      lat.toFixed(2),
+      lng.toFixed(2),
+      String(radius),
+    ].join("|");
+
+    // Best-effort cache via PostgREST (service role). Failures fall through to
+    // a live Google call so the feature keeps working without the table.
+    const sbUrl = Deno.env.get("SUPABASE_URL");
+    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const cacheHeaders = sbKey
+      ? {
+        apikey: sbKey,
+        Authorization: `Bearer ${sbKey}`,
+        "Content-Type": "application/json",
+      }
+      : null;
+
+    if (sbUrl && cacheHeaders) {
+      try {
+        const since = new Date(
+          Date.now() - NEARBY_CACHE_HOURS * 3600 * 1000,
+        ).toISOString();
+        const r = await fetch(
+          `${sbUrl}/rest/v1/places_nearby_cache?cache_key=eq.${
+            encodeURIComponent(cacheKey)
+          }&fetched_at=gte.${encodeURIComponent(since)}&select=payload`,
+          { headers: cacheHeaders },
+        );
+        if (r.ok) {
+          const rows = await r.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            return json(rows[0].payload, 200, ch);
+          }
+        }
+      } catch (e) {
+        console.warn(`nearby cache read failed: ${e}`);
+      }
+    }
+
+    const url = new URL(GOOGLE_NEARBY);
+    url.searchParams.set("location", `${lat},${lng}`);
+    url.searchParams.set("radius", String(radius));
+    if (type) url.searchParams.set("type", type);
+    if (keyword) url.searchParams.set("keyword", keyword);
+    url.searchParams.set("key", apiKey);
+
+    const res = await fetch(url.toString());
+    const data = await res.json();
+
+    if (res.ok && sbUrl && cacheHeaders) {
+      try {
+        await fetch(
+          `${sbUrl}/rest/v1/places_nearby_cache?on_conflict=cache_key`,
+          {
+            method: "POST",
+            headers: {
+              ...cacheHeaders,
+              Prefer: "resolution=merge-duplicates",
+            },
+            body: JSON.stringify({
+              cache_key: cacheKey,
+              payload: data,
+              fetched_at: new Date().toISOString(),
+            }),
+          },
+        );
+      } catch (e) {
+        console.warn(`nearby cache write failed: ${e}`);
+      }
+    }
+
     return new Response(JSON.stringify(data), {
       status: res.ok ? 200 : res.status,
       headers: { ...ch, "Content-Type": "application/json" },
