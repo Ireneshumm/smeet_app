@@ -36,6 +36,17 @@ jobs:
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/smeet-keystore.jks
 
+      - name: Print signing certificate fingerprints
+        # Certificate fingerprints are public (they ship inside every APK).
+        # Printed here so they can be copied into Firebase (Android app >
+        # Add fingerprint) for Google sign-in.
+        run: |
+          keytool -list -v \
+            -keystore android/app/smeet-keystore.jks \
+            -alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            | grep -E "SHA1:|SHA256:" || true
+
       - name: Create key.properties
         run: |
           {
