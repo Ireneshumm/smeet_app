@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "717679610351",
+    "project_id": "smeet-app-5a5d5",
+    "storage_bucket": "smeet-app-5a5d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:717679610351:android:1356e2b2df5058694a8e1a",
+        "android_client_info": {
+          "package_name": "com.smeet.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "717679610351-rp3rcotlsfabp4bmiv7a40bdsjjdtt13.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHnHjkMAVuuypwkKaqGUHMc1SokEET3dM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "717679610351-buov6gpvk936onfitinvgkvea4gvmb3r.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "717679610351-74u12bfpscpcm7n9sohinck93tbtjb9t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.smeet.smeetapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
