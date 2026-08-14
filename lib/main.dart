@@ -403,6 +403,21 @@ Future<void> main() async {
                 (msg.contains('jsobject') || errStr.contains('jsobject')))) {
           return null;
         }
+        // Device-connectivity noise (user offline / DNS hiccups). These fire
+        // for every user in a lift or on flaky mobile data and would drown
+        // real crashes — the app already degrades to cached/empty states.
+        final all = '$msg $errStr';
+        if (excType.contains('socketexception') ||
+            excType.contains('clientexception') ||
+            all.contains('failed host lookup') ||
+            all.contains('socketexception') ||
+            all.contains('connection refused') ||
+            all.contains('connection reset') ||
+            all.contains('network is unreachable') ||
+            all.contains('connection timed out') ||
+            all.contains('errno = 8')) {
+          return null;
+        }
         return event;
       };
     },
