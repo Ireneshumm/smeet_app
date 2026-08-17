@@ -132,54 +132,59 @@ class _VenuesTabState extends State<_VenuesTab>
       PlacesNearbyService(Supabase.instance.client);
   final Map<String, List<Venue>> _nearbyByCategory = {};
 
+  // Ordered by worldwide participation (football #1, basketball #2, gym =
+  // most-used venue type, then swimming / racket sports / yoga...).
   static const _sportsCategories = <(String, String)>[
     ('all', '🏃 All'),
-    ('tennis', '🎾 Tennis Court'),
-    ('basketball', '🏀 Basketball Court'),
-    ('badminton', '🏸 Badminton'),
     ('football', '⚽ Football Field'),
+    ('basketball', '🏀 Basketball Court'),
     ('gym', '💪 Gym'),
-    ('yoga', '🧘 Yoga'),
     ('pool', '🏊 Swimming Pool'),
-    ('pickleball', '🥎 Pickleball'),
-    ('table_tennis', '🏓 Table Tennis'),
+    ('tennis', '🎾 Tennis Court'),
+    ('badminton', '🏸 Badminton'),
     ('volleyball', '🏐 Volleyball'),
-    ('squash', '🎯 Squash'),
-    ('golf', '⛳ Golf Course'),
-    ('climbing', '🧗 Climbing'),
+    ('table_tennis', '🏓 Table Tennis'),
+    ('yoga', '🧘 Yoga'),
     ('running', '🏃 Athletics Track'),
-    ('rugby', '🏉 Rugby Field'),
-    ('hockey', '🏑 Hockey'),
+    ('golf', '⛳ Golf Course'),
+    ('pickleball', '🥎 Pickleball'),
     ('baseball', '⚾ Baseball Field'),
+    ('hockey', '🏑 Hockey'),
+    ('rugby', '🏉 Rugby Field'),
+    ('squash', '🎯 Squash'),
+    ('climbing', '🧗 Climbing'),
     ('ski', '🎿 Ski Area'),
     ('sports_court', '🏟️ Other Courts'),
   ];
 
+  // Ordered by demand (massage & skincare are the biggest wellness spends).
   static const _wellnessCategories = <(String, String)>[
     ('massage', '💆 Massage'),
-    ('physio', '🩺 Physio'),
-    ('clinic', '✨ Cosmetic Clinic'),
     ('skincare', '🧴 Skincare & Facial'),
+    ('clinic', '✨ Cosmetic Clinic'),
+    ('physio', '🩺 Physio'),
     ('sauna', '🧖 Sauna'),
-    ('recovery', '🧊 Recovery & Ice Bath'),
     ('chiro', '🦴 Chiropractor'),
+    ('recovery', '🧊 Recovery & Ice Bath'),
     ('nutrition', '🥤 Nutrition'),
   ];
 
+  // Ordered by what people buy most (footwear & sportswear lead global
+  // sporting-goods sales, then big-participation sports gear).
   static const _shopCategories = <(String, String)>[
     ('equipment', '🎽 All Sports Gear'),
-    ('shop_tennis', '🎾 Tennis Gear'),
-    ('shop_golf', '⛳ Golf Gear'),
-    ('shop_ski', '🎿 Ski Gear'),
+    ('shop_running', '🏃 Running Shoes'),
+    ('apparel', '👟 Sportswear'),
     ('shop_football', '⚽ Football Gear'),
     ('shop_basketball', '🏀 Basketball Gear'),
-    ('shop_racquet', '🏸 Racquet Shop'),
     ('shop_swim', '🩱 Swim Gear'),
+    ('shop_tennis', '🎾 Tennis Gear'),
     ('shop_bike', '🚴 Bike Shop'),
-    ('shop_running', '🏃 Running Shoes'),
+    ('shop_golf', '⛳ Golf Gear'),
     ('shop_skincare', '🧴 Skincare Products'),
+    ('shop_racquet', '🏸 Racquet Shop'),
     ('shop_outdoor', '🏕️ Outdoor Gear'),
-    ('apparel', '👟 Sportswear'),
+    ('shop_ski', '🎿 Ski Gear'),
     ('retail', '🏪 Retail'),
   ];
 
