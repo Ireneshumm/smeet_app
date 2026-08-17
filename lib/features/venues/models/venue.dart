@@ -5,11 +5,31 @@ abstract final class VenueCategory {
   static const pool = 'pool';
   static const golf = 'golf';
   static const ski = 'ski';
+  // Per-sport venue categories (live Google Places discovery).
+  static const tennis = 'tennis';
+  static const badminton = 'badminton';
+  static const basketball = 'basketball';
+  static const football = 'football';
+  static const pickleball = 'pickleball';
+  static const tableTennis = 'table_tennis';
+  static const volleyball = 'volleyball';
+  static const squash = 'squash';
+  static const climbing = 'climbing';
+  static const yoga = 'yoga';
+  static const running = 'running';
+  static const rugby = 'rugby';
+  static const hockey = 'hockey';
+  static const baseball = 'baseball';
+  // Health & beauty.
   static const massage = 'massage';
   static const physio = 'physio';
   static const clinic = 'clinic';
   static const skincare = 'skincare';
+  static const sauna = 'sauna';
+  static const recovery = 'recovery';
+  static const chiro = 'chiro';
   static const nutrition = 'nutrition';
+  // Shop.
   static const apparel = 'apparel';
   static const equipment = 'equipment';
   static const retail = 'retail';
@@ -18,14 +38,31 @@ abstract final class VenueCategory {
 /// Display strings keyed by [Venue.category].
 const kVenueCategoryInfo = <String, ({String emoji, String label})>{
   VenueCategory.sportsCourt: (emoji: '🏟️', label: 'Courts'),
+  VenueCategory.tennis: (emoji: '🎾', label: 'Tennis Court'),
+  VenueCategory.badminton: (emoji: '🏸', label: 'Badminton'),
+  VenueCategory.basketball: (emoji: '🏀', label: 'Basketball Court'),
+  VenueCategory.football: (emoji: '⚽', label: 'Football Field'),
+  VenueCategory.pickleball: (emoji: '🥎', label: 'Pickleball'),
+  VenueCategory.tableTennis: (emoji: '🏓', label: 'Table Tennis'),
+  VenueCategory.volleyball: (emoji: '🏐', label: 'Volleyball'),
+  VenueCategory.squash: (emoji: '🎯', label: 'Squash'),
+  VenueCategory.climbing: (emoji: '🧗', label: 'Climbing'),
+  VenueCategory.yoga: (emoji: '🧘', label: 'Yoga'),
+  VenueCategory.running: (emoji: '🏃', label: 'Athletics Track'),
+  VenueCategory.rugby: (emoji: '🏉', label: 'Rugby Field'),
+  VenueCategory.hockey: (emoji: '🏑', label: 'Hockey'),
+  VenueCategory.baseball: (emoji: '⚾', label: 'Baseball Field'),
   VenueCategory.gym: (emoji: '💪', label: 'Gym'),
-  VenueCategory.pool: (emoji: '🏊', label: 'Pool'),
-  VenueCategory.golf: (emoji: '⛳', label: 'Golf'),
-  VenueCategory.ski: (emoji: '🎿', label: 'Ski'),
+  VenueCategory.pool: (emoji: '🏊', label: 'Swimming Pool'),
+  VenueCategory.golf: (emoji: '⛳', label: 'Golf Course'),
+  VenueCategory.ski: (emoji: '🎿', label: 'Ski Area'),
   VenueCategory.massage: (emoji: '💆', label: 'Massage'),
   VenueCategory.physio: (emoji: '🩺', label: 'Physio'),
-  VenueCategory.clinic: (emoji: '✨', label: 'Clinic'),
-  VenueCategory.skincare: (emoji: '🧴', label: 'Skincare'),
+  VenueCategory.clinic: (emoji: '✨', label: 'Cosmetic Clinic'),
+  VenueCategory.skincare: (emoji: '🧴', label: 'Skincare & Facial'),
+  VenueCategory.sauna: (emoji: '🧖', label: 'Sauna'),
+  VenueCategory.recovery: (emoji: '🧊', label: 'Recovery & Ice Bath'),
+  VenueCategory.chiro: (emoji: '🦴', label: 'Chiropractor'),
   VenueCategory.nutrition: (emoji: '🥤', label: 'Nutrition'),
   VenueCategory.apparel: (emoji: '👟', label: 'Apparel'),
   VenueCategory.equipment: (emoji: '🎽', label: 'Equipment'),

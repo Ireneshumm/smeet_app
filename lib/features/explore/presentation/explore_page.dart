@@ -134,18 +134,35 @@ class _VenuesTabState extends State<_VenuesTab>
 
   static const _sportsCategories = <(String, String)>[
     ('all', '🏃 All'),
-    ('sports_court', '🏟️ Courts'),
+    ('tennis', '🎾 Tennis Court'),
+    ('basketball', '🏀 Basketball Court'),
+    ('badminton', '🏸 Badminton'),
+    ('football', '⚽ Football Field'),
     ('gym', '💪 Gym'),
-    ('pool', '🏊 Pool'),
-    ('golf', '⛳ Golf'),
-    ('ski', '🎿 Ski'),
+    ('yoga', '🧘 Yoga'),
+    ('pool', '🏊 Swimming Pool'),
+    ('pickleball', '🥎 Pickleball'),
+    ('table_tennis', '🏓 Table Tennis'),
+    ('volleyball', '🏐 Volleyball'),
+    ('squash', '🎯 Squash'),
+    ('golf', '⛳ Golf Course'),
+    ('climbing', '🧗 Climbing'),
+    ('running', '🏃 Athletics Track'),
+    ('rugby', '🏉 Rugby Field'),
+    ('hockey', '🏑 Hockey'),
+    ('baseball', '⚾ Baseball Field'),
+    ('ski', '🎿 Ski Area'),
+    ('sports_court', '🏟️ Other Courts'),
   ];
 
   static const _wellnessCategories = <(String, String)>[
     ('massage', '💆 Massage'),
     ('physio', '🩺 Physio'),
-    ('clinic', '✨ Clinic'),
-    ('skincare', '🧴 Skincare'),
+    ('clinic', '✨ Cosmetic Clinic'),
+    ('skincare', '🧴 Skincare & Facial'),
+    ('sauna', '🧖 Sauna'),
+    ('recovery', '🧊 Recovery & Ice Bath'),
+    ('chiro', '🦴 Chiropractor'),
     ('nutrition', '🥤 Nutrition'),
   ];
 
