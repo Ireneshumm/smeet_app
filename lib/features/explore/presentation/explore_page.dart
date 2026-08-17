@@ -167,8 +167,19 @@ class _VenuesTabState extends State<_VenuesTab>
   ];
 
   static const _shopCategories = <(String, String)>[
-    ('apparel', '👟 Apparel'),
-    ('equipment', '🎽 Equipment'),
+    ('equipment', '🎽 All Sports Gear'),
+    ('shop_tennis', '🎾 Tennis Gear'),
+    ('shop_golf', '⛳ Golf Gear'),
+    ('shop_ski', '🎿 Ski Gear'),
+    ('shop_football', '⚽ Football Gear'),
+    ('shop_basketball', '🏀 Basketball Gear'),
+    ('shop_racquet', '🏸 Racquet Shop'),
+    ('shop_swim', '🩱 Swim Gear'),
+    ('shop_bike', '🚴 Bike Shop'),
+    ('shop_running', '🏃 Running Shoes'),
+    ('shop_skincare', '🧴 Skincare Products'),
+    ('shop_outdoor', '🏕️ Outdoor Gear'),
+    ('apparel', '👟 Sportswear'),
     ('retail', '🏪 Retail'),
   ];
 

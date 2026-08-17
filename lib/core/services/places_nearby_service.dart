@@ -49,10 +49,21 @@ class PlacesNearbyService {
     VenueCategory.recovery: (type: '', keyword: 'recovery ice bath'),
     VenueCategory.chiro: (type: '', keyword: 'chiropractor'),
     VenueCategory.nutrition: (type: '', keyword: 'sports nutrition store'),
-    // Shop.
+    // Shop — per-sport gear stores.
     VenueCategory.apparel: (type: 'clothing_store', keyword: 'sports apparel'),
     VenueCategory.equipment: (type: 'sporting_goods_store', keyword: ''),
     VenueCategory.retail: (type: '', keyword: 'sports store'),
+    VenueCategory.shopTennis: (type: '', keyword: 'tennis shop'),
+    VenueCategory.shopGolf: (type: '', keyword: 'golf shop'),
+    VenueCategory.shopSki: (type: '', keyword: 'ski snowboard shop'),
+    VenueCategory.shopFootball: (type: '', keyword: 'football soccer store'),
+    VenueCategory.shopBasketball: (type: '', keyword: 'basketball store'),
+    VenueCategory.shopRacquet: (type: '', keyword: 'racquet sports shop'),
+    VenueCategory.shopSwim: (type: '', keyword: 'swimwear shop'),
+    VenueCategory.shopBike: (type: 'bicycle_store', keyword: ''),
+    VenueCategory.shopRunning: (type: 'shoe_store', keyword: 'running shoes'),
+    VenueCategory.shopSkincare: (type: '', keyword: 'skincare cosmetics store'),
+    VenueCategory.shopOutdoor: (type: '', keyword: 'outdoor sports gear store'),
   };
 
   /// Nearby venues for [category], sorted nearest-first from (lat, lng).

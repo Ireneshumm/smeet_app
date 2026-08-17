@@ -29,10 +29,21 @@ abstract final class VenueCategory {
   static const recovery = 'recovery';
   static const chiro = 'chiro';
   static const nutrition = 'nutrition';
-  // Shop.
+  // Shop — per-sport gear stores.
   static const apparel = 'apparel';
   static const equipment = 'equipment';
   static const retail = 'retail';
+  static const shopTennis = 'shop_tennis';
+  static const shopGolf = 'shop_golf';
+  static const shopSki = 'shop_ski';
+  static const shopFootball = 'shop_football';
+  static const shopBasketball = 'shop_basketball';
+  static const shopRacquet = 'shop_racquet';
+  static const shopSwim = 'shop_swim';
+  static const shopBike = 'shop_bike';
+  static const shopRunning = 'shop_running';
+  static const shopSkincare = 'shop_skincare';
+  static const shopOutdoor = 'shop_outdoor';
 }
 
 /// Display strings keyed by [Venue.category].
@@ -64,9 +75,20 @@ const kVenueCategoryInfo = <String, ({String emoji, String label})>{
   VenueCategory.recovery: (emoji: '🧊', label: 'Recovery & Ice Bath'),
   VenueCategory.chiro: (emoji: '🦴', label: 'Chiropractor'),
   VenueCategory.nutrition: (emoji: '🥤', label: 'Nutrition'),
-  VenueCategory.apparel: (emoji: '👟', label: 'Apparel'),
-  VenueCategory.equipment: (emoji: '🎽', label: 'Equipment'),
+  VenueCategory.apparel: (emoji: '👟', label: 'Sportswear'),
+  VenueCategory.equipment: (emoji: '🎽', label: 'All Sports Gear'),
   VenueCategory.retail: (emoji: '🏪', label: 'Retail'),
+  VenueCategory.shopTennis: (emoji: '🎾', label: 'Tennis Gear'),
+  VenueCategory.shopGolf: (emoji: '⛳', label: 'Golf Gear'),
+  VenueCategory.shopSki: (emoji: '🎿', label: 'Ski Gear'),
+  VenueCategory.shopFootball: (emoji: '⚽', label: 'Football Gear'),
+  VenueCategory.shopBasketball: (emoji: '🏀', label: 'Basketball Gear'),
+  VenueCategory.shopRacquet: (emoji: '🏸', label: 'Racquet Shop'),
+  VenueCategory.shopSwim: (emoji: '🩱', label: 'Swim Gear'),
+  VenueCategory.shopBike: (emoji: '🚴', label: 'Bike Shop'),
+  VenueCategory.shopRunning: (emoji: '🏃', label: 'Running Shoes'),
+  VenueCategory.shopSkincare: (emoji: '🧴', label: 'Skincare Products'),
+  VenueCategory.shopOutdoor: (emoji: '🏕️', label: 'Outdoor Gear'),
 };
 
 /// Partner venue / merchant row from `venues` (Supabase).
