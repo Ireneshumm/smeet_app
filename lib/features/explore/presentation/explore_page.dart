@@ -796,7 +796,7 @@ class _VenueSectionDivider extends StatelessWidget {
   }
 }
 
-class _CategoryRow extends StatelessWidget {
+class _CategoryRow extends StatefulWidget {
   const _CategoryRow({
     required this.title,
     required this.accent,
@@ -816,7 +816,83 @@ class _CategoryRow extends StatelessWidget {
   final void Function(String) onSelect;
 
   @override
+  State<_CategoryRow> createState() => _CategoryRowState();
+}
+
+class _CategoryRowState extends State<_CategoryRow> {
+  /// Chips shown before "More" expands the full set.
+  static const int _collapsedCount = 5;
+
+  bool _expanded = false;
+
+  Widget _chip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? widget.selectedBg : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: isSelected
+              ? null
+              : Border.all(color: SmeetApp.smeetGreyLight),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? widget.selectedText : SmeetApp.smeetGrey,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 12,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _toggleChip() {
+    return _chip(
+      label: _expanded
+          ? '▲ Less'
+          : 'More (${widget.categories.length - _collapsedCount}) ▾',
+      isSelected: false,
+      onTap: () => setState(() => _expanded = !_expanded),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final cats = widget.categories;
+    final needsToggle = cats.length > _collapsedCount + 1;
+
+    // Collapsed: top chips only — but always keep the selected chip visible.
+    var visible = cats;
+    if (!_expanded && needsToggle) {
+      visible = cats.take(_collapsedCount).toList();
+      if (widget.selected != 'all' &&
+          !visible.any((c) => c.$1 == widget.selected)) {
+        final sel = cats.where((c) => c.$1 == widget.selected);
+        visible = [...visible, ...sel];
+      }
+    }
+
+    final chips = <Widget>[
+      for (final cat in visible)
+        _chip(
+          label: cat.$2,
+          isSelected: widget.selected == cat.$1,
+          onTap: () => widget.onSelect(cat.$1),
+        ),
+      if (needsToggle) _toggleChip(),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -828,13 +904,13 @@ class _CategoryRow extends StatelessWidget {
                 width: 4,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: accent,
+                  color: widget.accent,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                title,
+                widget.title,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -845,46 +921,30 @@ class _CategoryRow extends StatelessWidget {
             ],
           ),
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: categories.map((cat) {
-              final isSelected = selected == cat.$1;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => onSelect(cat.$1),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? selectedBg : Colors.white,
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      border: isSelected
-                          ? null
-                          : Border.all(color: SmeetApp.smeetGreyLight),
-                    ),
-                    child: Text(
-                      cat.$2,
-                      style: TextStyle(
-                        color: isSelected
-                            ? selectedText
-                            : SmeetApp.smeetGrey,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 12,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
+        if (_expanded)
+          // Expanded: every category as a wrapped grid.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: chips,
+            ),
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                for (final c in chips)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: c,
                   ),
-                ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
