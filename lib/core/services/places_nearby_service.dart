@@ -17,15 +17,89 @@ class PlacesNearbyService {
 
   final SupabaseClient _supabase;
 
+  /// Keyword search matches a place's whole Google profile (reviews included),
+  /// so obviously-unrelated place types leak in (schools, childcare, churches,
+  /// real estate...). Filter them out by Google `types`...
+  static const Set<String> _excludedTypes = {
+    'school',
+    'primary_school',
+    'secondary_school',
+    'preschool',
+    'university',
+    'child_care',
+    'place_of_worship',
+    'church',
+    'mosque',
+    'synagogue',
+    'hindu_temple',
+    'cemetery',
+    'funeral_home',
+    'lodging',
+    'real_estate_agency',
+    'travel_agency',
+    'car_dealer',
+    'car_repair',
+    'car_wash',
+    'gas_station',
+    'bank',
+    'atm',
+    'lawyer',
+    'accounting',
+    'insurance_agency',
+    'local_government_office',
+    'embassy',
+    'courthouse',
+    'police',
+    'fire_station',
+    'post_office',
+    'storage',
+    'moving_company',
+    'plumber',
+    'electrician',
+    'locksmith',
+    'roofing_contractor',
+  };
+
+  /// ...and by tell-tale name fragments (e.g. "Early Learning Centre").
+  static const List<String> _excludedNameWords = [
+    'early learning',
+    'childcare',
+    'child care',
+    'kindergarten',
+    'kindy',
+    'daycare',
+    'day care',
+    'preschool',
+    'primary school',
+    'high school',
+    'state school',
+    'real estate',
+    'church',
+    'funeral',
+  ];
+
+  static bool _isIrrelevant(Map<String, dynamic> place) {
+    final types = (place['types'] as List?)
+            ?.map((e) => e.toString())
+            .toSet() ??
+        const <String>{};
+    if (types.intersection(_excludedTypes).isNotEmpty) return true;
+    final name = (place['name'] ?? '').toString().toLowerCase();
+    for (final w in _excludedNameWords) {
+      if (name.contains(w)) return true;
+    }
+    return false;
+  }
+
   /// Google Places (type, keyword) per venue category chip.
   static const Map<String, ({String type, String keyword})> _categoryQuery = {
-    'all': (type: '', keyword: 'sports'),
+    'all': (type: '', keyword: 'sports centre'),
     VenueCategory.sportsCourt: (type: '', keyword: 'sports court'),
     // Per-sport venues.
     VenueCategory.tennis: (type: '', keyword: 'tennis court'),
     VenueCategory.badminton: (type: '', keyword: 'badminton court'),
     VenueCategory.basketball: (type: '', keyword: 'basketball court'),
-    VenueCategory.football: (type: '', keyword: 'soccer football field'),
+    VenueCategory.football: (type: '', keyword: 'soccer field'),
     VenueCategory.pickleball: (type: '', keyword: 'pickleball court'),
     VenueCategory.tableTennis: (type: '', keyword: 'table tennis'),
     VenueCategory.volleyball: (type: '', keyword: 'volleyball court'),
@@ -108,6 +182,7 @@ class PlacesNearbyService {
       for (final raw in results) {
         if (raw is! Map) continue;
         final m = Map<String, dynamic>.from(raw);
+        if (_isIrrelevant(m)) continue;
         final v = _venueFromPlace(m, category);
         if (v == null) continue;
         if (v.locationLat != null && v.locationLng != null) {
