@@ -66,6 +66,7 @@ import 'package:smeet_app/features/profile/widgets/sport_achievement_wall.dart';
 import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
 import 'package:smeet_app/features/profile/profile.dart';
 import 'package:smeet_app/features/explore/presentation/explore_page.dart';
+import 'package:smeet_app/features/explore/widgets/featured_events_section.dart';
 import 'package:smeet_app/features/explore/widgets/swipe_deck_controls.dart';
 
 part 'app/shell/smeet_shell.dart';
@@ -2360,6 +2361,8 @@ class _HomePageState extends State<HomePage> {
         key: _formKey,
         child: Column(
           children: [
+            const FeaturedEventsSection(),
+            const SizedBox(height: AppSpacing.md),
             // Header card
             Container(
               width: double.infinity,
