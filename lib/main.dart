@@ -1400,6 +1400,18 @@ class _HomePageState extends State<HomePage> {
   String _filterCountry = 'Australia';
   String _filterCity = 'Brisbane';
   double _radiusKm = 15;
+  static const _radiusOptionsKm = [5.0, 10.0, 15.0, 25.0, 50.0];
+  static final _maxRadiusKm = _radiusOptionsKm.last;
+
+  /// Empty-state action: bring the Create Game form (top of page) into view.
+  void _scrollToCreateForm() {
+    if (!_scrollCtrl.hasClients) return;
+    _scrollCtrl.animateTo(
+      0,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
+  }
 
   (double, double) get _searchCenter {
     final m = kPresetCityCenters[_filterCountry];
@@ -2824,7 +2836,7 @@ class _HomePageState extends State<HomePage> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [5.0, 10.0, 15.0, 25.0, 50.0].map((km) {
+                    children: _radiusOptionsKm.map((km) {
                       final sel = _radiusKm == km;
                       return ChoiceChip(
                         label: Text('${km.toInt()} km'),
@@ -2882,21 +2894,32 @@ class _HomePageState extends State<HomePage> {
                 final visible = _filterUpcoming(sortedGames);
 
                 if (sortedGames.isEmpty) {
-                  return const AppEmptyState(
+                  return AppEmptyState(
                     icon: Icons.sports_tennis,
                     title: 'No games yet',
                     subtitle:
-                        'Create one with the form above, or check back later.',
+                        'Be the first — host a tennis, golf, ski or dive '
+                        'session and others nearby can join.',
+                    actionLabel: 'Host a game',
+                    onAction: _scrollToCreateForm,
                   );
                 }
 
                 if (visible.isEmpty) {
+                  final canWiden = _radiusKm < _maxRadiusKm;
                   return AppEmptyState(
                     icon: Icons.location_searching,
-                    title: 'No games in this area yet.',
+                    title: 'No games in this area yet',
                     subtitle:
                         'No joinable games within ${_radiusKm.toInt()} km of $_filterCity. '
-                        'Try a larger radius or another city.',
+                        '${canWiden ? 'Try a wider search' : 'Host one'} '
+                        'and get a session going.',
+                    actionLabel: canWiden
+                        ? 'Search within ${_maxRadiusKm.toInt()} km'
+                        : 'Host a game',
+                    onAction: canWiden
+                        ? () => setState(() => _radiusKm = _maxRadiusKm)
+                        : _scrollToCreateForm,
                   );
                 }
 
@@ -5339,10 +5362,13 @@ class _MyGamePageState extends State<MyGamePage> {
 /// --- 页面 4：Chat（聊天） ---
 ///
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, this.onTotalUnreadChanged});
+  const ChatPage({super.key, this.onTotalUnreadChanged, this.onFindPlayers});
 
   /// Notifies parent (e.g. [SmeetShell]) of aggregate unread for the Chat tab badge.
   final ValueChanged<int>? onTotalUnreadChanged;
+
+  /// Empty-state action: take the user to Swipe to meet players.
+  final VoidCallback? onFindPlayers;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -5547,8 +5573,11 @@ class _ChatPageState extends State<ChatPage> {
                 : 'No chats yet',
             subtitle: _user == null
                 ? 'Sign in to message people you meet on Smeet.'
-                : 'Connect with a player on Swipe to start a conversation.',
-            actionLabel: _user == null ? 'Sign in' : null,
+                : 'Say hi to a tennis, golf, ski or dive player on Swipe — '
+                    'your conversations will show up here.',
+            actionLabel: _user == null
+                ? 'Sign in'
+                : (widget.onFindPlayers != null ? 'Find players' : null),
             onAction: _user == null
                 ? () {
                     Navigator.of(context).push(
@@ -5557,7 +5586,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                     );
                   }
-                : null,
+                : widget.onFindPlayers,
           );
         }
 

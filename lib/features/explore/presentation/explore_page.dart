@@ -9,6 +9,7 @@ import 'package:smeet_app/core/services/places_nearby_service.dart';
 import 'package:smeet_app/features/venues/models/venue.dart';
 import 'package:smeet_app/features/venues/presentation/venue_detail_page.dart';
 import 'package:smeet_app/geo_utils.dart';
+import 'package:smeet_app/widgets/app_page_states.dart';
 
 /// Explore: Smeet ([smeetTab], usually [SwipePage]) / Venues / Events. Injected from [SmeetShell].
 class ExplorePage extends StatefulWidget {
@@ -383,31 +384,7 @@ class _VenuesTabState extends State<_VenuesTab>
             )
           else if (_filtered.isEmpty && nonFeatured.isEmpty)
             SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('🏟️', style: TextStyle(fontSize: 48)),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'No venues yet',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Check back soon',
-                      style: TextStyle(
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _buildEmptyState(),
             )
           else
             SliverPadding(
@@ -426,6 +403,32 @@ class _VenuesTabState extends State<_VenuesTab>
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final isAll = _selectedCategory == 'all';
+    final String subtitle;
+    if (_userPos == null) {
+      subtitle = 'Turn on location to discover tennis courts, golf courses, '
+          'ski areas and dive centres near you.';
+    } else if (isAll) {
+      subtitle = 'We couldn’t find tennis, golf, ski or dive venues near you '
+          'right now.';
+    } else {
+      subtitle = 'Nothing in this category nearby yet — try the others.';
+    }
+    return AppEmptyState(
+      icon: Icons.place_outlined,
+      title: 'No venues found nearby',
+      subtitle: subtitle,
+      actionLabel: isAll ? 'Try again' : 'Show all venues',
+      onAction: isAll
+          ? () {
+              _nearbyByCategory.clear();
+              _load();
+            }
+          : () => _filter('all'),
     );
   }
 

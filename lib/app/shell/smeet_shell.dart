@@ -339,6 +339,7 @@ class _SmeetShellState extends State<SmeetShell> {
       case 3:
         return ChatPage(
           key: ValueKey(_gamesListRevision),
+          onFindPlayers: () => setState(() => _index = 1),
         );
       case 4:
         return ProfilePage(key: ValueKey(_profileSessionKey));
