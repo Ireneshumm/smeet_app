@@ -1393,6 +1393,8 @@ class _HomePageState extends State<HomePage> {
       final endsAt = DateTime.tryParse(g['ends_at']?.toString() ?? '');
       if (endsAt != null && endsAt.isBefore(now)) continue;
 
+      if (!isFeaturedSport((g['sport'] ?? '').toString())) continue;
+
       final players = (g['players'] as num?)?.toInt() ?? 0;
       final joined = (g['joined_count'] as num?)?.toInt() ?? 0;
       if (players <= 0 || joined >= players) continue;
@@ -1514,9 +1516,9 @@ class _HomePageState extends State<HomePage> {
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: kSupportedSports.length,
+                  itemCount: kVisibleSports.length,
                   itemBuilder: (context, i) {
-                    final sport = kSupportedSports[i];
+                    final sport = kVisibleSports[i];
                     final isSelected = sport.$1 == _sport;
                     return InkWell(
                       onTap: () {

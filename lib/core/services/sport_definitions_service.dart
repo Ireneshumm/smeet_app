@@ -54,6 +54,10 @@ class SportDefinitionsService {
           .toList();
     }
 
+    if (list.isEmpty) {
+      list = kBuiltInSportLevels[sportKey] ?? const [];
+    }
+
     if (kDebugMode) {
       debugPrint(
         '[SportDefs] fetched sport=$sportKey rows=${list.length} '
@@ -85,6 +89,9 @@ class SportDefinitionsService {
     }
     for (final k in map.keys.toList()) {
       map[k]!.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    }
+    for (final e in kBuiltInSportLevels.entries) {
+      map.putIfAbsent(e.key, () => e.value);
     }
     if (kDebugMode) {
       debugPrint(
@@ -132,6 +139,48 @@ class SportLevelDefinition {
     return false;
   }
 }
+
+/// Client-side levels for sports not yet seeded in `sport_level_definitions`.
+/// DB rows, once present, take precedence.
+const Map<String, List<SportLevelDefinition>> kBuiltInSportLevels = {
+  'Diving': [
+    SportLevelDefinition(
+      sport: 'Diving',
+      levelKey: 'never',
+      levelLabel: 'Never Dived',
+      levelDescription: 'Curious, no certification yet',
+      sortOrder: 1,
+    ),
+    SportLevelDefinition(
+      sport: 'Diving',
+      levelKey: 'beginner',
+      levelLabel: 'Open Water',
+      levelDescription: 'Certified to 18 m',
+      sortOrder: 2,
+    ),
+    SportLevelDefinition(
+      sport: 'Diving',
+      levelKey: 'intermediate',
+      levelLabel: 'Advanced Open Water',
+      levelDescription: 'Certified to 30 m, deep & night dives',
+      sortOrder: 3,
+    ),
+    SportLevelDefinition(
+      sport: 'Diving',
+      levelKey: 'advanced',
+      levelLabel: 'Rescue Diver',
+      levelDescription: 'Rescue certified, 50+ logged dives',
+      sortOrder: 4,
+    ),
+    SportLevelDefinition(
+      sport: 'Diving',
+      levelKey: 'expert',
+      levelLabel: 'Divemaster+',
+      levelDescription: 'Professional level or instructor',
+      sortOrder: 5,
+    ),
+  ],
+};
 
 /// Maps old generic labels (Beginner, …) to canonical [level_key] names where possible.
 String? canonicalLegacyLevelKey(String raw) {

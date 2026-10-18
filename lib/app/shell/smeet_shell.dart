@@ -1431,7 +1431,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
               height: 36,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: ['General', ...kSupportedSports.map((s) => s.$3)]
+                children: ['General', ...kVisibleSports.map((s) => s.$3)]
                     .map((sport) {
                   final sel = _selectedSport == sport;
                   return GestureDetector(

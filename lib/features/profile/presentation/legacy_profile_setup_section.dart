@@ -217,14 +217,13 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
     }
   }
 
+  /// [kFeaturedSports] first, then hidden sports the user already has a level for.
   List<String> get _orderedSportKeys {
-    final fromDb = _defsBySport?.keys.toList() ?? <String>[];
-    fromDb.sort();
-    final extra = <String>[];
-    for (final e in kSupportedSports) {
-      if (!fromDb.contains(e.$1)) extra.add(e.$1);
-    }
-    return [...fromDb, ...extra];
+    final alreadySet = _sportLevels.keys
+        .where((k) => !kFeaturedSports.contains(k))
+        .toList()
+      ..sort();
+    return [...kFeaturedSports, ...alreadySet];
   }
 
   Future<void> _openSportPickerSheet() async {

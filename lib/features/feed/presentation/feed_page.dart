@@ -180,13 +180,14 @@ class _FeedPageState extends State<FeedPage> {
     return _feedMasonryCard(item);
   }
 
-  /// Sports present in the current feed payload (posts + games).
+  /// Featured sports present in the current feed payload (posts + games).
   static Set<String> _distinctSportKeys(List<FeedItem> items) {
     final s = <String>{};
     for (final it in items) {
       final raw = it.sport.trim();
       if (raw.isEmpty) continue;
-      s.add(canonicalSportKey(raw));
+      final key = canonicalSportKey(raw);
+      if (isFeaturedSport(key)) s.add(key);
     }
     return s;
   }

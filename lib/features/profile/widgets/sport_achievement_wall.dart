@@ -74,6 +74,11 @@ class _SportAchievementWallState extends State<SportAchievementWall> {
     return (data as List).cast<Map<String, dynamic>>();
   }
 
+  static int _featuredRank(String sportKey) {
+    final i = kFeaturedSports.indexOf(sportKey);
+    return i < 0 ? kFeaturedSports.length : i;
+  }
+
   Map<String, Map<String, dynamic>> _bySport(List<Map<String, dynamic>> rows) {
     final m = <String, Map<String, dynamic>>{};
     for (final r in rows) {
@@ -120,6 +125,13 @@ class _SportAchievementWallState extends State<SportAchievementWall> {
           );
         }
         final bySport = _bySport(snap.data!);
+        // Featured sports, plus hidden ones the user already has stats for.
+        final sports = kSupportedSports
+            .where((s) => isFeaturedSport(s.$1) || bySport.containsKey(s.$1))
+            .toList()
+          ..sort(
+            (a, b) => _featuredRank(a.$1).compareTo(_featuredRank(b.$1)),
+          );
 
         return _sectionShell(
           child: LayoutBuilder(
@@ -138,10 +150,10 @@ class _SportAchievementWallState extends State<SportAchievementWall> {
                     crossAxisSpacing: 12,
                     mainAxisExtent: _cellHeight,
                   ),
-                  itemCount: kSupportedSports.length,
+                  itemCount: sports.length,
                   itemBuilder: (context, i) {
-                    final sport = kSupportedSports[i].$1;
-                    final label = kSupportedSports[i].$3;
+                    final sport = sports[i].$1;
+                    final label = sports[i].$3;
                     final row = bySport[sport];
                     final locked = row == null;
                     final played = (row?['games_played'] as num?)?.toInt() ?? 0;

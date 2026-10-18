@@ -22,6 +22,20 @@ const List<(String key, String emoji, String label)> kSupportedSports = [
   ('Rugby', '🏉', 'Rugby'),
   ('Squash', '🎯', 'Squash'),
   ('Hockey', '🏒', 'Hockey'),
+  ('Diving', '🤿', 'Scuba Diving'),
+];
+
+/// Sports shown in pickers, filters and profile. Others stay in
+/// [kSupportedSports] (so existing data still renders) but are hidden.
+const List<String> kFeaturedSports = ['Tennis', 'Golf', 'Ski', 'Diving'];
+
+bool isFeaturedSport(String sportKey) =>
+    kFeaturedSports.contains(canonicalSportKey(sportKey));
+
+/// [kSupportedSports] entries for [kFeaturedSports], in featured order.
+final List<(String key, String emoji, String label)> kVisibleSports = [
+  for (final k in kFeaturedSports)
+    kSupportedSports.firstWhere((e) => e.$1 == k),
 ];
 
 String sportEmojiForKey(String sportKey) {
