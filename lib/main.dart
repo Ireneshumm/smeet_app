@@ -66,6 +66,7 @@ import 'package:smeet_app/features/profile/widgets/sport_achievement_wall.dart';
 import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
 import 'package:smeet_app/features/profile/profile.dart';
 import 'package:smeet_app/features/ai/presentation/ai_find_players_page.dart';
+import 'package:smeet_app/features/ai/widgets/chat_coach_sheet.dart';
 import 'package:smeet_app/features/ai/widgets/ai_find_players_banner.dart';
 import 'package:smeet_app/features/explore/presentation/explore_page.dart';
 import 'package:smeet_app/features/explore/widgets/featured_events_section.dart';
@@ -5826,6 +5827,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   bool _prunePendingPostFrameScheduled = false;
 
+  /// Last merged list rendered (oldest first) — read by the AI chat helper.
+  List<Map<String, dynamic>> _latestVisibleMessages = const [];
+
   /// Direct chat only: true if either party blocked the other (client-side).
   bool _eitherBlocked = false;
   bool _iBlockedThem = false;
@@ -5919,6 +5923,29 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       byId['__client__$cid'] = Map<String, dynamic>.from(o);
     }
     return sortedChatMessages(byId.values.toList());
+  }
+
+  String? get _coachPeerId =>
+      widget.chatKind == 'direct' ? (widget.directPeerUserId ?? _directPeerId) : null;
+
+  Future<void> _openChatCoach() async {
+    final peerId = _coachPeerId;
+    final me = _user?.id;
+    if (peerId == null || me == null) return;
+    final recent = [
+      for (final m in _latestVisibleMessages)
+        if ((m['content'] ?? '').toString().trim().isNotEmpty)
+          (m['user_id']?.toString() == me, m['content'].toString()),
+    ];
+    final picked = await showChatCoachSheet(
+      context,
+      otherUserId: peerId,
+      recent: recent.length > 10 ? recent.sublist(recent.length - 10) : recent,
+      draft: _ctrl.text,
+    );
+    if (picked == null || !mounted) return;
+    _ctrl.text = picked;
+    _ctrl.selection = TextSelection.collapsed(offset: picked.length);
   }
 
   Future<void> _send() async {
@@ -6417,6 +6444,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final msgs = _mergeVisibleMessages(snapshot.data!);
+                _latestVisibleMessages = msgs;
                 if (msgs.isEmpty) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6625,6 +6653,15 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     )
                   : Row(
                       children: [
+                        if (_coachPeerId != null && _user != null)
+                          IconButton(
+                            tooltip: 'AI chat helper',
+                            onPressed: _openChatCoach,
+                            icon: const Icon(
+                              Icons.auto_awesome,
+                              color: AppColors.indigo,
+                            ),
+                          ),
                         Expanded(
                           child: TextField(
                             controller: _ctrl,
