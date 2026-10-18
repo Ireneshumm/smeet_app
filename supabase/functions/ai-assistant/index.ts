@@ -47,6 +47,14 @@ const DEFAULT_RADIUS_KM = 30;
 const PROFILE_COLUMNS =
   "id, display_name, city, intro, avatar_url, sport_levels, availability, location_lat, location_lng";
 
+/** Supabase client acting as the caller (their JWT, so RLS applies). */
+function clientFor(authHeader: string) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+}
+type Db = ReturnType<typeof clientFor>;
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -235,7 +243,7 @@ const RANK_TOOL: Tool = {
 };
 
 async function findPlayers(
-  db: ReturnType<typeof createClient>,
+  db: Db,
   me: Profile | null,
   uid: string,
   body: Record<string, unknown>,
@@ -366,7 +374,7 @@ const COACH_TASK: Record<string, string> = {
 };
 
 async function chatCoach(
-  db: ReturnType<typeof createClient>,
+  db: Db,
   me: Profile | null,
   body: Record<string, unknown>,
 ) {
@@ -431,9 +439,7 @@ Deno.serve(async (req) => {
   if (!ANTHROPIC_API_KEY) return json({ error: "ai_not_configured" }, 503);
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
+  const db = clientFor(authHeader);
   const { data: auth } = await db.auth.getUser(
     authHeader.replace(/^Bearer\s+/i, ""),
   );

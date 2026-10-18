@@ -2,7 +2,7 @@ name: smeet_app
 description: "Smeet - meet people through premium sport: tennis, golf, ski and dive."
 publish_to: "none"
 
-version: 1.0.1+26
+version: 1.0.1+27
 
 environment:
   sdk: ^3.10.4
