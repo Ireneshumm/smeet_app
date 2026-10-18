@@ -28,6 +28,7 @@ import 'package:smeet_app/core/notifiers/smeet_open_chat_room_notifier.dart';
 import 'package:smeet_app/core/services/chat_conversation_list_service.dart';
 import 'package:smeet_app/core/services/joined_games_service.dart';
 import 'package:smeet_app/core/services/media_upload_service.dart';
+import 'package:smeet_app/core/services/review_prompt_service.dart';
 import 'package:smeet_app/core/services/posts_service.dart';
 import 'package:smeet_app/core/formatting/game_countdown.dart';
 import 'package:smeet_app/core/widgets/game_urgency_chip.dart';
@@ -2334,6 +2335,7 @@ class _HomePageState extends State<HomePage> {
         widget.joinedLocal.add(gameId);
       });
       widget.onGamesMutated?.call();
+      unawaited(ReviewPromptService.recordSuccessfulJoin());
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
