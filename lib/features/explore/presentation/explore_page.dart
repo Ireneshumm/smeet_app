@@ -154,6 +154,7 @@ class _VenuesTabState extends State<_VenuesTab>
     ('squash', '🎯 Squash'),
     ('climbing', '🧗 Climbing'),
     ('ski', '🎿 Ski Area'),
+    ('diving', '🤿 Dive Centre'),
     ('sports_court', '🏟️ Other Courts'),
   ];
 
@@ -185,7 +186,22 @@ class _VenuesTabState extends State<_VenuesTab>
     ('shop_racquet', '🏸 Racquet Shop'),
     ('shop_outdoor', '🏕️ Outdoor Gear'),
     ('shop_ski', '🎿 Ski Gear'),
+    ('shop_diving', '🤿 Dive Gear'),
     ('retail', '🏪 Retail'),
+  ];
+
+  /// Only [kFeaturedVenueCategories] (plus "All") are shown; the full lists
+  /// above stay so hidden categories can be re-enabled.
+  static List<(String, String)> _visible(List<(String, String)> cats) => cats
+      .where((c) => c.$1 == 'all' || kFeaturedVenueCategories.contains(c.$1))
+      .toList();
+
+  /// Venue categories "All" covers (featured sports, not gear shops).
+  static const _allSportCategories = [
+    VenueCategory.tennis,
+    VenueCategory.golf,
+    VenueCategory.ski,
+    VenueCategory.diving,
   ];
 
   @override
@@ -219,7 +235,7 @@ class _VenuesTabState extends State<_VenuesTab>
           );
         }
         return v;
-      }).toList();
+      }).where((v) => kFeaturedVenueCategories.contains(v.category)).toList();
 
       list.sort((a, b) {
         if (a.isFeatured != b.isFeatured) return a.isFeatured ? -1 : 1;
@@ -262,11 +278,25 @@ class _VenuesTabState extends State<_VenuesTab>
     final pos = _userPos;
     if (pos == null || _nearbyByCategory.containsKey(cat)) return;
     _nearbyByCategory[cat] = const []; // guard against duplicate fetches
-    final list = await _nearbyService.fetchNearby(
-      lat: pos.lat,
-      lng: pos.lng,
-      category: cat,
+    final cats = cat == 'all' ? _allSportCategories : [cat];
+    final results = await Future.wait(
+      cats.map(
+        (c) => _nearbyService.fetchNearby(
+          lat: pos.lat,
+          lng: pos.lng,
+          category: c,
+        ),
+      ),
     );
+    final seen = <String>{};
+    final list = [
+      for (final r in results)
+        for (final v in r)
+          if (seen.add(v.id)) v,
+    ]..sort(
+        (a, b) => (a.distanceKm ?? double.infinity)
+            .compareTo(b.distanceKm ?? double.infinity),
+      );
     if (!mounted || list.isEmpty) return;
     setState(() => _nearbyByCategory[cat] = list);
   }
@@ -312,27 +342,29 @@ class _VenuesTabState extends State<_VenuesTab>
                   accent: SmeetApp.smeetMint,
                   selectedBg: SmeetApp.smeetMintLight,
                   selectedText: SmeetApp.smeetDeep,
-                  categories: _sportsCategories,
+                  categories: _visible(_sportsCategories),
                   selected: _selectedCategory,
                   onSelect: _filter,
                 ),
                 const _VenueSectionDivider(),
-                _CategoryRow(
-                  title: 'Health & Beauty',
-                  accent: SmeetApp.smeetCoral,
-                  selectedBg: SmeetApp.smeetCoralLight,
-                  selectedText: SmeetApp.smeetCoral,
-                  categories: _wellnessCategories,
-                  selected: _selectedCategory,
-                  onSelect: _filter,
-                ),
-                const _VenueSectionDivider(),
+                if (_visible(_wellnessCategories).isNotEmpty) ...[
+                  _CategoryRow(
+                    title: 'Health & Beauty',
+                    accent: SmeetApp.smeetCoral,
+                    selectedBg: SmeetApp.smeetCoralLight,
+                    selectedText: SmeetApp.smeetCoral,
+                    categories: _visible(_wellnessCategories),
+                    selected: _selectedCategory,
+                    onSelect: _filter,
+                  ),
+                  const _VenueSectionDivider(),
+                ],
                 _CategoryRow(
                   title: 'Shop',
                   accent: SmeetApp.smeetIndigo,
                   selectedBg: SmeetApp.smeetIndigoLight,
                   selectedText: SmeetApp.smeetIndigo,
-                  categories: _shopCategories,
+                  categories: _visible(_shopCategories),
                   selected: _selectedCategory,
                   onSelect: _filter,
                 ),

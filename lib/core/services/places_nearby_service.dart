@@ -78,12 +78,21 @@ class PlacesNearbyService {
     'funeral',
   ];
 
-  static bool _isIrrelevant(Map<String, dynamic> place) {
+  /// Ski resorts and dive centres are commonly typed as lodging or travel
+  /// agencies on Google, so keep those types for these categories.
+  static const Map<String, Set<String>> _allowedTypesByCategory = {
+    VenueCategory.ski: {'lodging', 'travel_agency'},
+    VenueCategory.diving: {'lodging', 'travel_agency'},
+  };
+
+  static bool _isIrrelevant(Map<String, dynamic> place, String category) {
     final types = (place['types'] as List?)
             ?.map((e) => e.toString())
             .toSet() ??
         const <String>{};
-    if (types.intersection(_excludedTypes).isNotEmpty) return true;
+    final excluded = _excludedTypes
+        .difference(_allowedTypesByCategory[category] ?? const <String>{});
+    if (types.intersection(excluded).isNotEmpty) return true;
     final name = (place['name'] ?? '').toString().toLowerCase();
     for (final w in _excludedNameWords) {
       if (name.contains(w)) return true;
@@ -114,6 +123,7 @@ class PlacesNearbyService {
     VenueCategory.pool: (type: '', keyword: 'swimming pool'),
     VenueCategory.golf: (type: 'golf_course', keyword: ''),
     VenueCategory.ski: (type: '', keyword: 'ski resort'),
+    VenueCategory.diving: (type: '', keyword: 'scuba diving centre'),
     // Health & beauty.
     VenueCategory.massage: (type: 'spa', keyword: 'massage'),
     VenueCategory.physio: (type: 'physiotherapist', keyword: ''),
@@ -130,6 +140,7 @@ class PlacesNearbyService {
     VenueCategory.shopTennis: (type: '', keyword: 'tennis shop'),
     VenueCategory.shopGolf: (type: '', keyword: 'golf shop'),
     VenueCategory.shopSki: (type: '', keyword: 'ski snowboard shop'),
+    VenueCategory.shopDiving: (type: '', keyword: 'dive shop scuba gear'),
     VenueCategory.shopFootball: (type: '', keyword: 'football soccer store'),
     VenueCategory.shopBasketball: (type: '', keyword: 'basketball store'),
     VenueCategory.shopRacquet: (type: '', keyword: 'racquet sports shop'),
@@ -182,7 +193,7 @@ class PlacesNearbyService {
       for (final raw in results) {
         if (raw is! Map) continue;
         final m = Map<String, dynamic>.from(raw);
-        if (_isIrrelevant(m)) continue;
+        if (_isIrrelevant(m, category)) continue;
         final v = _venueFromPlace(m, category);
         if (v == null) continue;
         if (v.locationLat != null && v.locationLng != null) {

@@ -5,6 +5,7 @@ abstract final class VenueCategory {
   static const pool = 'pool';
   static const golf = 'golf';
   static const ski = 'ski';
+  static const diving = 'diving';
   // Per-sport venue categories (live Google Places discovery).
   static const tennis = 'tennis';
   static const badminton = 'badminton';
@@ -36,6 +37,7 @@ abstract final class VenueCategory {
   static const shopTennis = 'shop_tennis';
   static const shopGolf = 'shop_golf';
   static const shopSki = 'shop_ski';
+  static const shopDiving = 'shop_diving';
   static const shopFootball = 'shop_football';
   static const shopBasketball = 'shop_basketball';
   static const shopRacquet = 'shop_racquet';
@@ -67,6 +69,7 @@ const kVenueCategoryInfo = <String, ({String emoji, String label})>{
   VenueCategory.pool: (emoji: '🏊', label: 'Swimming Pool'),
   VenueCategory.golf: (emoji: '⛳', label: 'Golf Course'),
   VenueCategory.ski: (emoji: '🎿', label: 'Ski Area'),
+  VenueCategory.diving: (emoji: '🤿', label: 'Dive Centre'),
   VenueCategory.massage: (emoji: '💆', label: 'Massage'),
   VenueCategory.physio: (emoji: '🩺', label: 'Physio'),
   VenueCategory.clinic: (emoji: '✨', label: 'Cosmetic Clinic'),
@@ -81,6 +84,7 @@ const kVenueCategoryInfo = <String, ({String emoji, String label})>{
   VenueCategory.shopTennis: (emoji: '🎾', label: 'Tennis Gear'),
   VenueCategory.shopGolf: (emoji: '⛳', label: 'Golf Gear'),
   VenueCategory.shopSki: (emoji: '🎿', label: 'Ski Gear'),
+  VenueCategory.shopDiving: (emoji: '🤿', label: 'Dive Gear'),
   VenueCategory.shopFootball: (emoji: '⚽', label: 'Football Gear'),
   VenueCategory.shopBasketball: (emoji: '🏀', label: 'Basketball Gear'),
   VenueCategory.shopRacquet: (emoji: '🏸', label: 'Racquet Shop'),
@@ -89,6 +93,19 @@ const kVenueCategoryInfo = <String, ({String emoji, String label})>{
   VenueCategory.shopRunning: (emoji: '🏃', label: 'Running Shoes'),
   VenueCategory.shopSkincare: (emoji: '🧴', label: 'Skincare Products'),
   VenueCategory.shopOutdoor: (emoji: '🏕️', label: 'Outdoor Gear'),
+};
+
+/// Venue categories shown in the Venues tab (featured sports + their gear
+/// shops). Other categories stay defined but hidden.
+const Set<String> kFeaturedVenueCategories = {
+  VenueCategory.tennis,
+  VenueCategory.golf,
+  VenueCategory.ski,
+  VenueCategory.diving,
+  VenueCategory.shopTennis,
+  VenueCategory.shopGolf,
+  VenueCategory.shopSki,
+  VenueCategory.shopDiving,
 };
 
 /// Partner venue / merchant row from `venues` (Supabase).
