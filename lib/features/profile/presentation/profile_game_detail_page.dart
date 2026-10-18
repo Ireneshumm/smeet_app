@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:smeet_app/core/services/game_detail_service.dart';
+import 'package:smeet_app/core/services/game_share_service.dart';
 import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
 
@@ -177,7 +178,23 @@ class _GameDetailBody extends StatelessWidget {
               letterSpacing: -0.2,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Builder(
+              builder: (btnContext) => OutlinedButton.icon(
+                onPressed: () => GameShareService.shareInvite(
+                  btnContext,
+                  headline: headline,
+                  startsAt: starts,
+                  location: loc,
+                ),
+                icon: const Icon(Icons.ios_share_rounded, size: AppIconSize.xs),
+                label: const Text('Invite friends'),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           sectionCard(
             title: 'When & where',
             children: [

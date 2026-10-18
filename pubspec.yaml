@@ -2,7 +2,7 @@ name: smeet_app
 description: "Smeet - meet people through premium sport: tennis, golf, ski and dive."
 publish_to: "none"
 
-version: 1.0.1+22
+version: 1.0.1+23
 
 environment:
   sdk: ^3.10.4
@@ -29,6 +29,7 @@ dependencies:
   sentry_flutter: ^9.24.0
   video_thumbnail: ^0.5.6
   in_app_review: ^2.0.12
+  share_plus: 10.1.4
 
 dev_dependencies:
   flutter_test:
