@@ -5,6 +5,7 @@ import 'package:smeet_app/core/services/game_detail_service.dart';
 import 'package:smeet_app/core/services/game_share_service.dart';
 import 'package:smeet_app/core/theme/theme.dart';
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
+import 'package:smeet_app/features/profile/widgets/game_recap_card.dart';
 
 String _mvpGameSourceLabel(ProfileContentTab tab) {
   switch (tab) {
@@ -195,6 +196,17 @@ class _GameDetailBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+          if ((ends ?? starts) case final playedAt?
+              when playedAt.isBefore(DateTime.now())) ...[
+            GameRecapCard(
+              sport: sport,
+              headline: headline,
+              playedAt: playedAt,
+              location: loc,
+              players: joined is num ? joined.toInt() : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           sectionCard(
             title: 'When & where',
             children: [
