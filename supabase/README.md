@@ -48,3 +48,19 @@ Point Flutter at local Supabase URL only when developing against local stack.
 ### Google Cloud
 
 Enable **Places API** (and billing) for the key. Restrict the key by IP for Edge Functions, or use HTTP referrer + server key patterns per Google’s docs.
+
+---
+
+## Edge Functions — AI assistant (`ai-assistant`)
+
+Powers **AI Find Players** (Swipe tab) and the **AI chat coach** (1:1 chats). The app calls this function; it calls Claude with a key stored in Supabase secrets, so the key never ships in the app.
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # from console.anthropic.com
+supabase secrets set AI_MODEL=claude-haiku-5-5      # optional; default shown
+supabase functions deploy ai-assistant
+```
+
+- `verify_jwt = true`: only signed-in users. Database reads use the caller's JWT, so RLS applies exactly as in the app.
+- No new tables or columns. Nothing is stored; chat snippets are only sent when the user taps an AI button.
+- Until the secret is set the app shows "AI features are coming soon."

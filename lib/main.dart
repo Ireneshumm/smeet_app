@@ -65,6 +65,8 @@ import 'package:smeet_app/features/profile/widgets/battle_report_sheet.dart';
 import 'package:smeet_app/features/profile/widgets/sport_achievement_wall.dart';
 import 'package:smeet_app/features/profile/presentation/profile_setup_demo_page.dart';
 import 'package:smeet_app/features/profile/profile.dart';
+import 'package:smeet_app/features/ai/presentation/ai_find_players_page.dart';
+import 'package:smeet_app/features/ai/widgets/ai_find_players_banner.dart';
 import 'package:smeet_app/features/explore/presentation/explore_page.dart';
 import 'package:smeet_app/features/explore/widgets/featured_events_section.dart';
 import 'package:smeet_app/features/explore/widgets/swipe_deck_controls.dart';
@@ -4129,6 +4131,16 @@ class _SwipePageState extends State<SwipePage> {
     return '📅 Free same time: $shown$extra';
   }
 
+  Future<void> _openAiFindPlayers() async {
+    if (_user == null) {
+      final ok = await _ensureLoginAndPrompt(context);
+      if (!ok || !mounted) return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const AiFindPlayersPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -4191,6 +4203,12 @@ class _SwipePageState extends State<SwipePage> {
                 onPressed: _bootstrap,
                 child: const Text('Refresh'),
               ),
+              const SizedBox(height: AppSpacing.xs),
+              OutlinedButton.icon(
+                onPressed: _openAiFindPlayers,
+                icon: const Icon(Icons.auto_awesome, size: AppIconSize.xs),
+                label: const Text('AI Find Players'),
+              ),
             ],
           ),
         ),
@@ -4211,6 +4229,10 @@ class _SwipePageState extends State<SwipePage> {
 
     return Column(
       children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AiFindPlayersBanner(onTap: _openAiFindPlayers),
+          ),
           if (_user != null)
             ValueListenableBuilder<int>(
               valueListenable: smeetIncomingLikesCount,

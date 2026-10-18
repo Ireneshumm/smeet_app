@@ -15,3 +15,8 @@ verify_jwt = false
 
 [functions.notify-game-reminders]
 verify_jwt = false
+
+# AI find players + chat coach (Claude). Signed-in users only.
+# Secret: supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+[functions.ai-assistant]
+verify_jwt = true
