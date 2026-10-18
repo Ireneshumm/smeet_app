@@ -41,7 +41,7 @@ void showReportProblemDialog(BuildContext context) {
               'and try again. If something still fails, note what you were doing when it happened.',
               style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               'Account access',
               style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
@@ -54,7 +54,7 @@ void showReportProblemDialog(BuildContext context) {
               'Forgotten-password flows depend on how you signed up (email link, Apple, etc.).',
               style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               'Account deletion',
               style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
@@ -67,7 +67,7 @@ void showReportProblemDialog(BuildContext context) {
               'deletion request. You’ll get a reference number after submission.',
               style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               'Other help',
               style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
@@ -107,7 +107,7 @@ class LegalSectionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpacing.xxs),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.lgAll,
@@ -117,7 +117,7 @@ class LegalSectionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 14, AppSpacing.md, 6),
             child: Text(
               'Legal & safety',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -126,7 +126,7 @@ class LegalSectionCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xxs),
             child: Text(
               'Legal',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -162,7 +162,7 @@ class LegalSectionCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xxs),
             child: Text(
               'Help & account',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(

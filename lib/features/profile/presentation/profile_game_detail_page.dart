@@ -69,7 +69,7 @@ class _ProfileMvpGameDetailPageState extends State<ProfileMvpGameDetailPage> {
           if (row == null) {
             return const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpacing.xl),
                 child: Text(
                   'Game not found or unavailable.',
                   textAlign: TextAlign.center,
@@ -135,7 +135,7 @@ class _GameDetailBody extends StatelessWidget {
           side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.55)),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, 14, AppSpacing.md, AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -146,7 +146,7 @@ class _GameDetailBody extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...children,
             ],
           ),
@@ -156,11 +156,11 @@ class _GameDetailBody extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
         children: [
           if (sourceLabel.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Chip(
@@ -192,7 +192,7 @@ class _GameDetailBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           sectionCard(
             title: 'Players & fee',
             children: [
@@ -208,7 +208,7 @@ class _GameDetailBody extends StatelessWidget {
             ],
           ),
           if (createdBy.isNotEmpty || createdAt != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             sectionCard(
               title: 'Listing',
               children: [

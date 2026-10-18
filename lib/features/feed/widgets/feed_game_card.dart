@@ -133,7 +133,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
         borderRadius: AppRadius.lgAll,
         child: Container(
           width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: AppRadius.lgAll,
@@ -167,7 +167,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,12 +255,12 @@ class _FeedGameCardState extends State<FeedGameCard> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 _joined
                     ? Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
-                          vertical: 8,
+                          vertical: AppSpacing.xs,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.green.shade50,
@@ -280,8 +280,8 @@ class _FeedGameCardState extends State<FeedGameCard> {
                         onPressed: _joining ? null : _join,
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
                           ),
                           shape: const StadiumBorder(),
                           minimumSize: Size.zero,

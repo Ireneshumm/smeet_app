@@ -7,7 +7,7 @@ class AppLoadingState extends StatelessWidget {
   const AppLoadingState({
     super.key,
     required this.message,
-    this.padding = const EdgeInsets.all(24),
+    this.padding = const EdgeInsets.all(AppSpacing.xl),
   });
 
   final String message;
@@ -30,7 +30,7 @@ class AppLoadingState extends StatelessWidget {
                 color: cs.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -68,12 +68,12 @@ class AppEmptyState extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 64, color: cs.primary.withValues(alpha: 0.65)),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -83,7 +83,7 @@ class AppEmptyState extends StatelessWidget {
                   ),
             ),
             if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 subtitle!,
                 textAlign: TextAlign.center,
@@ -124,7 +124,7 @@ class AppErrorState extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -133,7 +133,7 @@ class AppErrorState extends StatelessWidget {
               size: AppIconSize.xxl,
               color: cs.error.withValues(alpha: 0.88),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -142,7 +142,7 @@ class AppErrorState extends StatelessWidget {
                   ),
             ),
             if (detail != null && detail!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 detail!,
                 textAlign: TextAlign.center,

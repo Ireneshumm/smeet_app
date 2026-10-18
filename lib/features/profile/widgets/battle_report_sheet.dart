@@ -134,7 +134,7 @@ class _BattleReportSheetState extends State<BattleReportSheet> {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottom),
+      padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 16 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,7 +152,7 @@ class _BattleReportSheetState extends State<BattleReportSheet> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(5, (i) {
@@ -176,13 +176,13 @@ class _BattleReportSheetState extends State<BattleReportSheet> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
             onPressed: _busy ? null : _pickImage,
             icon: const Icon(Icons.add_photo_alternate_outlined),
             label: const Text('Add image'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           FilledButton(
             onPressed: _busy ? null : _submit,
             style: FilledButton.styleFrom(

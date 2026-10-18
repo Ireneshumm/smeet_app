@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/report_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Preset reasons stored in [reports.reason] (plain text).
 const List<({String label, String value})> kReportReasonOptions = [
@@ -104,7 +105,7 @@ class _ReportSheetBodyState extends State<_ReportSheetBody> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -125,14 +126,14 @@ class _ReportSheetBodyState extends State<_ReportSheetBody> {
                     ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(
               'Reason',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             ...List.generate(kReportReasonOptions.length, (i) {
               final o = kReportReasonOptions[i];
               return RadioListTile<int>(
@@ -146,7 +147,7 @@ class _ReportSheetBodyState extends State<_ReportSheetBody> {
                 dense: true,
               );
             }),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             TextField(
               controller: _detailsCtrl,
               enabled: !_submitting,
@@ -159,7 +160,7 @@ class _ReportSheetBodyState extends State<_ReportSheetBody> {
                 hintText: 'Help us understand what happened…',
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             FilledButton(
               onPressed: _submitting ? null : _submit,
               child: _submitting

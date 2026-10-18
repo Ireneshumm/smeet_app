@@ -1520,14 +1520,14 @@ class _HomePageState extends State<HomePage> {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 12),
+                margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: SmeetApp.smeetGreyLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxs, AppSpacing.lg, AppSpacing.md),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -1555,7 +1555,7 @@ class _HomePageState extends State<HomePage> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
+                          horizontal: AppSpacing.lg,
                           vertical: 14,
                         ),
                         color: isSelected
@@ -1567,7 +1567,7 @@ class _HomePageState extends State<HomePage> {
                               sport.$2,
                               style: const TextStyle(fontSize: 22),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 sport.$3,
@@ -1626,14 +1626,14 @@ class _HomePageState extends State<HomePage> {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 12),
+                margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: SmeetApp.smeetGreyLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxs, AppSpacing.lg, AppSpacing.md),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -1660,7 +1660,7 @@ class _HomePageState extends State<HomePage> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
+                          horizontal: AppSpacing.lg,
                           vertical: 14,
                         ),
                         color: isSelected
@@ -1672,7 +1672,7 @@ class _HomePageState extends State<HomePage> {
                               '🎯',
                               style: TextStyle(fontSize: 22),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 level.levelDescription != null &&
@@ -1723,11 +1723,11 @@ class _HomePageState extends State<HomePage> {
         onTap: enabled ? onTap : null,
         borderRadius: AppRadius.mdAll,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
           child: Row(
             children: [
               Text(emoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   value,
@@ -1792,7 +1792,7 @@ class _HomePageState extends State<HomePage> {
                 color: SmeetApp.smeetInk,
               ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1803,7 +1803,7 @@ class _HomePageState extends State<HomePage> {
                   : () => setState(() => _players--),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 40),
                 child: Text(
@@ -1825,7 +1825,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         const Center(
           child: Text(
             'How many players total',
@@ -2356,7 +2356,7 @@ class _HomePageState extends State<HomePage> {
 
     return SingleChildScrollView(
       controller: _scrollCtrl,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Form(
         key: _formKey,
         child: Column(
@@ -2366,7 +2366,7 @@ class _HomePageState extends State<HomePage> {
             // Header card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: AppRadius.lgAll,
@@ -2432,7 +2432,7 @@ class _HomePageState extends State<HomePage> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
+                        horizontal: AppSpacing.sm,
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
@@ -2447,7 +2447,7 @@ class _HomePageState extends State<HomePage> {
                             size: 18,
                             color: cs.primary,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(
                               _whenSummaryLine(context),
@@ -2458,14 +2458,14 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                   ],
                   InkWell(
                     onTap: _pickGameDate,
                     borderRadius: AppRadius.mdAll,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        vertical: 8,
+                        vertical: AppSpacing.xs,
                         horizontal: 2,
                       ),
                       child: Row(
@@ -2527,7 +2527,7 @@ class _HomePageState extends State<HomePage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 12,
+                              vertical: AppSpacing.sm,
                             ),
                             decoration: BoxDecoration(
                               border: Border.all(
@@ -2547,7 +2547,7 @@ class _HomePageState extends State<HomePage> {
                                         color: cs.onSurface.withOpacity(0.65),
                                       ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   startLabel,
                                   style: Theme.of(context)
@@ -2576,7 +2576,7 @@ class _HomePageState extends State<HomePage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 12,
+                              vertical: AppSpacing.sm,
                             ),
                             decoration: BoxDecoration(
                               border: Border.all(
@@ -2596,7 +2596,7 @@ class _HomePageState extends State<HomePage> {
                                         color: cs.onSurface.withOpacity(0.65),
                                       ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   endLabel,
                                   style: Theme.of(context)
@@ -2670,7 +2670,7 @@ class _HomePageState extends State<HomePage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -2720,7 +2720,7 @@ class _HomePageState extends State<HomePage> {
                   onTap: canSubmitCreate ? _createGame : null,
                   borderRadius: BorderRadius.circular(28),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     child: Center(
                       child: _createGameSubmitting
                           ? const SizedBox(
@@ -2767,7 +2767,7 @@ class _HomePageState extends State<HomePage> {
                           fontWeight: FontWeight.w800,
                         ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   DropdownButtonFormField<String>(
                     initialValue: _filterCountry,
                     decoration: const InputDecoration(
@@ -2838,7 +2838,7 @@ class _HomePageState extends State<HomePage> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -2970,7 +2970,7 @@ class _HomePageState extends State<HomePage> {
                             Icons.sports,
                             color: Theme.of(context).colorScheme.primary,
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2991,7 +2991,7 @@ class _HomePageState extends State<HomePage> {
                                     if (urgency != null) urgency,
                                   ],
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   dateLine,
                                   style: Theme.of(context)
@@ -3008,7 +3008,7 @@ class _HomePageState extends State<HomePage> {
                                       ?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 if (countdownLine.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: AppSpacing.xxs),
                                   Text(
                                     countdownLine,
                                     style: Theme.of(context)
@@ -3022,7 +3022,7 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                   ),
                                 ],
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   suburb.isEmpty
                                       ? formatDistanceKm(distKm)
@@ -3031,7 +3031,7 @@ class _HomePageState extends State<HomePage> {
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   '$remaining spots left • \$${perPerson.toStringAsFixed(2)}/pp',
                                   style: Theme.of(context).textTheme.bodySmall,
@@ -3039,13 +3039,13 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           FilledButton(
                             onPressed:
                                 isJoined ? null : () => _joinGame(gameId),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                                horizontal: AppSpacing.md,
                                 vertical: 10,
                               ),
                               shape: RoundedRectangleBorder(
@@ -3082,8 +3082,8 @@ class _CreateGameFieldCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.lgAll,
@@ -3131,8 +3131,8 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.lgAll,
@@ -3393,7 +3393,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
           if (list.isEmpty) {
             return const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpacing.xl),
                 child: Text(
                   'No new invites right now. Keep smeeting!',
                   textAlign: TextAlign.center,
@@ -3402,7 +3402,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
             );
           }
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             itemCount: list.length,
             itemBuilder: (context, i) {
               final p = list[i];
@@ -3411,7 +3411,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
               final av = (p['avatar_url'] ?? '').toString();
               return Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   child: Row(
                     children: [
                       CircularNetworkAvatar(
@@ -3419,7 +3419,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
                         imageUrl: av,
                         placeholder: const Icon(Icons.person),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3438,7 +3438,7 @@ class _LikesYouPageState extends State<LikesYouPage> {
                         onPressed: () => _pass(p),
                         child: const Text('Skip'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.xs),
                       FilledButton(
                         onPressed: () => _likeBack(p),
                         child: const Text('Play!'),
@@ -3812,12 +3812,12 @@ class _SwipePageState extends State<SwipePage> {
         final theme = Theme.of(ctx);
         final cs = theme.colorScheme;
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           shape: RoundedRectangleBorder(
             borderRadius: AppRadius.xlAll,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 28, AppSpacing.lg, AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3846,7 +3846,7 @@ class _SwipePageState extends State<SwipePage> {
                       fallbackLabel: 'You',
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                       child: Icon(
                         Icons.sports_rounded,
                         color: cs.primary,
@@ -3859,7 +3859,7 @@ class _SwipePageState extends State<SwipePage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.lg),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -3870,7 +3870,7 @@ class _SwipePageState extends State<SwipePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 ..._kSwipeMatchOpeners.map(
                   (line) => Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -3891,7 +3891,7 @@ class _SwipePageState extends State<SwipePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -3902,7 +3902,7 @@ class _SwipePageState extends State<SwipePage> {
                     child: const Text('Let\'s play! 👋'),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
                   child: const Text('Keep exploring'),
@@ -4054,7 +4054,7 @@ class _SwipePageState extends State<SwipePage> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
           child: Text(
             '$emoji $label',
             style: const TextStyle(
@@ -4140,7 +4140,7 @@ class _SwipePageState extends State<SwipePage> {
     if (cur == null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -4149,7 +4149,7 @@ class _SwipePageState extends State<SwipePage> {
                 size: 64,
                 color: SmeetApp.smeetMint,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               const Text(
                 'No new players right now — check back soon!',
                 textAlign: TextAlign.center,
@@ -4159,7 +4159,7 @@ class _SwipePageState extends State<SwipePage> {
                   color: SmeetApp.smeetInk,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 _user == null
                     ? 'Sign in and finish your profile to see people you can connect with.'
@@ -4171,7 +4171,7 @@ class _SwipePageState extends State<SwipePage> {
                   height: 1.35,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.lg),
               FilledButton(
                 onPressed: _bootstrap,
                 child: const Text('Refresh'),
@@ -4216,8 +4216,8 @@ class _SwipePageState extends State<SwipePage> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
                         ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -4238,7 +4238,7 @@ class _SwipePageState extends State<SwipePage> {
                               color: cs.primary,
                               size: AppIconSize.sm,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Expanded(
                               child: Text(
                                 '$count want to play with you',
@@ -4265,7 +4265,7 @@ class _SwipePageState extends State<SwipePage> {
                 borderRadius: AppRadius.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: AppSpacing.sm,
                     vertical: 10,
                   ),
                   child: Row(
@@ -4292,7 +4292,7 @@ class _SwipePageState extends State<SwipePage> {
             ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   const maxCardWidth = 440.0;
@@ -4449,7 +4449,7 @@ class _SwipePageState extends State<SwipePage> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: AppSpacing.xs),
                                   Row(
                                     children: [
                                       Icon(
@@ -4458,7 +4458,7 @@ class _SwipePageState extends State<SwipePage> {
                                         color: Colors.white
                                             .withValues(alpha: 0.92),
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: AppSpacing.xxs),
                                       Expanded(
                                         child: Text(
                                           city.isEmpty ? 'City not set' : city,
@@ -4482,7 +4482,7 @@ class _SwipePageState extends State<SwipePage> {
                                     ],
                                   ),
                                   if (sportChips.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: AppSpacing.xs),
                                     if (sportChips.length <= 6)
                                       Text(
                                         'Sports',
@@ -4495,7 +4495,7 @@ class _SwipePageState extends State<SwipePage> {
                                         ),
                                       ),
                                     if (sportChips.length <= 6)
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: AppSpacing.xxs),
                                     Wrap(
                                       spacing: 6,
                                       runSpacing: 6,
@@ -4557,8 +4557,8 @@ class _SwipePageState extends State<SwipePage> {
                                         .clamp(0.0, 1.0),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
+                                        horizontal: AppSpacing.md,
+                                        vertical: AppSpacing.xs,
                                       ),
                                       decoration: BoxDecoration(
                                         border: Border.all(
@@ -4592,8 +4592,8 @@ class _SwipePageState extends State<SwipePage> {
                                         .clamp(0.0, 1.0),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
+                                        horizontal: AppSpacing.md,
+                                        vertical: AppSpacing.xs,
                                       ),
                                       decoration: BoxDecoration(
                                         border: Border.all(
@@ -4635,7 +4635,7 @@ class _SwipePageState extends State<SwipePage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
             child: SwipeDeckControls(
               loading: _loading,
               onSkip: () => _swipe('skip'),
@@ -4892,7 +4892,7 @@ class _MyGamePageState extends State<MyGamePage> {
       builder: (ctx) => ListView(
         shrinkWrap: true,
         physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xxl),
         children: [
           Text(
             'Players',
@@ -4900,7 +4900,7 @@ class _MyGamePageState extends State<MyGamePage> {
                   fontWeight: FontWeight.w800,
                 ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           ...profiles.map((p) {
             final id = p['id']?.toString() ?? '';
             final name = (p['display_name'] ?? 'Player').toString();
@@ -4985,7 +4985,7 @@ class _MyGamePageState extends State<MyGamePage> {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           itemCount: games.length,
           itemBuilder: (context, i) {
             final g = games[i];
@@ -5031,7 +5031,7 @@ class _MyGamePageState extends State<MyGamePage> {
                 endsAt != null && endsAt.isBefore(DateTime.now());
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(bottom: AppSpacing.md),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: AppRadius.lgAll,
@@ -5047,7 +5047,7 @@ class _MyGamePageState extends State<MyGamePage> {
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, 14, AppSpacing.md, 14),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -5117,7 +5117,7 @@ class _MyGamePageState extends State<MyGamePage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -5128,7 +5128,7 @@ class _MyGamePageState extends State<MyGamePage> {
                               size: AppIconSize.xs,
                               color: cs.primary,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Text(
                               dateLine,
                               style: const TextStyle(
@@ -5146,7 +5146,7 @@ class _MyGamePageState extends State<MyGamePage> {
                               size: AppIconSize.xs,
                               color: cs.onSurface.withValues(alpha: 0.5),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Text(
                               '$startLine  →  $endLine',
                               style: TextStyle(
@@ -5166,7 +5166,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 size: AppIconSize.xs,
                                 color: cs.onSurface.withValues(alpha: 0.5),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               Expanded(
                                 child: Text(
                                   loc,
@@ -5182,13 +5182,13 @@ class _MyGamePageState extends State<MyGamePage> {
                             ],
                           ),
                         ],
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
-                                vertical: 4,
+                                vertical: AppSpacing.xxs,
                               ),
                               decoration: BoxDecoration(
                                 color: cs.primary.withValues(alpha: 0.08),
@@ -5204,11 +5204,11 @@ class _MyGamePageState extends State<MyGamePage> {
                               ),
                             ),
                             if (perPerson > 0) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
-                                  vertical: 4,
+                                  vertical: AppSpacing.xxs,
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.secondaryContainer,
@@ -5227,7 +5227,7 @@ class _MyGamePageState extends State<MyGamePage> {
                           ],
                         ),
                         if (profiles.isNotEmpty) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.sm),
                           GestureDetector(
                             onTap: () => _showParticipants(
                               context,
@@ -5237,7 +5237,7 @@ class _MyGamePageState extends State<MyGamePage> {
                             child: Row(
                               children: [
                                 _myGameAvatarStack(profiles, cs),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   'View all ${profiles.length} players',
                                   style: TextStyle(
@@ -5255,7 +5255,7 @@ class _MyGamePageState extends State<MyGamePage> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                         if (gameEnded)
                           SizedBox(
                             width: double.infinity,
@@ -5516,7 +5516,7 @@ class _ChatPageState extends State<ChatPage> {
     if (label.isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 3),
       decoration: BoxDecoration(
         color: cs.errorContainer,
         borderRadius: AppRadius.smAll,
@@ -5589,7 +5589,7 @@ class _ChatPageState extends State<ChatPage> {
                 await _chatsFuture;
               },
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 itemCount: chats.length,
                 itemBuilder: (context, i) {
                   final c = chats[i];
@@ -5628,7 +5628,7 @@ class _ChatPageState extends State<ChatPage> {
                                 horizontal: 6,
                                 vertical: 2,
                               ),
-                              margin: const EdgeInsets.only(right: 8),
+                              margin: const EdgeInsets.only(right: AppSpacing.xs),
                               decoration: BoxDecoration(
                                 color: cs.secondary.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(6),
@@ -5651,7 +5651,7 @@ class _ChatPageState extends State<ChatPage> {
                               ),
                             ),
                             if (unreadShown > 0) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: AppSpacing.xs),
                               _compactUnreadBadge(context, unreadShown),
                             ],
                           ],
@@ -5705,7 +5705,7 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                           ),
                           if (unreadShown > 0) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             _compactUnreadBadge(context, unreadShown),
                           ],
                         ],
@@ -6093,7 +6093,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         showDragHandle: true,
         builder: (ctx) {
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             children: [
               Text(
                 'Players in this game',
@@ -6101,7 +6101,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       fontWeight: FontWeight.w800,
                     ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               ...list.map((p) {
                 final id = p['id'].toString();
                 final name =
@@ -6151,7 +6151,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       color: cs.errorContainer.withValues(alpha: 0.35),
       borderRadius: AppRadius.mdAll,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -6227,7 +6227,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 onTap: () => _showGameMembers(context),
                 borderRadius: AppRadius.mdAll,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                   child: Row(
                     children: [
                       CircleAvatar(
@@ -6283,7 +6283,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       },
                 borderRadius: AppRadius.mdAll,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                   child: Row(
                     children: [
                       CircularNetworkAvatar(
@@ -6351,7 +6351,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   if (snapshot.hasError) {
                     return Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(AppSpacing.xl),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -6360,14 +6360,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                               size: AppIconSize.xxl,
                               color: cs.outline,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             Text(
                               'Couldn’t load messages',
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
                               'Go back and open this chat again, or check your connection.',
                               textAlign: TextAlign.center,
@@ -6388,14 +6388,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     children: [
                       if (widget.chatKind == 'direct' && _eitherBlocked) ...[
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, 0),
                           child: _directChatBlockBanner(context, cs),
                         ),
                       ],
                       Expanded(
                         child: Center(
                           child: Padding(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(AppSpacing.xl),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -6404,7 +6404,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                   size: AppIconSize.xl,
                                   color: cs.outline,
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: AppSpacing.sm),
                                 Text(
                                   'No messages yet',
                                   textAlign: TextAlign.center,
@@ -6445,14 +6445,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     children: [
                       if (widget.chatKind == 'direct' && _eitherBlocked) ...[
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, 0),
                           child: _directChatBlockBanner(context, cs),
                         ),
                       ],
                       const Expanded(
                         child: Center(
                           child: Padding(
-                            padding: EdgeInsets.all(16),
+                            padding: EdgeInsets.all(AppSpacing.md),
                             child: Text(
                               'Messages are hidden while you and this player can’t chat.',
                               textAlign: TextAlign.center,
@@ -6483,7 +6483,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 final listView = ListView.builder(
                   reverse: true,
                   controller: _listCtrl,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   itemCount: newestFirst.length,
                   itemBuilder: (context, i) {
                     final m = newestFirst[i];
@@ -6498,9 +6498,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     final reportableId = _reportableMessageId(m);
 
                     Widget bubble = Container(
-                      margin: const EdgeInsets.only(bottom: 8),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
+                        horizontal: AppSpacing.sm,
                         vertical: 10,
                       ),
                       constraints: const BoxConstraints(maxWidth: 280),
@@ -6561,7 +6561,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, 0),
                         child: _directChatBlockBanner(context, cs),
                       ),
                       Expanded(child: listView),
@@ -6577,7 +6577,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, AppSpacing.sm),
               child: widget.chatKind == 'direct' && _eitherBlocked
                   ? Text(
                       _iBlockedThem
@@ -6600,7 +6600,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                               isDense: true,
                               contentPadding: EdgeInsets.symmetric(
                                 horizontal: 14,
-                                vertical: 12,
+                                vertical: AppSpacing.sm,
                               ),
                             ),
                             onSubmitted: (_) => _send(),
@@ -6940,7 +6940,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // 允许游客打开 profile：提示登录（scrollable：小屏避免 Column 溢出）
     if (_user == null) {
       return SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -6953,7 +6953,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               'Sign in to add a photo, set your sports profile, and post photos or videos.',
               textAlign: TextAlign.center,
@@ -6961,7 +6961,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     color: cs.onSurface.withOpacity(0.7),
                   ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             FilledButton(
               onPressed: () {
                 Navigator.of(
@@ -6970,7 +6970,7 @@ class _ProfilePageState extends State<ProfilePage> {
               },
               child: const Text('Sign in or create account'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
             const LegalSectionCard(guestMode: true),
           ],
         ),
@@ -7004,14 +7004,14 @@ class _ProfilePageState extends State<ProfilePage> {
           child: DefaultTabController(
             length: 2,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
               // Top header — XHS-style: flat on the canvas (no boxed card),
               // large avatar, bold name, muted meta.
               Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 0, 12),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.xxs, AppSpacing.xxs, 0, AppSpacing.sm),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -7079,7 +7079,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               decoration: TextDecoration.none,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: AppSpacing.xxs),
                           Row(
                             children: [
                               const Icon(
@@ -7087,7 +7087,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 size: 14,
                                 color: SmeetApp.smeetMint,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: AppSpacing.xxs),
                               Expanded(
                                 child: Text(
                                   _cityCtrl.text.trim().isEmpty
@@ -7118,7 +7118,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     (e) => Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
-                                        vertical: 4,
+                                        vertical: AppSpacing.xxs,
                                       ),
                                       decoration: BoxDecoration(
                                         // XHS-style muted chip: light grey pill,
@@ -7213,7 +7213,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
 
               Expanded(
                 child: TabBarView(
@@ -7226,12 +7226,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           if (identityUser != null) ...[
                             ProfileIdentitySection(userId: identityUser.id),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                             SportAchievementWall(
                               userId: identityUser.id,
                               supabase: Supabase.instance.client,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: AppSpacing.sm),
                           ],
                           LegacyProfileSetupSection(
                             key: _legacySetupKey,
@@ -7247,9 +7247,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             },
                             onProfileSaved: SmeetShell.refreshAuthState,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.sm),
                           const LegalSectionCard(),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.sm),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
@@ -7292,7 +7292,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
 
                         Expanded(
                           child: FutureBuilder<List<Map<String, dynamic>>>(
@@ -7328,7 +7328,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                               return ProfilePostsGrid(
                                 posts: posts,
-                                padding: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                                 onOpenPost: (p) async {
                                   await Navigator.of(context).push<void>(
                                     MaterialPageRoute<void>(
@@ -7463,7 +7463,7 @@ class _MatchesPageState extends State<MatchesPage> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
             itemCount: items.length,
             itemBuilder: (context, i) {
               final p = items[i];

@@ -126,7 +126,7 @@ class VenueDetailPage extends StatelessWidget {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -134,7 +134,7 @@ class VenueDetailPage extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: AppSpacing.sm,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
@@ -157,7 +157,7 @@ class VenueDetailPage extends StatelessWidget {
                           size: AppIconSize.xs,
                           color: cs.onSurface.withValues(alpha: 0.5),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: AppSpacing.xxs),
                         Text(
                           formatDistanceKm(venue.distanceKm!),
                           style: TextStyle(
@@ -169,7 +169,7 @@ class VenueDetailPage extends StatelessWidget {
                     ],
                   ),
                   if (venue.reviewCount > 0) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -216,7 +216,7 @@ class VenueDetailPage extends StatelessWidget {
                     ),
                   ],
                   if (venue.address != null) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -239,7 +239,7 @@ class VenueDetailPage extends StatelessWidget {
                     ),
                   ],
                   if (venue.openingHours != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -263,7 +263,7 @@ class VenueDetailPage extends StatelessWidget {
                     ),
                   ],
                   if (venue.description != null) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.lg),
                     const Text(
                       'About',
                       style: TextStyle(
@@ -282,7 +282,7 @@ class VenueDetailPage extends StatelessWidget {
                     ),
                   ],
                   if (venue.sport.isNotEmpty) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.lg),
                     const Text(
                       'Sports',
                       style: TextStyle(
@@ -299,7 +299,7 @@ class VenueDetailPage extends StatelessWidget {
                             (s) => Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
-                                vertical: 8,
+                                vertical: AppSpacing.xs,
                               ),
                               decoration: BoxDecoration(
                                 color: cs.surfaceContainerHighest,
@@ -319,7 +319,7 @@ class VenueDetailPage extends StatelessWidget {
                           .toList(),
                     ),
                   ],
-                  const SizedBox(height: 32),
+                  const SizedBox(height: AppSpacing.xxl),
                   if (venue.instagramUrl != null &&
                       venue.instagramUrl!.isNotEmpty) ...[
                     SizedBox(
@@ -340,7 +340,7 @@ class VenueDetailPage extends StatelessWidget {
                         label: const Text('Follow on Instagram'),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                   ],
                   if (venue.bookingUrl != null &&
                       venue.bookingUrl!.isNotEmpty) ...[
@@ -365,7 +365,7 @@ class VenueDetailPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                   ],
                   if (venue.websiteUrl != null &&
                       venue.websiteUrl!.isNotEmpty &&
@@ -389,7 +389,7 @@ class VenueDetailPage extends StatelessWidget {
                     ),
                   ],
                   if (venue.phone != null && venue.phone!.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -406,7 +406,7 @@ class VenueDetailPage extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 40),
+                  const SizedBox(height: AppSpacing.xxxl),
                 ],
               ),
             ),

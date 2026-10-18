@@ -150,12 +150,12 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
         ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.visibility_off_outlined, size: 56, color: cs.outline),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   'This profile isn’t available.',
                   textAlign: TextAlign.center,
@@ -187,7 +187,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
             _ReportUserActionButton(targetUserId: widget.userId),
             if (_busy)
               const Padding(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppSpacing.sm),
                 child: SizedBox(
                   width: 22,
                   height: 22,
@@ -234,7 +234,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
           final availability = p['availability'];
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -273,7 +273,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                 ],
                 Center(
                   child: Container(
@@ -297,7 +297,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   name.isEmpty ? 'Unnamed' : name,
                   textAlign: TextAlign.center,
@@ -307,21 +307,21 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                       ?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 if (city.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(city, textAlign: TextAlign.center),
                 ],
                 if (intro.isNotEmpty && !_iBlocked) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(intro),
                 ],
                 if (!_iBlocked) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   ProfileIdentitySection(
                     userId: widget.userId,
                     heading: 'Sports identity',
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -332,7 +332,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 if (sportLevels.isEmpty)
                   const Text('No sports info')
                 else
@@ -343,7 +343,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                       final defsBySport = defsSnap.data;
                       if (defsSnap.connectionState == ConnectionState.waiting) {
                         return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
                           child: Center(
                             child: SizedBox(
                               width: 22,
@@ -379,7 +379,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                     },
                   ),
                 if (!_iBlocked) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -390,7 +390,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   AvailabilityDisplayWidget(
                     availability: availability is Map
                         ? Map<String, dynamic>.from(availability)
@@ -398,7 +398,7 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                   ),
                 ],
                 if (!_iBlocked) ...[
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.xl),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -409,21 +409,21 @@ class _OtherProfilePageState extends State<OtherProfilePage> {
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(
                     'Recent clips and photos — get a feel for level and style.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: cs.onSurface.withValues(alpha: 0.65),
                         ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   FutureBuilder<List<Map<String, dynamic>>>(
                     future: _postsFuture,
                     builder: (context, postSnap) {
                       if (postSnap.connectionState == ConnectionState.waiting) {
                         return const Center(
                           child: Padding(
-                            padding: EdgeInsets.all(24),
+                            padding: EdgeInsets.all(AppSpacing.xl),
                             child: CircularProgressIndicator(),
                           ),
                         );

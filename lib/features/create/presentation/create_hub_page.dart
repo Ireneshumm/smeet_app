@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:smeet_app/features/create/presentation/create_note_page.dart';
 import 'package:smeet_app/features/create/presentation/create_video_page.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Entry hub for create flows (MVP). Does not replace the legacy Home create form.
 ///
@@ -22,10 +23,10 @@ class CreateHubPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Create')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xs, AppSpacing.xxs, AppSpacing.xs, AppSpacing.sm),
               child: Text(
                 'Add something new to your profile, or start the same game flow as Home.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

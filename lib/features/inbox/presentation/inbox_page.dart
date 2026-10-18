@@ -324,7 +324,7 @@ class _InboxPageState extends State<InboxPage>
     if (label.isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 3),
       decoration: BoxDecoration(
         color: cs.errorContainer,
         borderRadius: AppRadius.smAll,
@@ -351,7 +351,7 @@ class _InboxPageState extends State<InboxPage>
       builder: (context, openChatId, _) {
         return ListView.builder(
           physics: physics,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           itemCount: items.length,
           itemBuilder: (context, i) {
             final item = items[i];
@@ -385,7 +385,7 @@ class _InboxPageState extends State<InboxPage>
                               horizontal: 6,
                               vertical: 2,
                             ),
-                            margin: const EdgeInsets.only(right: 8),
+                            margin: const EdgeInsets.only(right: AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: cs.secondary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
@@ -409,7 +409,7 @@ class _InboxPageState extends State<InboxPage>
                             ),
                           ),
                           if (unreadShown > 0) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             _inboxCompactUnreadBadge(context, unreadShown),
                           ],
                         ],
@@ -461,7 +461,7 @@ class _InboxPageState extends State<InboxPage>
                           ),
                         ),
                         if (unreadShown > 0) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           _inboxCompactUnreadBadge(context, unreadShown),
                         ],
                       ],
@@ -610,7 +610,7 @@ class _InboxPageState extends State<InboxPage>
   }) {
     return ListView.builder(
       physics: physics,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final row = items[i];

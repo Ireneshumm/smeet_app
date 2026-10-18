@@ -94,7 +94,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
         final isWeekend = di >= 5;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
           child: Row(
             children: [
               SizedBox(
@@ -108,7 +108,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Row(
                   children: List.generate(kAvailabilitySlots.length, (si) {

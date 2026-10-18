@@ -117,7 +117,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(AppSpacing.xl),
                   child: Text(
                     'Couldn’t load notifications.',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -139,7 +139,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               );
             }
             return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
               itemCount: rows.length,
               separatorBuilder: (_, __) => const SizedBox(height: 6),
               itemBuilder: (context, i) {
@@ -171,7 +171,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
+                        horizontal: AppSpacing.sm,
                         vertical: 10,
                       ),
                       child: Row(
@@ -183,7 +183,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 ? theme.colorScheme.outline
                                 : theme.colorScheme.primary,
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +197,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         isRead ? FontWeight.w500 : FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   mapped.$2,
                                   maxLines: 3,
@@ -241,7 +241,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             }
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
                   'Couldn’t load notifications.',
                   textAlign: TextAlign.center,
@@ -264,7 +264,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
             itemCount: items.length,
             separatorBuilder: (context, index) => const SizedBox(height: 6),
             itemBuilder: (context, i) {
@@ -290,7 +290,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
+                      horizontal: AppSpacing.sm,
                       vertical: 10,
                     ),
                     child: Row(
@@ -302,7 +302,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               ? theme.colorScheme.primary
                               : theme.colorScheme.outline,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +317,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                       : FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: AppSpacing.xxs),
                               Text(
                                 item.body,
                                 maxLines: 2,

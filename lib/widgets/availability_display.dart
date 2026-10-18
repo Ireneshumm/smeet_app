@@ -46,7 +46,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
         final slots = normalized[day] ?? [];
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -72,7 +72,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
-                        vertical: 4,
+                        vertical: AppSpacing.xxs,
                       ),
                       decoration: BoxDecoration(
                         color: slotColor.withValues(alpha: 0.1),
@@ -89,7 +89,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
                             size: 12,
                             color: slotColor,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: AppSpacing.xxs),
                           Text(
                             slot,
                             style: TextStyle(

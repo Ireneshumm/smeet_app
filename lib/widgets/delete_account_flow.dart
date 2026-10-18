@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:smeet_app/services/account_deletion_service.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 const String _kDeleteConfirmWord = 'DELETE';
 
@@ -265,7 +266,7 @@ class _DeletingDialog extends StatelessWidget {
             height: 28,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Text(
               'Recording your deletion request…',

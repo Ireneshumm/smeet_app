@@ -76,7 +76,7 @@ class _FeedDetailVideoState extends State<FeedDetailVideo> {
     if (_failed || _controller == null) {
       return const Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: EdgeInsets.all(AppSpacing.xl),
           child: Text('Could not load video'),
         ),
       );

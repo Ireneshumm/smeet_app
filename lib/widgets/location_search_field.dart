@@ -481,7 +481,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
                 ),
                 suffixIcon: _loading
                     ? const Padding(
-                        padding: EdgeInsets.all(12),
+                        padding: EdgeInsets.all(AppSpacing.sm),
                         child: SizedBox(
                           width: 18,
                           height: 18,
@@ -559,7 +559,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
           },
         ),
         if (_error != null && _error!.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             _error!,
             style: TextStyle(color: cs.error, fontSize: 12),
@@ -569,7 +569,7 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
             _controller.text.trim().isNotEmpty &&
             _error == null &&
             hasFocus) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             'Type to search, then pick an address from the list.',
             style: Theme.of(context).textTheme.bodySmall,

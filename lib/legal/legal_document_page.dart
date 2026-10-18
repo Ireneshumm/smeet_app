@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'placeholder_legal_copy.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Scrollable legal document with intro + sections — shared by Terms & Privacy.
 class LegalDocumentPage extends StatelessWidget {
@@ -28,7 +29,7 @@ class LegalDocumentPage extends StatelessWidget {
       body: SafeArea(
         child: Scrollbar(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -38,12 +39,12 @@ class LegalDocumentPage extends StatelessWidget {
                     color: cs.onSurface.withValues(alpha: 0.65),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   intro,
                   style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.lg),
                 for (final s in sections) ...[
                   if (s.heading != null && s.heading!.isNotEmpty) ...[
                     Text(
@@ -52,13 +53,13 @@ class LegalDocumentPage extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                   ],
                   Text(
                     s.body,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
               ],
             ),

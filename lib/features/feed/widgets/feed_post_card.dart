@@ -37,7 +37,7 @@ String _feedVideoPlayableUrl(FeedItem item) {
 
 Widget _feedVideoLabel() {
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
     decoration: BoxDecoration(
       color: Colors.black.withValues(alpha: 0.6),
       borderRadius: BorderRadius.circular(6),
@@ -230,7 +230,7 @@ class FeedPostCard extends StatelessWidget {
                     : _buildImageSection(mediaUrl, hasCover),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                padding: const EdgeInsets.fromLTRB(10, AppSpacing.xs, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -245,7 +245,7 @@ class FeedPostCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                     ],
                     Row(
                       children: [
@@ -382,8 +382,8 @@ class FeedPostCard extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: AppSpacing.xs,
+                    vertical: AppSpacing.xxs,
                   ),
                   child: Text(
                     item.durationLabel!.trim(),

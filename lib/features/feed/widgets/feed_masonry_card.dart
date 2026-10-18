@@ -71,7 +71,7 @@ class FeedMasonryCard extends StatelessWidget {
               ),
               if (caption.isNotEmpty || authorId.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -88,7 +88,7 @@ class FeedMasonryCard extends StatelessWidget {
                             decoration: TextDecoration.none,
                           ),
                         ),
-                      if (caption.isNotEmpty) const SizedBox(height: 8),
+                      if (caption.isNotEmpty) const SizedBox(height: AppSpacing.xs),
                       _AuthorRow(item: item),
                     ],
                   ),

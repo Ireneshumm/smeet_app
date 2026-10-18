@@ -5,6 +5,7 @@ import 'package:smeet_app/features/create/data/create_post_repository.dart';
 import 'package:smeet_app/features/create/data/supabase_create_post_repository.dart';
 import 'package:smeet_app/features/profile/presentation/profile_page.dart';
 import 'package:smeet_app/features/profile/profile_routes.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Single video from gallery → same storage + `posts` path as main Profile video post.
 class CreateVideoPage extends StatefulWidget {
@@ -93,7 +94,7 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
       appBar: AppBar(title: const Text('New video')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -104,14 +105,14 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               OutlinedButton.icon(
                 onPressed: _submitting ? null : _pickVideo,
                 icon: const Icon(Icons.video_library_outlined),
                 label: Text(_video == null ? 'Choose video' : 'Change video'),
               ),
               if (_video != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   _video!.name,
                   style: theme.textTheme.bodySmall,
@@ -119,7 +120,7 @@ class _CreateVideoPageState extends State<CreateVideoPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: _captionCtrl,
                 maxLines: 3,

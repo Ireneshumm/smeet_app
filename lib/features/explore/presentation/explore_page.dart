@@ -368,7 +368,7 @@ class _VenuesTabState extends State<_VenuesTab>
                   selected: _selectedCategory,
                   onSelect: _filter,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
               ],
             ),
           ),
@@ -376,7 +376,7 @@ class _VenuesTabState extends State<_VenuesTab>
             SliverToBoxAdapter(
               child: _buildFeaturedBanner(cs),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xs)),
           if (_loading)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
@@ -388,7 +388,7 @@ class _VenuesTabState extends State<_VenuesTab>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text('🏟️', style: TextStyle(fontSize: 48)),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       'No venues yet',
                       style: TextStyle(
@@ -398,7 +398,7 @@ class _VenuesTabState extends State<_VenuesTab>
                         decoration: TextDecoration.none,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Check back soon',
                       style: TextStyle(
@@ -412,7 +412,7 @@ class _VenuesTabState extends State<_VenuesTab>
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, 80),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
@@ -438,7 +438,7 @@ class _VenuesTabState extends State<_VenuesTab>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, 10),
           child: Row(
             children: [
               Text(
@@ -456,7 +456,7 @@ class _VenuesTabState extends State<_VenuesTab>
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             itemCount: featured.length,
             itemBuilder: (context, i) => _FeaturedVenueCard(
               venue: featured[i],
@@ -464,9 +464,9 @@ class _VenuesTabState extends State<_VenuesTab>
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.md),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Text(
             'All Venues',
             style: TextStyle(
@@ -476,7 +476,7 @@ class _VenuesTabState extends State<_VenuesTab>
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
       ],
     );
   }
@@ -499,7 +499,7 @@ class _FeaturedVenueCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 260,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: AppSpacing.sm),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: AppRadius.lgAll,
@@ -546,7 +546,7 @@ class _FeaturedVenueCard extends StatelessWidget {
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -571,7 +571,7 @@ class _FeaturedVenueCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xxs),
                   Row(
                     children: [
                       Container(
@@ -630,7 +630,7 @@ class _VenueCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: AppRadius.lgAll,
@@ -670,7 +670,7 @@ class _VenueCard extends StatelessWidget {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -695,7 +695,7 @@ class _VenueCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xxs),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
@@ -744,7 +744,7 @@ class _VenueCard extends StatelessWidget {
                     if (venue.rating > 0 ||
                         venue.priceRange != null ||
                         venue.openingHours == 'Open now') ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       Row(
                         children: [
                           if (venue.rating > 0) ...[
@@ -792,7 +792,7 @@ class _VenueCard extends StatelessWidget {
                       ),
                     ],
                     if (venue.description != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       Text(
                         venue.description!,
                         style: TextStyle(
@@ -821,7 +821,7 @@ class _VenueSectionDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       height: 1,
       color: SmeetApp.smeetGreyLight,
     );
@@ -866,8 +866,8 @@ class _CategoryRowState extends State<_CategoryRow> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
           color: isSelected ? widget.selectedBg : Colors.white,
@@ -929,7 +929,7 @@ class _CategoryRowState extends State<_CategoryRow> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xl, AppSpacing.md, AppSpacing.sm),
           child: Row(
             children: [
               Container(
@@ -940,7 +940,7 @@ class _CategoryRowState extends State<_CategoryRow> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 widget.title,
                 style: const TextStyle(
@@ -956,7 +956,7 @@ class _CategoryRowState extends State<_CategoryRow> {
         if (_expanded)
           // Expanded: every category as a wrapped grid.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -966,12 +966,12 @@ class _CategoryRowState extends State<_CategoryRow> {
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Row(
               children: [
                 for (final c in chips)
                   Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: AppSpacing.xs),
                     child: c,
                   ),
               ],

@@ -88,7 +88,7 @@ class PostMediaMvpLeading extends StatelessWidget {
                   if (isVideo)
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.55),
                           shape: BoxShape.circle,
@@ -379,7 +379,7 @@ class PostMediaDetailImages extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < urls.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
+          if (i > 0) const SizedBox(height: AppSpacing.sm),
           ClipRRect(
             borderRadius: BorderRadius.circular(kPostMediaDetailRadius),
             child: DecoratedBox(
@@ -478,7 +478,7 @@ class _PostMediaDetailVideoState extends State<PostMediaDetailVideo> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: AppIconSize.xxl, color: cs.onSurfaceVariant),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(label, style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),

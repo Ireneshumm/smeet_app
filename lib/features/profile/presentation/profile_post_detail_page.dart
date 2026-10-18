@@ -43,7 +43,7 @@ class _ProfileMvpPostDetailPageState extends State<ProfileMvpPostDetailPage> {
           if (row == null) {
             return const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(AppSpacing.xl),
                 child: Text(
                   'Post not found or unavailable.',
                   textAlign: TextAlign.center,
@@ -105,7 +105,7 @@ class ProfilePostDetailBody extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
         children: [
           if (urls.isNotEmpty) ...[
             if (t == 'video')
@@ -129,7 +129,7 @@ class ProfilePostDetailBody extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           if (caption.isEmpty)
             Text(
               'No caption for this post.',
@@ -153,7 +153,7 @@ class ProfilePostDetailBody extends StatelessWidget {
               side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -171,7 +171,7 @@ class ProfilePostDetailBody extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Chip(
                     visualDensity: VisualDensity.compact,
                     label: Text(kindLabel),
@@ -278,7 +278,7 @@ class _UnifiedProfilePostDetailPageState
           if (_isOwner)
             _deleting
                 ? const Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: EdgeInsets.all(AppSpacing.md),
                     child: SizedBox(
                       width: 22,
                       height: 22,

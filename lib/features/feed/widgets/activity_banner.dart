@@ -23,7 +23,7 @@ class ActivityBanner extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xs),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,7 +54,7 @@ class ActivityBanner extends StatelessWidget {
                           '❤️',
                           style: TextStyle(fontSize: 24),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           incomingLikes == 1
                               ? '1 person wants to play with you 🎾'
@@ -66,7 +66,7 @@ class ActivityBanner extends StatelessWidget {
                             height: 1.3,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xxs),
                         const Text(
                           'Tap to connect',
                           style: TextStyle(
@@ -108,7 +108,7 @@ class ActivityBanner extends StatelessWidget {
                           '⚡',
                           style: TextStyle(fontSize: 24),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           todayGames == 1
                               ? '1 game near you today'
@@ -120,7 +120,7 @@ class ActivityBanner extends StatelessWidget {
                             height: 1.3,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xxs),
                         const Text(
                           'Find a game →',
                           style: TextStyle(

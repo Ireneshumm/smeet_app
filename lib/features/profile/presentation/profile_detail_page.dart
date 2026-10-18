@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:smeet_app/features/profile/models/profile_tab_item.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 class ProfileMvpDetailPage extends StatelessWidget {
   const ProfileMvpDetailPage({super.key, required this.item});
@@ -26,17 +27,17 @@ class ProfileMvpDetailPage extends StatelessWidget {
       appBar: AppBar(title: Text(_tabLabel(item.tab))),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             Text(
               item.title,
               style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(item.subtitle, style: theme.textTheme.bodyLarge),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text('id: ${item.id}', style: theme.textTheme.bodySmall),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
             Text(
               'Placeholder — not connected to legacy Profile or Supabase.',
               style: theme.textTheme.bodyMedium?.copyWith(

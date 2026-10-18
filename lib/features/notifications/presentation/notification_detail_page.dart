@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:smeet_app/features/notifications/models/notification_item.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 class NotificationDetailPage extends StatelessWidget {
   const NotificationDetailPage({super.key, required this.item});
@@ -40,15 +41,15 @@ class NotificationDetailPage extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             Text(
               item.title,
               style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(item.body, style: theme.textTheme.bodyLarge),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text('Created: $when', style: theme.textTheme.bodySmall),
             Text('Read (mock): ${item.isRead}', style: theme.textTheme.bodySmall),
             Text('id: ${item.id}', style: theme.textTheme.bodySmall),

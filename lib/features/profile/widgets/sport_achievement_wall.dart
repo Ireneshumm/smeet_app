@@ -197,7 +197,7 @@ class _SportAchievementWallState extends State<SportAchievementWall> {
       context: context,
       showDragHandle: true,
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +210,7 @@ class _SportAchievementWallState extends State<SportAchievementWall> {
                 decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               '$played games · ${hours.toStringAsFixed(1)} h',
               style: const TextStyle(
@@ -261,7 +261,7 @@ class _SportAchievementCell extends StatelessWidget {
                   : SmeetApp.smeetMint.withValues(alpha: 0.25),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -275,7 +275,7 @@ class _SportAchievementCell extends StatelessWidget {
                       : null,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 label,
                 maxLines: 1,
@@ -288,7 +288,7 @@ class _SportAchievementCell extends StatelessWidget {
                   decoration: TextDecoration.none,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               if (locked)
                 Text(
                   'No games yet',

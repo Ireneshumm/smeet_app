@@ -18,8 +18,8 @@ class ProfileSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.lgAll,
@@ -45,7 +45,7 @@ class ProfileSectionCard extends StatelessWidget {
                 decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
           child,
         ],
@@ -103,7 +103,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                 onTap: () => setState(() => _expanded = !_expanded),
                 borderRadius: AppRadius.mdAll,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                   child: Row(
                     children: [
                       Expanded(
@@ -119,7 +119,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                                 decoration: TextDecoration.none,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: AppSpacing.xs),
                             _CollapsedStatsRow(
                               joined: joined,
                               hosted: hosted,
@@ -141,7 +141,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
               ),
               if (_expanded)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: AppSpacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -153,7 +153,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                               'Joined',
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: _statBox(
                               '$hosted',
@@ -162,7 +162,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
                           Expanded(
@@ -171,7 +171,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                               'Players met',
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: _statBox(
                               '$matches',
@@ -180,11 +180,11 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
+                          horizontal: AppSpacing.md,
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
@@ -199,7 +199,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                               size: AppIconSize.xs,
                               color: SmeetApp.smeetMint,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             const Text(
                               'This month: ',
                               style: TextStyle(
@@ -222,7 +222,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                         ),
                       ),
                       if (badges.isNotEmpty) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                         const Text(
                           'Badges',
                           style: TextStyle(
@@ -232,7 +232,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                             decoration: TextDecoration.none,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -251,7 +251,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
 
   static Widget _statBox(String value, String label) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: SmeetApp.smeetMintFaint,
         borderRadius: AppRadius.lgAll,
@@ -268,7 +268,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
               decoration: TextDecoration.none,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xxs),
           Text(
             label,
             style: const TextStyle(
@@ -285,7 +285,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
 
   static Widget _badgeChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: SmeetApp.smeetMintLight,
         borderRadius: BorderRadius.circular(AppRadius.pill),

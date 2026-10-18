@@ -174,7 +174,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
     final cs = theme.colorScheme;
 
     final inner = Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -210,7 +210,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.xs),
                 Row(
                   children: [
                     Icon(
@@ -231,11 +231,11 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                   ],
                 ),
                 if (s.sportsSummary.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
+                      horizontal: AppSpacing.sm,
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
@@ -299,7 +299,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _postsTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
+    const pad = EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.posts],
@@ -329,7 +329,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 hasScrollBody: false,
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Text(
                       'We couldn’t load posts. Pull to refresh.',
                       textAlign: TextAlign.center,
@@ -351,7 +351,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 sliver: SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -362,7 +362,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           loggedIn
                               ? 'No posts yet'
@@ -372,7 +372,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           loggedIn
                               ? 'Create a post from the main Profile tab or pull to refresh.'
@@ -420,7 +420,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _joinedTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
+    const pad = EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.joined],
@@ -450,7 +450,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 hasScrollBody: false,
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Text(
                       'We couldn’t load joined games. Pull to refresh.',
                       textAlign: TextAlign.center,
@@ -472,7 +472,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 sliver: SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -483,7 +483,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           loggedIn
                               ? 'No joined games yet'
@@ -493,7 +493,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           loggedIn
                               ? 'Join a game from the Home tab or pull to refresh.'
@@ -541,7 +541,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
   Widget _hostedTabList() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const pad = EdgeInsets.fromLTRB(16, 8, 16, 12);
+    const pad = EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm);
 
     return FutureBuilder<List<ProfileTabItem>>(
       future: _listFutures[ProfileContentTab.hosted],
@@ -571,7 +571,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 hasScrollBody: false,
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Text(
                       'We couldn’t load hosted games. Pull to refresh.',
                       textAlign: TextAlign.center,
@@ -593,7 +593,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                 sliver: SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -604,7 +604,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           size: AppIconSize.xxl,
                           color: cs.outline,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           loggedIn
                               ? 'No hosted games yet'
@@ -614,7 +614,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           loggedIn
                               ? 'Create a game from the Home tab or pull to refresh.'
@@ -706,7 +706,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
           ),
           child: ListTile(
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
             leading: leading,
             title: Text(
               item.title,
@@ -747,7 +747,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
         children: [
           if (_usesSummaryToggle)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, 0),
               child: SegmentedButton<ProfileMvpSummarySource>(
                 segments: const [
                   ButtonSegment<ProfileMvpSummarySource>(
@@ -769,7 +769,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xxs),
             child: Text(
               !_usesSummaryToggle
                   ? 'Using a custom summary source. Posts, hosted, and joined lists stay live.'
@@ -792,7 +792,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
               }
               if (snapshot.hasError) {
                 return Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -800,7 +800,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                         'Summary error: ${snapshot.error}',
                         style: theme.textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       OutlinedButton.icon(
                         onPressed: _reloadSummary,
                         icon: const Icon(Icons.refresh),
@@ -820,7 +820,7 @@ class _ProfileMvpPageState extends State<ProfileMvpPage>
                   _header(summary),
                   if (summary.isGuest)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
                       child: OutlinedButton.icon(
                         onPressed: _reloadSummary,
                         icon: const Icon(Icons.refresh),

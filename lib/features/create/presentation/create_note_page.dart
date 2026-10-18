@@ -4,6 +4,7 @@ import 'package:smeet_app/features/create/data/create_post_repository.dart';
 import 'package:smeet_app/features/create/data/supabase_create_post_repository.dart';
 import 'package:smeet_app/features/profile/presentation/profile_page.dart';
 import 'package:smeet_app/features/profile/profile_routes.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Minimal text post — reuses `posts` insert shape from the main Profile flow.
 class CreateNotePage extends StatefulWidget {
@@ -64,7 +65,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
       appBar: AppBar(title: const Text('New note')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -74,7 +75,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               Expanded(
                 child: TextField(
                   controller: _bodyCtrl,
@@ -89,7 +90,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               FilledButton.icon(
                 onPressed: _submitting ? null : _submit,
                 icon: _submitting

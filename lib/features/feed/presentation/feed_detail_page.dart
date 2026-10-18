@@ -129,7 +129,7 @@ class FeedDetailPage extends StatelessWidget {
                   child: _FeedDetailCoverBanner(item: item),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       Text(
@@ -157,7 +157,7 @@ class FeedDetailPage extends StatelessWidget {
                           letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.sm),
                       _DetailFactRow(
                         icon: Icons.schedule_rounded,
                         text: dateStr,
@@ -178,7 +178,7 @@ class FeedDetailPage extends StatelessWidget {
                           text: item.gameVenue!.trim(),
                         ),
                       ],
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AppSpacing.lg),
                       Text(
                         _footerHint(item.type),
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -199,7 +199,7 @@ class FeedDetailPage extends StatelessWidget {
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
                 child: _FeedDetailCtaBar(
                   item: item,
                   onOpenGame: () => _openGameDetail(context),
@@ -316,8 +316,8 @@ class _FeedDetailCoverBanner extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: AppSpacing.xs,
+                    vertical: AppSpacing.xxs,
                   ),
                   child: Text(
                     item.durationLabel!.trim(),
@@ -376,7 +376,7 @@ class _FdGradientCover extends StatelessWidget {
       ),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Text(
             heroText,
             textAlign: TextAlign.center,
@@ -441,7 +441,7 @@ class _DetailFactRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 22, color: cs.primary.withValues(alpha: 0.85)),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 1),
@@ -499,7 +499,7 @@ class _FeedDetailCtaBar extends StatelessWidget {
             height: 1.45,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         TextButton.icon(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back_rounded, size: 18),

@@ -59,7 +59,7 @@ class ProfilePostsGrid extends StatelessWidget {
           child: InkWell(
             onTap: () => onOpenPost(p),
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(AppSpacing.xs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,

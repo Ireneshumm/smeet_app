@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:smeet_app/features/inbox/models/chat_list_item.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 class InboxDetailPage extends StatelessWidget {
   const InboxDetailPage({super.key, required this.item});
@@ -30,15 +31,15 @@ class InboxDetailPage extends StatelessWidget {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             Text(
               item.title,
               style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Text('Last: ${item.lastMessage}', style: theme.textTheme.bodyLarge),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text('Updated: $when', style: theme.textTheme.bodySmall),
             Text('Unread (mock): ${item.unreadCount}', style: theme.textTheme.bodySmall),
             Text('id: ${item.id}', style: theme.textTheme.bodySmall),

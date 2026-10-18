@@ -122,13 +122,13 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
       body: u == null
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.engineering_outlined,
                         size: AppIconSize.xxl, color: theme.colorScheme.outline),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       'Sign in to try this demo.',
                       textAlign: TextAlign.center,
@@ -136,7 +136,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Debug-only — not used for onboarding.',
                       textAlign: TextAlign.center,
@@ -151,7 +151,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
           : !_loaded && _loading
               ? const Center(child: CircularProgressIndicator())
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   children: [
                     Text(
                       'Standalone [LegacyProfileSetupSection] — save uses the same upsert as Profile tab.',
@@ -159,7 +159,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     LegacyProfileSetupSection(
                       key: _setupKey,
                       nameCtrl: _nameCtrl,
@@ -174,7 +174,7 @@ class _ProfileSetupDemoPageState extends State<ProfileSetupDemoPage> {
                       },
                       onProfileSaved: () => widget.onProfileSaved?.call(),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.md),
                     FilledButton(
                       onPressed: _loading ? null : _save,
                       child: Text(_loading ? 'Saving…' : 'Save profile'),

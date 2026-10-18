@@ -333,7 +333,7 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
               const SizedBox(height: 10),
               if (_defsLoading)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: Center(child: CircularProgressIndicator()),
                 )
               else ...[
@@ -342,7 +342,7 @@ class LegacyProfileSetupSectionState extends State<LegacyProfileSetupSection> {
                   icon: const Icon(Icons.sports_outlined),
                   label: const Text('Add or edit sports'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
               ],
               if (_sportLevels.isEmpty)
                 Text(
@@ -446,7 +446,7 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxs, AppSpacing.lg, AppSpacing.xs),
           child: Text(
             'Sports & levels',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -455,7 +455,7 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
@@ -468,11 +468,11 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
             onChanged: (v) => setState(() => _query = v),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xs),
         Expanded(
           child: ListView.builder(
             controller: widget.scrollController,
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xl),
             itemCount: sports.length,
             itemBuilder: (context, i) {
               final sport = sports[i];
@@ -493,7 +493,7 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
                   : null;
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                 color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
                 child: ExpansionTile(
                   key: ValueKey(sport),
@@ -520,7 +520,7 @@ class _SportLevelBottomSheetState extends State<_SportLevelBottomSheet> {
                   children: [
                     if (defs == null || defs.isEmpty)
                       const Padding(
-                        padding: EdgeInsets.all(16),
+                        padding: EdgeInsets.all(AppSpacing.md),
                         child: Text('No levels defined for this sport yet.'),
                       )
                     else
@@ -586,7 +586,7 @@ class _ProfileSetupCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,

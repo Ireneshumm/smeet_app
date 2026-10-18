@@ -30,7 +30,7 @@ void _openMvpDebugLauncher(
           shrinkWrap: true,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xxs),
               child: Text(
                 'MVP debug',
                 style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
@@ -154,7 +154,7 @@ class SmeetApp extends StatelessWidget {
           backgroundColor: const WidgetStatePropertyAll(smeetMint),
           foregroundColor: const WidgetStatePropertyAll(Colors.white),
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
           ),
           shape: WidgetStatePropertyAll(
             StadiumBorder(),
@@ -165,7 +165,7 @@ class SmeetApp extends StatelessWidget {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            EdgeInsets.symmetric(horizontal: 18, vertical: AppSpacing.sm),
           ),
           shape: WidgetStatePropertyAll(
             StadiumBorder(),
@@ -197,7 +197,7 @@ class SmeetApp extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 12, 104),
+                        padding: const EdgeInsets.fromLTRB(0, 0, AppSpacing.sm, 104),
                         child: FloatingActionButton.small(
                           heroTag: 'smeet_mvp_debug_launcher',
                           // Omit tooltip: FAB Tooltip needs Overlay; builder Stack is not under it.

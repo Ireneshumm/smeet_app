@@ -217,7 +217,7 @@ class _FeedPageState extends State<FeedPage> {
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         children: [
           _SportFilterChip(
             label: '🏃 All',
@@ -245,8 +245,8 @@ class _FeedPageState extends State<FeedPage> {
         onTap: () => widget.onOpenHome?.call(context),
         borderRadius: AppRadius.mdAll,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          margin: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -299,7 +299,7 @@ class _FeedPageState extends State<FeedPage> {
         final isLast = i == items.length - 1;
         slivers.add(
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(12, top, 12, isLast ? 80 : 8),
+            padding: EdgeInsets.fromLTRB(AppSpacing.sm, top, AppSpacing.sm, isLast ? 80 : 8),
             sliver: SliverToBoxAdapter(
               child: FeedGameCard(
                 item: it,
@@ -326,7 +326,7 @@ class _FeedPageState extends State<FeedPage> {
         final isLast = i >= items.length;
         slivers.add(
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(8, top, 8, isLast ? 100 : 8),
+            padding: EdgeInsets.fromLTRB(AppSpacing.xs, top, AppSpacing.xs, isLast ? 100 : 8),
             sliver: SliverMasonryGrid.count(
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 8,
@@ -364,7 +364,7 @@ class _FeedPageState extends State<FeedPage> {
                   child: Row(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(left: 16),
+                        padding: const EdgeInsets.only(left: AppSpacing.md),
                         child: Text(
                           'Smeet',
                           style: TextStyle(
@@ -429,7 +429,7 @@ class _FeedPageState extends State<FeedPage> {
                           await refreshAppNotificationBadges();
                         },
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.xs),
                     ],
                   ),
                 ),
@@ -437,7 +437,7 @@ class _FeedPageState extends State<FeedPage> {
               SliverToBoxAdapter(
                 child: _buildSportFilterChips(cs, chipItems),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
               if (loaded) ...[
                 SliverToBoxAdapter(
                   child: _buildNearbyGamesBanner(cs, items) ??
@@ -469,7 +469,7 @@ class _FeedPageState extends State<FeedPage> {
               if (widget.repository != null)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xxs, AppSpacing.lg, AppSpacing.xs),
                     child: Text(
                       'Using a custom feed source for this screen.',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -541,7 +541,7 @@ class _FeedEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -550,7 +550,7 @@ class _FeedEmptyState extends StatelessWidget {
               size: 64,
               color: SmeetApp.smeetMint,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             const Text(
               'Be the first to post!',
               textAlign: TextAlign.center,
@@ -561,7 +561,7 @@ class _FeedEmptyState extends StatelessWidget {
                 decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             const Text(
               'Share a court, a game, or your latest tennis moment',
               textAlign: TextAlign.center,
@@ -571,7 +571,7 @@ class _FeedEmptyState extends StatelessWidget {
                 decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.lg),
             FilledButton(
               onPressed: onShare,
               child: const Text('Share a moment'),
@@ -598,7 +598,7 @@ class _SportFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: AppSpacing.xs),
       child: GestureDetector(
         onTap: onTap,
         child: Container(

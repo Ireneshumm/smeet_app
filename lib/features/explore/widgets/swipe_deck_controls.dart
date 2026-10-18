@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smeet_app/app/smeet_app.dart';
+import 'package:smeet_app/core/theme/theme.dart';
 
 /// Skip / Play controls below the swipe card (Explore → Smeet).
 class SwipeDeckControls extends StatelessWidget {
@@ -65,7 +66,7 @@ class SwipeDeckControls extends StatelessWidget {
           ],
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.only(top: AppSpacing.sm),
           child: Text(
             'Showing ${currentIndex + 1} / $totalCount',
             textAlign: TextAlign.center,

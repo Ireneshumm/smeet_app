@@ -52,7 +52,7 @@ class MatchRelationshipCard extends StatelessWidget {
     final trimmedAvatar = avatarUrl.trim();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -74,7 +74,7 @@ class MatchRelationshipCard extends StatelessWidget {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -88,7 +88,7 @@ class MatchRelationshipCard extends StatelessWidget {
                       color: cs.tertiary,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +97,7 @@ class MatchRelationshipCard extends StatelessWidget {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
+                                horizontal: AppSpacing.xs,
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
@@ -113,7 +113,7 @@ class MatchRelationshipCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.xs),
                             Expanded(
                               child: Text(
                                 'Mutual match',
@@ -127,7 +127,7 @@ class MatchRelationshipCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           displayName,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -145,7 +145,7 @@ class MatchRelationshipCard extends StatelessWidget {
                               size: AppIconSize.xs,
                               color: cs.onSurfaceVariant.withValues(alpha: 0.9),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: AppSpacing.xxs),
                             Expanded(
                               child: Text(
                                 cityLabel,
@@ -159,7 +159,7 @@ class MatchRelationshipCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xxs),
                         Text(
                           _matchedLine(matchedAt),
                           style: theme.textTheme.labelSmall?.copyWith(
@@ -207,7 +207,7 @@ Future<void> showMatchRelationshipNoChatDialog(
         ),
         titlePadding: EdgeInsets.zero,
         title: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 0),
           child: Column(
             children: [
               CircularNetworkAvatar(
@@ -216,7 +216,7 @@ Future<void> showMatchRelationshipNoChatDialog(
                 backgroundColor: cs.tertiary.withValues(alpha: 0.2),
                 placeholder: Icon(Icons.favorite_rounded, color: cs.tertiary, size: AppIconSize.lg),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 displayName,
                 textAlign: TextAlign.center,
@@ -224,7 +224,7 @@ Future<void> showMatchRelationshipNoChatDialog(
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 'Mutual match',
                 style: theme.textTheme.labelMedium?.copyWith(

@@ -767,7 +767,7 @@ class _SmeetShellState extends State<SmeetShell> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(),
-                SizedBox(height: 16),
+                SizedBox(height: AppSpacing.md),
                 Text('Loading…'),
               ],
             ),
@@ -821,7 +821,7 @@ class _CreateActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 32),
+      margin: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xxl),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.xlAll,
@@ -830,7 +830,7 @@ class _CreateActionSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
@@ -839,14 +839,14 @@ class _CreateActionSheet extends StatelessWidget {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Text(
               'Create',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ),
           const Divider(height: 1),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           _CreateItem(
             icon: Icons.photo_library_rounded,
             iconColor: const Color(0xFF4CAF50),
@@ -875,7 +875,7 @@ class _CreateActionSheet extends StatelessWidget {
             subtitle: 'Set up a session for others to join',
             onTap: onCreateGame,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
         ],
       ),
     );
@@ -901,7 +901,7 @@ class _CreateItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
       leading: Container(
         width: 48,
         height: 48,
@@ -938,7 +938,7 @@ class _MediaSourceSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 32),
+      margin: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xxl),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.xlAll,
@@ -947,7 +947,7 @@ class _MediaSourceSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
@@ -956,18 +956,18 @@ class _MediaSourceSheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Text(
               title,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ),
           const Divider(height: 1),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.xs),
           ListTile(
             onTap: () => Navigator.pop(context, ImageSource.camera),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
             leading: Container(
               width: 48,
               height: 48,
@@ -989,7 +989,7 @@ class _MediaSourceSheet extends StatelessWidget {
           ListTile(
             onTap: () => Navigator.pop(context, ImageSource.gallery),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
             leading: Container(
               width: 48,
               height: 48,
@@ -1012,7 +1012,7 @@ class _MediaSourceSheet extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
         ],
       ),
     );
@@ -1159,7 +1159,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
         title: Text(widget.mediaType == 'image' ? 'New Photo' : 'New Video'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: FilledButton(
               onPressed: _loading ? null : _publish,
               child: _loading
@@ -1177,7 +1177,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1230,7 +1230,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                   color: Colors.white54,
                                   size: AppIconSize.xxl,
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: AppSpacing.xs),
                                 Text(
                                   'Tap to add cover image',
                                   style: TextStyle(
@@ -1239,7 +1239,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                     fontSize: 14,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   'Recommended: a photo from your game',
                                   style: TextStyle(
@@ -1254,11 +1254,11 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest,
@@ -1267,7 +1267,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                 child: Row(
                   children: [
                     Icon(Icons.videocam_rounded, size: AppIconSize.xs, color: cs.primary),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         'Video selected ✓',
@@ -1300,7 +1300,7 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                   ),
                 ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _captionCtrl,
               maxLines: 4,
@@ -1396,7 +1396,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
         title: const Text('Write Note'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: FilledButton(
               onPressed: _loading ? null : _publish,
               child: _loading
@@ -1414,7 +1414,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1426,7 +1426,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 36,
               child: ListView(
@@ -1437,7 +1437,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
                   return GestureDetector(
                     onTap: () => setState(() => _selectedSport = sport),
                     child: Container(
-                      margin: const EdgeInsets.only(right: 8),
+                      margin: const EdgeInsets.only(right: AppSpacing.xs),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 6,
@@ -1459,7 +1459,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Expanded(
               child: TextField(
                 controller: _noteCtrl,
