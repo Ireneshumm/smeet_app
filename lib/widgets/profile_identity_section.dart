@@ -112,8 +112,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                           children: [
                             Text(
                               widget.heading,
-                              style: const TextStyle(
-                                fontSize: 16,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: SmeetApp.smeetInk,
                                 decoration: TextDecoration.none,
@@ -200,10 +199,9 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                               color: SmeetApp.smeetMint,
                             ),
                             const SizedBox(width: AppSpacing.xs),
-                            const Text(
+                            Text(
                               'This month: ',
-                              style: TextStyle(
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: SmeetApp.smeetGrey,
                                 fontWeight: FontWeight.w500,
                                 decoration: TextDecoration.none,
@@ -211,8 +209,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
                             ),
                             Text(
                               '$month',
-                              style: const TextStyle(
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: SmeetApp.smeetInk,
                                 fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.none,
@@ -261,7 +258,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w700,
               color: SmeetApp.smeetInk,
@@ -271,7 +268,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
           const SizedBox(height: AppSpacing.xxs),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: SmeetApp.smeetGrey,
               fontWeight: FontWeight.w500,
@@ -292,7 +289,7 @@ class _ProfileIdentitySectionState extends State<ProfileIdentitySection> {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: SmeetApp.smeetDeep,
@@ -341,7 +338,7 @@ class _CollapsedStatsRow extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: SmeetApp.smeetInk,
@@ -354,7 +351,7 @@ class _CollapsedStatsRow extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             color: SmeetApp.smeetGrey,
             fontWeight: FontWeight.w500,

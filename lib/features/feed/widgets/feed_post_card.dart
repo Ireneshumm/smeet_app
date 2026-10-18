@@ -50,8 +50,8 @@ Widget _feedVideoLabel() {
         Text(
           'Video',
           style: TextStyle(
-            color: Colors.white,
             fontSize: 11,
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -270,8 +270,7 @@ class FeedPostCard extends StatelessWidget {
                             behavior: HitTestBehavior.opaque,
                             child: Text(
                               item.authorName,
-                              style: const TextStyle(
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
@@ -501,8 +500,7 @@ class _FeedLikeButtonState extends State<_FeedLikeButton>
           const SizedBox(width: 3),
           Text(
             '$_count',
-            style: TextStyle(
-              fontSize: 12,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Colors.grey.shade500,
               fontWeight: FontWeight.w600,
             ),

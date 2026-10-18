@@ -562,7 +562,9 @@ class _LocationSearchFieldState extends State<LocationSearchField> {
           const SizedBox(height: AppSpacing.xs),
           Text(
             _error!,
-            style: TextStyle(color: cs.error, fontSize: 12),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w400,
+              color: cs.error,),
           ),
         ],
         if (!_loading &&

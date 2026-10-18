@@ -267,8 +267,8 @@ class _SportAchievementCell extends StatelessWidget {
             children: [
               Text(
                 sportEmojiForKey(sportKey),
-                style: TextStyle(
-                  fontSize: 24,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w400,
                   decoration: TextDecoration.none,
                   color: locked
                       ? SmeetApp.smeetGrey.withValues(alpha: 0.55)
@@ -281,8 +281,7 @@ class _SportAchievementCell extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: locked ? SmeetApp.smeetGrey : SmeetApp.smeetInk,
                   decoration: TextDecoration.none,
@@ -294,8 +293,8 @@ class _SportAchievementCell extends StatelessWidget {
                   'No games yet',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w400,
                     color: SmeetApp.smeetGrey.withValues(alpha: 0.85),
                     decoration: TextDecoration.none,
                   ),
@@ -305,8 +304,7 @@ class _SportAchievementCell extends StatelessWidget {
                   badgeLabel(badge),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: SmeetApp.smeetDeep,
                     decoration: TextDecoration.none,
@@ -316,8 +314,8 @@ class _SportAchievementCell extends StatelessWidget {
                   '$played games',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w400,
                     color: SmeetApp.smeetGrey,
                     decoration: TextDecoration.none,
                   ),

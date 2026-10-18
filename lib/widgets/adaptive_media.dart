@@ -354,7 +354,7 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                 color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
@@ -365,9 +365,8 @@ class _AdaptiveVideoCoverState extends State<AdaptiveVideoCover> {
                   SizedBox(width: 3),
                   Text(
                     'Video',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.white,
-                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

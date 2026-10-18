@@ -70,8 +70,7 @@ class SwipeDeckControls extends StatelessWidget {
           child: Text(
             'Showing ${currentIndex + 1} / $totalCount',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w500,
               color: SmeetApp.smeetGrey,
             ),

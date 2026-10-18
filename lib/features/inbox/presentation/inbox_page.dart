@@ -332,10 +332,9 @@ class _InboxPageState extends State<InboxPage>
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: cs.onErrorContainer,
           fontWeight: FontWeight.w800,
-          fontSize: 11,
         ),
       ),
     );
@@ -392,8 +391,7 @@ class _InboxPageState extends State<InboxPage>
                             ),
                             child: Text(
                               'GROUP',
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 color: cs.secondary,
                               ),

@@ -101,8 +101,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                 width: 36,
                 child: Text(
                   dayShort,
-                  style: TextStyle(
-                    fontSize: 12,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: isWeekend ? cs.primary : cs.onSurface,
                   ),
@@ -147,8 +146,7 @@ class _AvailabilityPickerWidgetState extends State<AvailabilityPickerWidget> {
                               const SizedBox(height: 1),
                               Text(
                                 availabilitySlotShort(slot),
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   fontWeight: selected
                                       ? FontWeight.w700
                                       : FontWeight.w500,

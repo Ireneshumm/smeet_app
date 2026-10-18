@@ -1571,8 +1571,7 @@ class _HomePageState extends State<HomePage> {
                             Expanded(
                               child: Text(
                                 sport.$3,
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   color: isSelected
                                       ? SmeetApp.smeetDeep
                                       : SmeetApp.smeetInk,
@@ -1679,8 +1678,7 @@ class _HomePageState extends State<HomePage> {
                                         level.levelDescription!.isNotEmpty
                                     ? '${level.levelLabel} — ${level.levelDescription}'
                                     : level.levelLabel,
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   color: isSelected
                                       ? SmeetApp.smeetDeep
                                       : SmeetApp.smeetInk,
@@ -1731,8 +1729,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: Text(
                   value,
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: enabled ? SmeetApp.smeetInk : SmeetApp.smeetGrey,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1809,8 +1806,7 @@ class _HomePageState extends State<HomePage> {
                 child: Text(
                   '$_players',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 22,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: SmeetApp.smeetInk,
                   ),
@@ -1826,11 +1822,11 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        const Center(
+        Center(
           child: Text(
             'How many players total',
-            style: TextStyle(
-              fontSize: 12,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w400,
               color: SmeetApp.smeetGrey,
             ),
           ),
@@ -2657,8 +2653,8 @@ class _HomePageState extends State<HomePage> {
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w400,
                       color: SmeetApp.smeetInk,
                     ),
                     onChanged: (_) => setState(() {}),
@@ -2733,8 +2729,7 @@ class _HomePageState extends State<HomePage> {
                             )
                           : Text(
                               'Create Game',
-                              style: TextStyle(
-                                fontSize: 16,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: canSubmitCreate
                                     ? Colors.white
@@ -3107,8 +3102,7 @@ class _CreateGameFieldCard extends StatelessWidget {
           if (label != null) ...[
             Text(
               label!,
-              style: const TextStyle(
-                fontSize: 12,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: SmeetApp.smeetGrey,
               ),
@@ -4057,10 +4051,9 @@ class _SwipePageState extends State<SwipePage> {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
           child: Text(
             '$emoji $label',
-            style: const TextStyle(
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: 11,
               height: 1.15,
               decoration: TextDecoration.none,
             ),
@@ -4150,11 +4143,10 @@ class _SwipePageState extends State<SwipePage> {
                 color: SmeetApp.smeetMint,
               ),
               const SizedBox(height: AppSpacing.md),
-              const Text(
+              Text(
                 'No new players right now — check back soon!',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: SmeetApp.smeetInk,
                 ),
@@ -4165,8 +4157,8 @@ class _SwipePageState extends State<SwipePage> {
                     ? 'Sign in and finish your profile to see people you can connect with.'
                     : 'Or invite friends from Brisbane to join Smeet',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w400,
                   color: SmeetApp.smeetGrey,
                   height: 1.35,
                 ),
@@ -5074,18 +5066,17 @@ class _MyGamePageState extends State<MyGamePage> {
                             children: [
                               Text(
                                 sport.isEmpty ? 'Game' : sport,
-                                style: const TextStyle(
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   color: Colors.white,
-                                  fontSize: 20,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
                               if (gameLevel.isNotEmpty)
                                 Text(
                                   gameLevel,
-                                  style: TextStyle(
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w400,
                                     color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 12,
                                   ),
                                 ),
                             ],
@@ -5106,9 +5097,8 @@ class _MyGamePageState extends State<MyGamePage> {
                             ),
                             child: Text(
                               countdownLine,
-                              style: const TextStyle(
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.white,
-                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -5149,8 +5139,8 @@ class _MyGamePageState extends State<MyGamePage> {
                             const SizedBox(width: AppSpacing.xs),
                             Text(
                               '$startLine  →  $endLine',
-                              style: TextStyle(
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w400,
                                 color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
@@ -5170,8 +5160,8 @@ class _MyGamePageState extends State<MyGamePage> {
                               Expanded(
                                 child: Text(
                                   loc,
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w400,
                                     color: cs.onSurface.withValues(alpha: 0.7),
                                     decoration: TextDecoration.none,
                                   ),
@@ -5196,8 +5186,7 @@ class _MyGamePageState extends State<MyGamePage> {
                               ),
                               child: Text(
                                 '$joinedC / ${g['players'] ?? '?'} players',
-                                style: TextStyle(
-                                  fontSize: 12,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: cs.primary,
                                 ),
@@ -5216,8 +5205,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 ),
                                 child: Text(
                                   '\$${perPerson.toStringAsFixed(2)}/pp',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     fontWeight: FontWeight.w700,
                                     color: cs.secondary,
                                   ),
@@ -5240,8 +5228,7 @@ class _MyGamePageState extends State<MyGamePage> {
                                 const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   'View all ${profiles.length} players',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: cs.primary,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -5524,10 +5511,9 @@ class _ChatPageState extends State<ChatPage> {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: cs.onErrorContainer,
           fontWeight: FontWeight.w800,
-          fontSize: 11,
         ),
       ),
     );
@@ -5635,8 +5621,7 @@ class _ChatPageState extends State<ChatPage> {
                               ),
                               child: Text(
                                 'GROUP',
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.w900,
                                   color: cs.secondary,
                                 ),
@@ -6252,8 +6237,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             Text(
                               _gameSubtitle,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: cs.onSurface.withOpacity(0.65),
                               ),
@@ -7071,8 +7055,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : _nameCtrl.text.trim(),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 20,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.3,
                               color: SmeetApp.smeetInk,
@@ -7095,8 +7078,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                       : _cityCtrl.text.trim(),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w400,
                                     color: SmeetApp.smeetGrey,
                                     decoration: TextDecoration.none,
                                   ),
@@ -7131,9 +7114,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                       child: Text(
                                         '${sportEmojiForKey(e.key.toString())} ${e.key}',
-                                        style: const TextStyle(
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           fontWeight: FontWeight.w500,
-                                          fontSize: 12,
                                           color: SmeetApp.smeetGrey,
                                           decoration: TextDecoration.none,
                                         ),

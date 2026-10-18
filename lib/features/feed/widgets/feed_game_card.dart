@@ -199,8 +199,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                               ),
                               child: Text(
                                 'Last spot!',
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: Colors.red.shade600,
                                 ),
@@ -212,8 +211,8 @@ class _FeedGameCardState extends State<FeedGameCard> {
                       const SizedBox(height: 2),
                       Text(
                         timeLine,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -232,8 +231,8 @@ class _FeedGameCardState extends State<FeedGameCard> {
                                 dk != null
                                     ? '$locationText · ${formatDistanceKm(dk)}'
                                     : locationText,
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w400,
                                   color: cs.onSurface.withValues(alpha: 0.55),
                                 ),
                                 maxLines: 1,
@@ -247,8 +246,8 @@ class _FeedGameCardState extends State<FeedGameCard> {
                       Text(
                         '${filled ?? 0}/${total ?? '?'} joined'
                         '${item.gamePerPerson != null && item.gamePerPerson! > 0 ? ' · \$${item.gamePerPerson!.toStringAsFixed(0)}/pp' : ''}',
-                        style: TextStyle(
-                          fontSize: 11,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
@@ -269,8 +268,7 @@ class _FeedGameCardState extends State<FeedGameCard> {
                         ),
                         child: Text(
                           'Joined ✓',
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: Colors.green.shade700,
                           ),

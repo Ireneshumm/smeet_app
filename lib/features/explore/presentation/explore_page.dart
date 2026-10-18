@@ -391,8 +391,7 @@ class _VenuesTabState extends State<_VenuesTab>
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       'No venues yet',
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: cs.onSurface,
                         decoration: TextDecoration.none,
@@ -443,8 +442,7 @@ class _VenuesTabState extends State<_VenuesTab>
             children: [
               Text(
                 '⭐ Featured',
-                style: TextStyle(
-                  fontSize: 16,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: cs.onSurface,
                 ),
@@ -469,8 +467,7 @@ class _VenuesTabState extends State<_VenuesTab>
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Text(
             'All Venues',
-            style: TextStyle(
-              fontSize: 16,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: cs.onSurface,
             ),
@@ -585,8 +582,7 @@ class _FeaturedVenueCard extends StatelessWidget {
                         ),
                         child: Text(
                           '${venue.categoryEmoji} ${venue.categoryLabel}',
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: cs.primary,
                           ),
@@ -596,8 +592,8 @@ class _FeaturedVenueCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           formatDistanceKm(venue.distanceKm!),
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w400,
                             color: cs.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
@@ -707,8 +703,7 @@ class _VenueCard extends StatelessWidget {
                       ),
                       child: Text(
                         '${venue.categoryEmoji} ${venue.categoryLabel}',
-                        style: TextStyle(
-                          fontSize: 11,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: cs.primary,
                         ),
@@ -730,8 +725,8 @@ class _VenueCard extends StatelessWidget {
                                   ? '${venue.address!.split(',').first} · '
                                       '${formatDistanceKm(venue.distanceKm!)}'
                                   : venue.address!.split(',').first,
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w400,
                                 color: cs.onSurface.withValues(alpha: 0.55),
                               ),
                               maxLines: 1,
@@ -759,8 +754,7 @@ class _VenueCard extends StatelessWidget {
                                   ? '${venue.rating.toStringAsFixed(1)} '
                                       '(${venue.reviewCount})'
                                   : venue.rating.toStringAsFixed(1),
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: cs.onSurface.withValues(alpha: 0.75),
                               ),
@@ -770,8 +764,7 @@ class _VenueCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               venue.priceRange!,
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: cs.onSurface.withValues(alpha: 0.55),
                               ),
@@ -781,8 +774,7 @@ class _VenueCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               '· Open now',
-                              style: TextStyle(
-                                fontSize: 11,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: cs.primary,
                               ),
@@ -795,8 +787,8 @@ class _VenueCard extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xxs),
                       Text(
                         venue.description!,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurface.withValues(alpha: 0.65),
                           height: 1.3,
                         ),
@@ -878,10 +870,9 @@ class _CategoryRowState extends State<_CategoryRow> {
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: isSelected ? widget.selectedText : SmeetApp.smeetGrey,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            fontSize: 12,
             decoration: TextDecoration.none,
           ),
         ),

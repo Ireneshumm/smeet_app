@@ -917,7 +917,9 @@ class _CreateItem extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w400,
+          color: Colors.grey.shade500),
       ),
       trailing: Icon(
         Icons.chevron_right_rounded,
@@ -983,7 +985,9 @@ class _MediaSourceSheet extends StatelessWidget {
             ),
             subtitle: Text(
               'Use your camera now',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w400,
+                color: Colors.grey.shade500),
             ),
           ),
           ListTile(
@@ -1009,7 +1013,9 @@ class _MediaSourceSheet extends StatelessWidget {
             ),
             subtitle: Text(
               'Pick an existing file',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w400,
+                color: Colors.grey.shade500),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1208,11 +1214,10 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                     color: Colors.black54,
                                     borderRadius: AppRadius.smAll,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     '✏️ Change cover',
-                                    style: TextStyle(
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Colors.white,
-                                      fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -1233,19 +1238,19 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                                 const SizedBox(height: AppSpacing.xs),
                                 Text(
                                   'Tap to add cover image',
-                                  style: TextStyle(
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w400,
                                     color:
                                         Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 14,
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   'Recommended: a photo from your game',
-                                  style: TextStyle(
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w400,
                                     color:
                                         Colors.white.withValues(alpha: 0.4),
-                                    fontSize: 12,
                                   ),
                                 ),
                               ],
@@ -1271,8 +1276,8 @@ class _CreatePostPageState extends State<_CreatePostPage> {
                     Expanded(
                       child: Text(
                         'Video selected ✓',
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -1420,8 +1425,7 @@ class _WriteNotePageState extends State<_WriteNotePage> {
           children: [
             Text(
               'Sport tag (optional)',
-              style: TextStyle(
-                fontSize: 12,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w600,
               ),
@@ -1448,10 +1452,9 @@ class _WriteNotePageState extends State<_WriteNotePage> {
                       ),
                       child: Text(
                         sport,
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: sel ? Colors.white : cs.onSurface,
                           fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: 12,
                         ),
                       ),
                     ),

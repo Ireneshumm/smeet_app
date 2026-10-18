@@ -186,7 +186,9 @@ class _PostProfileListMediaState extends State<PostProfileListMedia> {
               const SizedBox(height: 6),
               Text(
                 label,
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w400,
+                  color: cs.onSurfaceVariant,),
                 textAlign: TextAlign.center,
               ),
             ],

@@ -265,10 +265,9 @@ class _FeedPageState extends State<FeedPage> {
                   n == 1
                       ? '1 game happening near you today'
                       : '$n games happening near you today',
-                  style: const TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
                   ),
                 ),
               ),
@@ -367,8 +366,7 @@ class _FeedPageState extends State<FeedPage> {
                         padding: const EdgeInsets.only(left: AppSpacing.md),
                         child: Text(
                           'Smeet',
-                          style: TextStyle(
-                            fontSize: 24,
+                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
                             fontWeight: FontWeight.w900,
                             color: cs.primary,
                             letterSpacing: -0.5,
@@ -551,22 +549,21 @@ class _FeedEmptyState extends StatelessWidget {
               color: SmeetApp.smeetMint,
             ),
             const SizedBox(height: AppSpacing.md),
-            const Text(
+            Text(
               'Be the first to post!',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: SmeetApp.smeetInk,
                 decoration: TextDecoration.none,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            const Text(
+            Text(
               'Share a court, a game, or your latest tennis moment',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w400,
                 color: SmeetApp.smeetGrey,
                 decoration: TextDecoration.none,
               ),
@@ -610,10 +607,9 @@ class _SportFilterChip extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(
             label,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: selected ? Colors.white : cs.onSurface,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 12,
             ),
           ),
         ),

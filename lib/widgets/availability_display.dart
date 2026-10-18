@@ -18,9 +18,9 @@ class AvailabilityDisplayWidget extends StatelessWidget {
     if (normalized.isEmpty) {
       return Text(
         'No availability set',
-        style: TextStyle(
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w400,
           color: Colors.grey.shade400,
-          fontSize: 12,
           fontStyle: FontStyle.italic,
         ),
       );
@@ -32,9 +32,9 @@ class AvailabilityDisplayWidget extends StatelessWidget {
     if (orderedDays.isEmpty) {
       return Text(
         'No availability set',
-        style: TextStyle(
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w400,
           color: Colors.grey.shade400,
-          fontSize: 12,
           fontStyle: FontStyle.italic,
         ),
       );
@@ -92,8 +92,7 @@ class AvailabilityDisplayWidget extends StatelessWidget {
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
                             slot,
-                            style: TextStyle(
-                              fontSize: 11,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: slotColor,
                             ),

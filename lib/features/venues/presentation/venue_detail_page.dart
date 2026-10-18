@@ -98,9 +98,8 @@ class VenueDetailPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             venue.name,
-                            style: const TextStyle(
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               color: Colors.white,
-                              fontSize: 24,
                               fontWeight: FontWeight.w900,
                               shadows: [
                                 Shadow(
@@ -143,10 +142,9 @@ class VenueDetailPage extends StatelessWidget {
                         ),
                         child: Text(
                           '${venue.categoryEmoji} ${venue.categoryLabel}',
-                          style: TextStyle(
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: cs.primary,
-                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -160,8 +158,8 @@ class VenueDetailPage extends StatelessWidget {
                         const SizedBox(width: AppSpacing.xxs),
                         Text(
                           formatDistanceKm(venue.distanceKm!),
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w400,
                             color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
@@ -194,8 +192,8 @@ class VenueDetailPage extends StatelessWidget {
                           child: Text(
                             '${venue.rating.toStringAsFixed(1)} '
                             '(${venue.reviewCount} reviews)',
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w400,
                               color: cs.onSurface.withValues(alpha: 0.65),
                             ),
                           ),
@@ -208,8 +206,7 @@ class VenueDetailPage extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       '${venue.priceRange} ${venue.priceDisplay}',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: cs.onSurface.withValues(alpha: 0.7),
                       ),
@@ -229,8 +226,8 @@ class VenueDetailPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             venue.address!,
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w400,
                               color: cs.onSurface.withValues(alpha: 0.7),
                             ),
                           ),
@@ -252,8 +249,8 @@ class VenueDetailPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             venue.openingHours!,
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w400,
                               color: cs.onSurface.withValues(alpha: 0.7),
                               height: 1.35,
                             ),
@@ -274,8 +271,8 @@ class VenueDetailPage extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       venue.description!,
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w400,
                         color: cs.onSurface.withValues(alpha: 0.75),
                         height: 1.6,
                       ),

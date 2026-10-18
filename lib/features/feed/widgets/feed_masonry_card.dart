@@ -80,8 +80,7 @@ class FeedMasonryCard extends StatelessWidget {
                           caption,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             height: 1.3,
                             color: SmeetApp.smeetInk,
@@ -306,8 +305,7 @@ class _AuthorRow extends StatelessWidget {
             backgroundColor: SmeetApp.smeetMintLight,
             placeholder: Text(
               initial,
-              style: const TextStyle(
-                fontSize: 11,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: SmeetApp.smeetDeep,
                 decoration: TextDecoration.none,
@@ -319,8 +317,7 @@ class _AuthorRow extends StatelessWidget {
             backgroundColor: SmeetApp.smeetMint,
             child: Text(
               initial,
-              style: const TextStyle(
-                fontSize: 11,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
                 decoration: TextDecoration.none,
@@ -340,8 +337,7 @@ class _AuthorRow extends StatelessWidget {
               item.authorName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w500,
                 color: SmeetApp.smeetInk,
                 decoration: TextDecoration.none,
@@ -357,8 +353,7 @@ class _AuthorRow extends StatelessWidget {
         const SizedBox(width: 2),
         Text(
           '${item.likesCount}',
-          style: const TextStyle(
-            fontSize: 12,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w600,
             color: SmeetApp.smeetGrey,
             decoration: TextDecoration.none,

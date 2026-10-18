@@ -59,19 +59,18 @@ class ActivityBanner extends StatelessWidget {
                           incomingLikes == 1
                               ? '1 person wants to play with you 🎾'
                               : '$incomingLikes people want to play with you 🎾',
-                          style: const TextStyle(
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 12,
                             height: 1.3,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxs),
-                        const Text(
+                        Text(
                           'Tap to connect',
-                          style: TextStyle(
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w400,
                             color: Colors.white70,
-                            fontSize: 11,
                           ),
                         ),
                       ],
@@ -113,19 +112,18 @@ class ActivityBanner extends StatelessWidget {
                           todayGames == 1
                               ? '1 game near you today'
                               : '$todayGames games near you today',
-                          style: const TextStyle(
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 12,
                             height: 1.3,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxs),
-                        const Text(
+                        Text(
                           'Find a game →',
-                          style: TextStyle(
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w400,
                             color: Colors.white,
-                            fontSize: 11,
                           ),
                         ),
                       ],
