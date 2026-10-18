@@ -516,7 +516,7 @@ class _InboxPageState extends State<InboxPage>
     return const AppEmptyState(
       icon: Icons.chat_bubble_outline,
       title: 'No chats yet.',
-      subtitle: 'Match with someone from Swipe to start a conversation.',
+      subtitle: 'Connect with a player on Swipe to start a conversation.',
     );
   }
 

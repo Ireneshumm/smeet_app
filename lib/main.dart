@@ -1076,7 +1076,7 @@ class _AuthPageState extends State<AuthPage> {
                         child: FittedBox(
                           fit: BoxFit.cover,
                           child: Text(
-                            '🎾 🏀 ⚽ 🏃 🏸 ⛳ 🏊',
+                            '🎾 ⛳ 🎿 🤿',
                             style: TextStyle(
                               fontSize: 120,
                               letterSpacing: 4,
@@ -1087,14 +1087,39 @@ class _AuthPageState extends State<AuthPage> {
                       ),
                     ),
                   ),
-                  Text(
-                    'Smeet',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: cs.primary,
-                      letterSpacing: -0.5,
-                    ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Smeet',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: cs.primary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Meet people through premium sport',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tennis · Golf · Ski · Dive',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -5531,7 +5556,7 @@ class _ChatPageState extends State<ChatPage> {
                 : 'No chats yet',
             subtitle: _user == null
                 ? 'Sign in to message people you meet on Smeet.'
-                : 'Match with someone on Swipe to start a conversation.',
+                : 'Connect with a player on Swipe to start a conversation.',
             actionLabel: _user == null ? 'Sign in' : null,
             onAction: _user == null
                 ? () {

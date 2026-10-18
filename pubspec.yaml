@@ -1,8 +1,8 @@
 name: smeet_app
-description: A new Flutter project.
+description: "Smeet - meet people through premium sport: tennis, golf, ski and dive."
 publish_to: "none"
 
-version: 1.0.1+16
+version: 1.0.1+17
 
 environment:
   sdk: ^3.10.4
